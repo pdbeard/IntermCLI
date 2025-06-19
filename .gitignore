@@ -1,0 +1,139 @@
+# 🐍 Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 🔧 Virtual Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.python-version
+
+# 📝 IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# 🔍 Testing & Coverage
+.coverage
+.pytest_cache/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+htmlcov/
+.cache
+nosetests.xml
+
+# 📊 Logs & Debug
+*.log
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# 🔒 Secrets & Config
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+config/local.json
+config/secrets.json
+*.key
+*.pem
+*.p12
+
+# 🗄️ Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# 📦 Dependencies
+node_modules/
+.npm/
+.yarn/
+.pnpm-store/
+
+# 🏗️ Build artifacts
+*.tar.gz
+*.zip
+*.deb
+*.rpm
+*.dmg
+*.pkg
+
+# 📋 OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# 🔄 Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+
+# 📈 Performance & profiling
+.prof
+*.prof
+
+# 🧪 IntermCLI specific
+# User data and cache
+.intermcli_cache/
+user_configs/
+*.intermcli.json.bak
+
+# Development and testing
+test_results/
+benchmark_results/
+.test_cache/
+test_data/generated/
+
+# Documentation builds
+docs/_build/
+docs/build/
+site/
+
+# Package manager files
+poetry.lock
+Pipfile.lock
+requirements-lock.txt
+
+# Security scanning
+.bandit
+.safety

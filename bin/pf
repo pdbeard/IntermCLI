@@ -1,0 +1,20 @@
+#!/bin/bash
+# Project Finder wrapper script
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_FINDER_PATH="$SCRIPT_DIR/../lib/project-finder.py"
+
+# Run the Python script and capture output
+output=$(python3 "$PROJECT_FINDER_PATH")
+echo "$output"
+
+# Check if there's a CD_TO command in the output
+cd_path=$(echo "$output" | grep "^CD_TO:" | cut -d: -f2-)
+
+if [ -n "$cd_path" ]; then
+    echo "📂 Navigating to: $cd_path"
+    cd "$cd_path"
+    # Start a new shell in the project directory
+    exec $SHELL
+fi
