@@ -2,7 +2,7 @@
 
 ## Overview
 
-IntermCLI is designed as a modular, extensible collection of interactive terminal utilities following the principle of "progressive enhancement" - core functionality works with Python standard library, with optional dependencies providing enhanced features.
+IntermCLI is designed as a collection of independent, self-contained terminal utilities that can optionally share common functionality when it makes sense. Each tool is designed to work standalone while benefiting from shared infrastructure for dependency management, configuration, and documentation.
 
 ## 📁 Project Structure
 
@@ -10,463 +10,339 @@ IntermCLI is designed as a modular, extensible collection of interactive termina
 intermcli/
 ├── README.md                  # Project overview, quick start
 ├── LICENSE                    # GPL v3
-├── CHANGELOG.md              # Version history
-├── requirements.txt          # Optional dependencies
+├── CHANGELOG.md              # Version history for entire suite
+├── requirements.txt          # Optional dependencies for all tools
 ├── requirements-dev.txt      # Development dependencies
-├── install.sh               # Installation script
+├── install.sh               # Installation script for all tools
 ├── .gitignore
 ├── .github/                 # GitHub-specific files
 │   ├── ISSUE_TEMPLATE/
 │   │   ├── bug_report.md
 │   │   └── feature_request.md
 │   ├── PULL_REQUEST_TEMPLATE.md
-│   └── workflows/           # GitHub Actions (if used)
-├── docs/                    # Documentation home
-│   ├── DESIGN.md           # Design goals document
-│   ├── CONTRIBUTING.md     # How to contribute
+│   └── workflows/           # GitHub Actions
+├── docs/                    # Suite-wide documentation
+│   ├── DESIGN.md           # Overall design philosophy
+│   ├── CONTRIBUTING.md     # How to contribute to any tool
 │   ├── ARCHITECTURE.md     # This document
-│   ├── CONFIGURATION.md    # Config file documentation
-│   ├── commands/           # Command-specific docs
-│   │   ├── port-scan.md
-│   │   └── project-find.md
-│   └── examples/           # Usage examples
+│   ├── CONFIGURATION.md    # Shared config documentation
+│   ├── tools/              # Individual tool documentation
+│   │   ├── port-scanner.md
+│   │   ├── project-finder.md
+│   │   └── tool-template.md # Template for new tools
+│   └── examples/           # Cross-tool usage examples
 │       ├── basic-usage.md
-│       └── advanced-usage.md
-├── bin/                    # Executable entry points
-│   └── interm             # Main CLI entry point
-├── lib/                    # Library code
-│   ├── core/              # Core functionality (stdlib only)
-│   │   ├── __init__.py
-│   │   ├── scanner.py     # Port scanning core
-│   │   ├── finder.py      # Project discovery core
-│   │   ├── config.py      # Configuration management
-│   │   └── utils.py       # Common utilities
-│   ├── enhanced/          # Enhanced features (optional deps)
-│   │   ├── __init__.py
-│   │   ├── http_detect.py # Enhanced HTTP detection
-│   │   ├── rich_output.py # Rich terminal formatting
-│   │   └── interactive.py # Interactive components
-│   └── utils/             # Shared utilities
-│       ├── __init__.py
-│       ├── network.py     # Network utilities
-│       ├── filesystem.py  # File system helpers
-│       └── terminal.py    # Terminal interaction
-├── config/                # Configuration files
-│   ├── defaults.json      # Default configuration
-│   ├── ports.json         # Port definitions
-│   └── README.md         # Config documentation
-├── tests/                 # Test files
+│       └── workflow-examples.md
+├── config/                 # Shared/global configuration
+│   ├── defaults.json       # Suite-wide defaults
+│   ├── enhancement-deps.json # Optional dependency mappings
+│   └── README.md          # Config system documentation
+├── tools/                  # Independent tool implementations
+│   ├── port-scanner/
+│   │   ├── port-scan.py    # Main executable (your current lib/port-check.py)
+│   │   ├── config/
+│   │   │   └── ports.json  # Tool-specific config
+│   │   ├── README.md       # Tool-specific docs
+│   │   └── tests/          # Tool-specific tests (optional)
+│   ├── project-finder/
+│   │   ├── project-find.py # Main executable (your current lib/project-finder.py)
+│   │   ├── config/
+│   │   │   └── defaults.json
+│   │   ├── README.md
+│   │   └── tests/
+│   └── template-tool/      # Template for new tools
+│       ├── tool-name.py
+│       ├── config/
+│       ├── README.md
+│       └── tests/
+├── shared/                 # Shared utilities (only when proven needed)
 │   ├── __init__.py
-│   ├── test_core.py       # Core functionality tests
-│   ├── test_enhanced.py   # Enhanced features tests
-│   ├── test_integration.py # Integration tests
-│   └── fixtures/          # Test data
-└── examples/             # Example scripts and usage
-    ├── sample-configs/   # Example configurations
-    └── scripts/          # Example usage scripts
+│   ├── config_loader.py    # Common config loading patterns
+│   ├── enhancement_loader.py # Progressive enhancement helpers
+│   └── network_utils.py    # Common network utilities
+├── bin/                    # Executable entry points
+│   ├── port-scan          # Symlink/wrapper to tools/port-scanner/port-scan.py
+│   ├── project-find       # Symlink/wrapper to tools/project-finder/project-find.py
+│   ├── interm             # Optional unified dispatcher
+│   └── install-tool       # Script to add new tools
+├── tests/                  # Suite-wide integration tests
+│   ├── test_integration.py # Cross-tool workflows
+│   ├── test_shared.py     # Shared utilities tests
+│   └── fixtures/          # Common test data
+└── examples/              # Example configurations and scripts
+    ├── configs/           # Example config files
+    ├── scripts/           # Usage examples
+    └── workflows/         # Multi-tool workflow examples
 ```
 
 ## 🎯 Core Architecture Principles
 
-### 1. Progressive Enhancement
+### 1. Tool Independence First
 
-The architecture follows a layered approach where each layer provides progressively enhanced functionality:
+Each tool in `tools/` is designed to be:
+- **Self-contained**: Can run with just its own directory
+- **Independently testable**: Has its own test suite
+- **Minimally coupled**: Uses shared utilities only when there's clear benefit
+- **Separately documented**: Complete documentation in its README
 
-```
-┌─────────────────────────────────────┐
-│        User Interface Layer        │  ← Interactive CLI, Rich output
-├─────────────────────────────────────┤
-│       Enhanced Features Layer      │  ← requests, rich, click
-├─────────────────────────────────────┤
-│         Core Library Layer         │  ← Python stdlib only
-├─────────────────────────────────────┤
-│       Configuration Layer          │  ← JSON configs, user prefs
-└─────────────────────────────────────┘
-```
+### 2. Progressive Sharing
 
-### 2. Dependency Management
-
-**Required Dependencies:**
-- Python 3.6+
-- Standard library only for core functionality
-
-**Optional Dependencies:**
-- `requests` - Enhanced HTTP service detection
-- `urllib3` - Better HTTP handling and SSL
-- `rich` - Enhanced terminal formatting
-- `click` - Advanced CLI parsing and interaction
-
-**Fallback Strategy:**
-- All features gracefully degrade when optional dependencies are missing
-- Clear feedback about available/missing capabilities
-- Core functionality always available
-
-### 3. Modular Design
-
-Each module has a single responsibility and clear interfaces:
+Shared utilities are created only when:
+- Multiple tools implement the same pattern
+- There's clear benefit to consolidation
+- The abstraction is stable and well-defined
 
 ```python
-# Example module structure
-lib/
-├── core/
-│   ├── scanner.py     # Port scanning logic
-│   ├── finder.py      # Project discovery
-│   └── config.py      # Configuration management
-├── enhanced/
-│   ├── http_detect.py # Enhanced HTTP detection
-│   └── rich_output.py # Rich terminal output
-└── utils/
-    ├── network.py     # Network utilities
-    └── terminal.py    # Terminal helpers
+# Example: Only create shared/config_loader.py when 3+ tools need it
+# Otherwise, each tool handles its own config loading
 ```
 
-## 🔧 Core Components
+### 3. Unified Experience
 
-### Configuration System
+Despite independence, tools provide consistent:
+- Command-line interface patterns
+- Configuration file formats  
+- Error messaging and output
+- Installation and update procedures
 
-**File Hierarchy:**
-1. System defaults (`config/defaults.json`)
-2. User global config (`~/.config/intermcli/config.json`)
-3. Project local config (`.intermcli.json`)
-4. Command line arguments
+## 🔧 Tool Development Pattern
 
-**Configuration Loading:**
+### Individual Tool Structure
+
+Each tool follows this pattern:
+
 ```python
-# lib/core/config.py
-class ConfigManager:
-    def __init__(self):
-        self.config = self._load_hierarchical_config()
-    
-    def _load_hierarchical_config(self):
-        # Load and merge configs in priority order
-        pass
-    
-    def get(self, key, default=None):
-        # Get config value with fallback
-        pass
+# tools/tool-name/tool-name.py
+#!/usr/bin/env python3
+"""
+Standalone tool that can optionally use shared utilities.
+"""
+import sys
+import os
+
+# Add shared utilities to path if available
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SHARED_DIR = os.path.join(os.path.dirname(os.path.dirname(SCRIPT_DIR)), 'shared')
+if os.path.exists(SHARED_DIR):
+    sys.path.insert(0, SHARED_DIR)
+
+# Core tool functionality (always works)
+def core_functionality():
+    """Tool's main logic using only stdlib"""
+    pass
+
+# Enhanced functionality (graceful degradation)
+def enhanced_functionality():
+    """Enhanced features with optional dependencies"""
+    try:
+        import requests  # or other optional deps
+        # Enhanced implementation
+    except ImportError:
+        # Fallback to core functionality
+        return core_functionality()
+
+# Optional shared utility usage
+def load_config():
+    """Load configuration with optional shared utilities"""
+    try:
+        from config_loader import load_hierarchical_config
+        return load_hierarchical_config(tool_name='tool-name')
+    except ImportError:
+        # Fallback to tool-specific config loading
+        return load_tool_config()
+
+if __name__ == '__main__':
+    main()
 ```
 
-### Port Scanner Architecture
+### Configuration Strategy
 
-**Core Scanner (`lib/core/scanner.py`):**
-- Basic port connectivity checking
-- Simple service detection via banner grabbing
-- Uses only Python standard library (`socket`, `threading`)
+**Hierarchical Loading (when shared/config_loader.py exists):**
+1. Suite defaults (`config/defaults.json`)
+2. Tool defaults (`tools/tool-name/config/defaults.json`)
+3. User global (`~/.config/intermcli/config.json`)
+4. User tool-specific (`~/.config/intermcli/tool-name.json`)
+5. Project local (`.intermcli.json`)
+6. Command line arguments
 
-**Enhanced Scanner (`lib/enhanced/http_detect.py`):**
-- HTTP/HTTPS service detection with `requests`
-- SSL certificate analysis
-- Advanced service fingerprinting
-- Framework detection (Django, Flask, React, etc.)
+**Fallback Loading (when shared utilities not available):**
+- Tool loads its own `config/defaults.json`
+- Optionally checks for user config files
+- Command line arguments override
 
-**Service Detection Pipeline:**
+### Dependency Management
+
+**Suite-level dependencies (`requirements.txt`):**
+```
+# Optional enhancements for any tool
+requests>=2.25.0
+rich>=10.0.0
+click>=8.0.0
+```
+
+**Tool-level dependency checking:**
 ```python
-def detect_service(host, port, timeout=3):
-    # 1. Basic connectivity check
-    if not check_port_open(host, port, timeout):
-        return None
+# In each tool
+OPTIONAL_DEPS = {
+    'requests': 'Enhanced HTTP detection',
+    'rich': 'Beautiful terminal output',
+    'click': 'Advanced CLI features'
+}
+
+def check_enhancements():
+    """Report available/missing enhancements"""
+    available = []
+    missing = []
     
-    # 2. Protocol-specific detection
-    if port in HTTP_PORTS:
-        return detect_http_service(host, port)
-    elif port == 22:
-        return detect_ssh_service(host, port)
-    elif port in DATABASE_PORTS:
-        return detect_database_service(host, port)
+    for dep, description in OPTIONAL_DEPS.items():
+        try:
+            __import__(dep)
+            available.append(f"✅ {dep}: {description}")
+        except ImportError:
+            missing.append(f"❌ {dep}: {description}")
     
-    # 3. Generic banner grabbing
-    return detect_generic_service(host, port)
+    return available, missing
 ```
 
-### Project Finder Architecture
+## 🚀 Installation & Usage
 
-**Core Finder (`lib/core/finder.py`):**
-- Git repository discovery
-- Basic project type detection
-- File system traversal with configurable patterns
+### Installation Process
 
-**Enhanced Finder (`lib/enhanced/interactive.py`):**
-- Interactive navigation with `rich`
-- Fuzzy search capabilities
-- Advanced project metadata extraction
-
-**Project Discovery Pipeline:**
-```python
-class ProjectFinder:
-    def __init__(self, config):
-        self.config = config
-        self.search_paths = config.get('search_paths', [])
-    
-    def discover_projects(self):
-        # 1. Scan configured directories
-        # 2. Filter by project patterns (.git, package.json, etc.)
-        # 3. Extract metadata (language, last modified, etc.)
-        # 4. Return structured project list
-        pass
-```
-
-## 🎨 User Interface Layer
-
-### Command Line Interface
-
-**Main Entry Point (`bin/interm`):**
 ```bash
-#!/bin/bash
-# Route to appropriate Python module based on command
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec python3 -m intermcli.cli "$@"
+# install.sh handles all tools
+./install.sh
+
+# Or install individual tools
+./install.sh --tool port-scanner
+./install.sh --tool project-finder
 ```
 
-**CLI Structure:**
-```python
-# lib/cli.py (main CLI dispatcher)
-import argparse
-from .core import scanner, finder
-from .enhanced import rich_output
+### Usage Patterns
 
-def main():
-    parser = argparse.ArgumentParser(prog='interm')
-    subparsers = parser.add_subparsers(dest='command')
-    
-    # Port scanner command
-    scan_parser = subparsers.add_parser('scan')
-    scan_parser.add_argument('host', default='localhost')
-    
-    # Project finder command  
-    find_parser = subparsers.add_parser('find')
-    
-    args = parser.parse_args()
-    
-    if args.command == 'scan':
-        run_port_scanner(args)
-    elif args.command == 'find':
-        run_project_finder(args)
+**Individual tool usage:**
+```bash
+# Direct execution
+./tools/port-scanner/port-scan.py localhost
+
+# Via installed binary
+port-scan localhost
+
+# With global config
+port-scan --config ~/.config/intermcli/port-scanner.json localhost
 ```
 
-### Output Formatting
+**Unified dispatcher (optional):**
+```bash
+# Via main entry point
+interm port-scan localhost
+interm project-find ~/dev
 
-**Basic Output (`lib/core/output.py`):**
-```python
-def format_port_result(port, service, status):
-    icon = "✅" if status == "open" else "❌"
-    return f"Port {port:5} | {service:20} | {icon} {status.upper()}"
+# List available tools
+interm --list-tools
 
-def format_project_list(projects):
-    for project in projects:
-        print(f"📁 {project['name']} - {project['path']}")
+# Get help for specific tool
+interm port-scan --help
 ```
 
-**Enhanced Output (`lib/enhanced/rich_output.py`):**
-```python
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
+## 🔄 Adding New Tools
 
-class RichFormatter:
-    def __init__(self):
-        self.console = Console()
-    
-    def format_port_results(self, results):
-        table = Table(title="Port Scan Results")
-        table.add_column("Port", style="cyan")
-        table.add_column("Service", style="magenta")
-        table.add_column("Status", style="green")
-        
-        for result in results:
-            table.add_row(str(result.port), result.service, result.status)
-        
-        self.console.print(table)
-```
+### Tool Creation Process
 
-## 🔌 Plugin Architecture (Future)
+1. **Copy template:**
+   ```bash
+   cp -r tools/template-tool tools/my-new-tool
+   ```
 
-### Plugin Interface
+2. **Implement tool logic:**
+   - Core functionality in `tools/my-new-tool/my-new-tool.py`
+   - Tool-specific config in `tools/my-new-tool/config/`
+   - Documentation in `tools/my-new-tool/README.md`
 
-```python
-# lib/core/plugin.py
-class PluginInterface:
-    def __init__(self, config):
-        self.config = config
-    
-    def get_name(self):
-        """Return plugin name"""
-        raise NotImplementedError
-    
-    def get_commands(self):
-        """Return list of commands this plugin provides"""
-        raise NotImplementedError
-    
-    def execute(self, command, args):
-        """Execute plugin command"""
-        raise NotImplementedError
+3. **Add to suite:**
+   - Update main `README.md` with tool description
+   - Add tool documentation to `docs/tools/my-new-tool.md`
+   - Create binary in `bin/my-new-tool`
+   - Update `install.sh` to include new tool
 
-class PluginManager:
-    def __init__(self):
-        self.plugins = []
-    
-    def discover_plugins(self):
-        # Scan for plugins in standard locations
-        pass
-    
-    def load_plugin(self, plugin_path):
-        # Load and register plugin
-        pass
-```
+4. **Optional shared utilities:**
+   - Only extract to `shared/` if pattern used by 3+ tools
+   - Update existing tools to use shared utility
+   - Add tests for shared functionality
 
-### Plugin Discovery
+### Tool Requirements
 
-**Plugin Locations:**
-1. `~/.config/intermcli/plugins/`
-2. `/usr/local/share/intermcli/plugins/`
-3. `./plugins/` (project-local)
-
-## 🔄 Data Flow
-
-### Port Scanner Flow
-
-```mermaid
-graph TD
-    A[CLI Input] --> B[Parse Arguments]
-    B --> C[Load Configuration]
-    C --> D{Enhanced Mode?}
-    D -->|Yes| E[Enhanced Scanner]
-    D -->|No| F[Core Scanner]
-    E --> G[Service Detection]
-    F --> G
-    G --> H{Output Format}
-    H -->|Basic| I[Text Output]
-    H -->|Rich| J[Rich Output]
-```
-
-### Project Finder Flow
-
-```mermaid
-graph TD
-    A[CLI Input] --> B[Load Config]
-    B --> C[Scan Directories]
-    C --> D[Filter Projects]
-    D --> E[Extract Metadata]
-    E --> F{Interactive Mode?}
-    F -->|Yes| G[Rich Interface]
-    F -->|No| H[List Output]
-    G --> I[User Selection]
-    I --> J[Open in Editor]
-```
+Each tool must:
+- Work standalone with Python stdlib
+- Provide `--help` and `--version` flags
+- Use consistent exit codes (0=success, 1=error, 2=invalid usage)
+- Handle missing optional dependencies gracefully
+- Include basic error handling and user feedback
 
 ## 🧪 Testing Strategy
 
-### Test Structure
+### Multi-level Testing
 
-```python
-# tests/test_core.py
-class TestPortScanner:
-    def test_basic_port_check(self):
-        # Test core port checking functionality
-        pass
-    
-    def test_service_detection_fallback(self):
-        # Test that service detection works without optional deps
-        pass
+**Tool-level tests:**
+```bash
+# Each tool can have its own tests
+cd tools/port-scanner && python -m pytest tests/
 
-# tests/test_enhanced.py  
-class TestEnhancedFeatures:
-    def test_http_detection_with_requests(self):
-        # Test enhanced HTTP detection
-        pass
-    
-    def test_rich_output_formatting(self):
-        # Test rich output formatting
-        pass
+# Or via main test runner
+python -m pytest tools/port-scanner/tests/
+```
 
-# tests/test_integration.py
-class TestIntegration:
-    def test_full_port_scan_workflow(self):
-        # Test complete port scanning workflow
-        pass
-    
-    def test_project_finder_workflow(self):
-        # Test complete project finding workflow
-        pass
+**Suite-level tests:**
+```bash
+# Integration tests
+python -m pytest tests/test_integration.py
+
+# Shared utilities tests
+python -m pytest tests/test_shared.py
+
+# All tests
+python -m pytest
 ```
 
 ### Testing Matrix
 
-| Component | Basic Tests | Enhanced Tests | Integration Tests |
-|-----------|-------------|----------------|-------------------|
-| Port Scanner | ✅ Core connectivity | ✅ HTTP detection | ✅ Full workflow |
-| Project Finder | ✅ Git discovery | ✅ Interactive UI | ✅ Editor integration |
-| Configuration | ✅ File loading | ✅ User preferences | ✅ Override hierarchy |
-| Output | ✅ Text formatting | ✅ Rich formatting | ✅ Terminal compatibility |
+| Component | Tool Tests | Integration Tests | Shared Tests |
+|-----------|------------|-------------------|--------------|
+| Port Scanner | ✅ Core logic | ✅ CLI interface | N/A |
+| Project Finder | ✅ Discovery logic | ✅ Editor integration | N/A |
+| Config Loader | N/A | ✅ Cross-tool config | ✅ Shared utility |
+| Install Script | N/A | ✅ Full installation | N/A |
 
-## 🚀 Deployment & Distribution
+## 🔮 Future Evolution
 
-### Installation Methods
+### When to Refactor
 
-1. **Direct Install:** `./install.sh`
-2. **Package Managers:** Future pip/homebrew packages
-3. **Container:** Future Docker image for isolated usage
+Extract to `shared/` when:
+- **3+ tools** implement the same pattern
+- **Clear abstraction** emerges naturally
+- **Maintenance burden** of duplication becomes significant
+- **User requests** for consistency across tools
 
-### Configuration Management
+### Plugin Architecture (Future)
 
-**System Integration:**
-- Shell completion scripts
-- Man pages generation
-- Desktop integration (future)
+Eventually, the tool-based architecture naturally supports plugins:
 
-**User Data:**
-- Config directory: `~/.config/intermcli/`
-- Cache directory: `~/.cache/intermcli/`
-- Data directory: `~/.local/share/intermcli/`
+```
+tools/
+├── core-tools/          # Built-in tools
+│   ├── port-scanner/
+│   └── project-finder/
+└── plugins/            # Third-party tools
+    ├── git-tools/
+    ├── docker-tools/
+    └── custom-scanner/
+```
 
-## 🔐 Security Considerations
+### Migration Path
 
-### Network Scanning
-- Respect rate limits and timeouts
-- Provide clear feedback about scanning activities
-- Allow configuration of scan intensity
+Current monolithic tools → Independent tools → Shared utilities → Plugin system
 
-### File System Access
-- Limit search to configured directories
-- Respect `.gitignore` and permission boundaries
-- Secure handling of file paths and user input
-
-### Configuration Security
-- Validate configuration file contents
-- Sanitize user-provided paths and commands
-- Clear separation between trusted and untrusted input
-
-## 📈 Performance Considerations
-
-### Scalability
-- Concurrent scanning with configurable thread pools
-- Efficient file system traversal with early termination
-- Caching of expensive operations (project discovery)
-
-### Memory Management
-- Streaming processing for large result sets
-- Configurable result limits
-- Efficient data structures for common operations
-
-### Startup Performance
-- Lazy loading of optional dependencies
-- Fast-path for common operations
-- Minimal import overhead for core functionality
-
-## 🔮 Future Architecture Enhancements
-
-### Planned Features
-1. **Plugin System** - Third-party command extensions
-2. **Configuration UI** - Interactive configuration wizard
-3. **Remote Scanning** - Distributed scanning capabilities
-4. **Result Caching** - Persistent result storage
-5. **Integration APIs** - RESTful API for tool integration
-
-### Architectural Evolution
-- Migration to async/await for I/O operations
-- GraphQL API for complex queries
-- WebUI for remote management
-- Integration with monitoring systems
+This evolution happens naturally as needs arise, rather than over-engineering upfront.
 
 ---
 
-This architecture supports the design goals of being interactive, terminal-native, and progressively enhanced while maintaining clean separation of concerns and extensibility for future enhancements.
+This architecture embraces the "start simple, evolve naturally" philosophy while maintaining the option for shared infrastructure when it proves valuable.
