@@ -1,4 +1,41 @@
 #!/usr/bin/env python3
+"""
+find-projects: Interactive development project discovery and navigation
+
+This tool follows the IntermCLI architecture with progressive enhancement:
+- Core functionality works with Python stdlib only
+- Enhanced features available with optional dependencies (rich, gitpython, click)
+- Hierarchical configuration loading (tool -> suite -> environment -> defaults)
+- Backwards compatibility with legacy PF_ environment variables
+
+Usage:
+    find-projects [options]
+    
+Examples:
+    find-projects              # Interactive project browser
+    find-projects --help       # Show this help
+    find-projects --version    # Show version info
+    find-projects --config     # Show configuration debug info
+
+Configuration Priority (highest to lowest):
+    1. Environment variables (FIND_PROJECTS_* or legacy PF_*)
+    2. Tool-specific config (tools/find-projects/config/defaults.json)
+    3. Suite-wide config (config/defaults.conf) 
+    4. Auto-detected defaults based on platform
+
+Architecture Notes:
+    - Progressive enhancement: graceful degradation without optional deps
+    - Shared config loading via shared/config_loader.py when available
+    - Tool-specific fallback config loading for independence
+    - Consistent CLI patterns across all IntermCLI tools
+    
+Contributing:
+    - Follow action-target naming convention (find-projects ✓)
+    - Test with both minimal and full dependency sets
+    - Update tool README for any new features
+    - Use tool:find-projects label for related issues/PRs
+"""
+
 
 import os
 import sys

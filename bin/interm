@@ -1,0 +1,54 @@
+# bin/interm (pseudocode)
+#!/usr/bin/env python3
+
+
+
+# Possible commands for the 'interm' suite:
+
+# Suite Management (Primary Purpose)
+
+# interm install                    # Manage installation
+# interm config                     # Global configuration
+# interm update                     # Update all tools
+# interm list                       # Show available tools
+# interm help scan-ports           # Tool-specific help
+# interm version                   # Suite version info
+
+# Tool Discovery & Documentation
+
+# interm tools                     # List all available tools
+# interm examples                  # Show cross-tool workflows
+# interm docs                      # Open documentation
+# interm status                    # Check installation/dependencies
+
+# Simple Delegation (Secondary)
+
+# interm scan-ports localhost      # Same as: scan-ports localhost
+# interm find-projects             # Same as: find-projects
+
+
+
+def main():
+    if len(sys.argv) < 2:
+        show_suite_help()
+        return
+    
+    command = sys.argv[1]
+    
+    # Suite management commands
+    if command in ['install', 'config', 'update', 'list', 'status']:
+        handle_suite_command(command, sys.argv[2:])
+    
+    # Tool delegation
+    elif tool_exists(command):
+        delegate_to_tool(command, sys.argv[2:])
+    
+    # Default help
+    else:
+        show_suite_help()
+
+def delegate_to_tool(tool_name, args):
+    """Simply call the standalone tool"""
+    import subprocess
+    tool_path = find_tool_executable(tool_name)
+    subprocess.run([tool_path] + args)

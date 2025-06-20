@@ -1,12 +1,20 @@
 #!/bin/bash
-# Project Finder wrapper script
+# IntermCLI find-projects wrapper
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_FINDER_PATH="$SCRIPT_DIR/../lib/project-finder.py"
+
+# Path to the find-projects tool
+TOOL_PATH="$SCRIPT_DIR/../tools/find-projects/find-projects.py"
+
+# Check if tool exists
+if [ ! -f "$TOOL_PATH" ]; then
+    echo "❌ find-projects tool not found at: $TOOL_PATH"
+    exit 1
+fi
 
 # Run the Python script and capture output
-output=$(python3 "$PROJECT_FINDER_PATH")
+output=$(python3 "$TOOL_PATH" "$@")
 echo "$output"
 
 # Check if there's a CD_TO command in the output

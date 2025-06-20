@@ -1,0 +1,34 @@
+- Ditermine github strat
+- Update docs with new strategy 
+
+
+- Add naming convention
+
+### 2. Action-Target Naming Convention
+
+All tools follow the `action-target` pattern for consistency and discoverability:
+
+**Current Tools:**
+- `scan-ports` - Scans network ports for services
+- `find-projects` - Finds and navigates development projects
+
+**Future Tool Examples:**
+- `check-services` - Enhanced service detection and analysis
+- `list-processes` - Process monitoring and management
+- `monitor-network` - Network traffic monitoring
+- `manage-configs` - Configuration file management
+- `analyze-logs` - Log file analysis and filtering
+
+**Benefits of Action-Target Pattern:**
+- **Self-documenting**: Command name clearly indicates function
+- **Tab-completable**: Easy discovery with shell completion
+- **Consistent**: All tools follow same `verb-noun` structure
+- **Professional**: Matches established CLI patterns
+
+
+
+
+
+
+
+
