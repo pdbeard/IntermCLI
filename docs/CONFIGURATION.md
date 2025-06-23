@@ -2,658 +2,545 @@
 
 ## Overview
 
-IntermCLI uses a hierarchical configuration system that allows for flexible customization at multiple levels. Configuration files use JSON format for simplicity and cross-platform compatibility.
+IntermCLI uses a hierarchical configuration system that allows for flexible customization at multiple levels. Configuration files use **TOML format** for better readability, comment support, and maintainability.
 
 ## 📁 Configuration File Locations
 
 Configuration files are loaded in the following priority order (later files override earlier ones):
 
-1. **System Defaults** - `config/defaults.json` (in repository)
-2. **User Global Config** - `~/.config/intermcli/config.json`
-3. **Project Local Config** - `.intermcli.json` (in current directory)
-4. **Command Line Arguments** - Override any config value
+1. **Tool Defaults** - `tools/{tool-name}/config/defaults.toml` (in repository)
+2. **User Global Config** - `~/.config/intermcli/config.toml`
+3. **User Tool-Specific** - `~/.config/intermcli/{tool-name}.toml`
+4. **Project Local Config** - `.intermcli.toml` (in current directory)
+5. **Environment Variables** - `TOOLNAME_SETTING=value`
+6. **Command Line Arguments** - Override any config value
 
 ### Configuration Directory Structure
 
 ```
 ~/.config/intermcli/
-├── config.json          # Main user configuration
-├── ports.json           # Custom port definitions
-├── projects.json        # Project discovery settings
+├── config.toml          # Main user configuration
+├── scan-ports.toml      # Port scanner specific settings
+├── find-projects.toml   # Project finder specific settings
 ├── plugins/             # User plugins directory
 └── cache/              # Cached data
 ```
 
-## 🔧 Core Configuration
+## 🔧 Tool-Specific Configuration
 
-### Default Configuration (`config/defaults.json`)
+### Scan Ports Configuration (`tools/scan-ports/config/defaults.toml`)
 
-```json
-{
-  "version": "1.0.0",
-  "general": {
-    "default_timeout": 3,
-    "max_threads": 50,
-    "output_format": "auto",
-    "interactive_mode": true,
-    "show_progress": true,
-    "color_output": true,
-    "emoji_output": true
-  },
-  "scanner": {
-    "default_host": "localhost",
-    "service_detection": true,
-    "enhanced_detection": "auto",
-    "show_closed_ports": false,
-    "confidence_threshold": "medium",
-    "scan_delay": 0,
-    "retry_attempts": 1
-  },
-  "finder": {
-    "search_paths": [
-      "~/Development",
-      "~/Projects",
-      "~/Code",
-      "~/workspace"
-    ],
-    "max_depth": 3,
-    "follow_symlinks": false,
-    "ignore_patterns": [
-      ".git",
-      "node_modules",
-      "__pycache__",
-      ".venv",
-      ".env"
-    ],
-    "project_indicators": [
-      ".git",
-      "package.json",
-      "requirements.txt",
-      "Cargo.toml",
-      "go.mod",
-      "pom.xml"
-    ]
-  },
-  "output": {
-    "verbosity": "normal",
-    "timestamp": false,
-    "save_results": false,
-    "results_dir": "~/.local/share/intermcli/results"
-  },
-  "ui": {
-    "confirm_external_scans": true,
-    "confirm_destructive_actions": true,
-    "auto_open_editor": false,
-    "preferred_editor": "auto"
-  }
-}
+```toml
+# Port scanning configuration
+# Organized by service category for easy reference and scanning
+
+[port_lists.common]
+description = "Most commonly used development and service ports"
+
+[port_lists.common.ports]
+"22" = "SSH"
+"80" = "HTTP"
+"443" = "HTTPS"
+"3000" = "Node.js/React Dev"
+"3001" = "Node.js Alt"
+"4000" = "Ruby/Jekyll"
+"5000" = "Flask/Python Dev"
+"8000" = "Django/Python Dev"
+"8080" = "HTTP Alt/Tomcat"
+"9000" = "SonarQube/PHP-FPM"
+"5432" = "PostgreSQL"
+"3306" = "MySQL/MariaDB"
+"6379" = "Redis"
+"27017" = "MongoDB"
+"9200" = "Elasticsearch"
+"5672" = "RabbitMQ"
+
+[port_lists.web]
+description = "Web development and HTTP services"
+
+[port_lists.web.ports]
+"80" = "HTTP"
+"443" = "HTTPS"
+"8080" = "HTTP Alt"
+"8443" = "HTTPS Alt"
+"3000" = "Node.js/React Dev"
+"3001" = "Node.js Alt"
+"4000" = "Ruby/Jekyll"
+"5000" = "Flask Dev"
+"8000" = "Django Dev"
+"8888" = "Jupyter Notebook"
+"9000" = "SonarQube"
+"4200" = "Angular Dev"
+"3030" = "Meteor Dev"
+"8081" = "Tomcat Manager"
+"9090" = "Prometheus"
+
+[port_lists.database]
+description = "Database services"
+
+[port_lists.database.ports]
+"3306" = "MySQL/MariaDB"
+"5432" = "PostgreSQL"
+"6379" = "Redis"
+"27017" = "MongoDB"
+"9200" = "Elasticsearch"
+"9300" = "Elasticsearch Transport"
+"5984" = "CouchDB"
+"8086" = "InfluxDB"
+"7000" = "Cassandra"
+"7001" = "Cassandra SSL"
+"9042" = "Cassandra CQL"
+"1433" = "SQL Server"
+"1521" = "Oracle DB"
+"50000" = "DB2"
+
+[port_lists.messaging]
+description = "Message queues and streaming"
+
+[port_lists.messaging.ports]
+"5672" = "RabbitMQ"
+"15672" = "RabbitMQ Management"
+"9092" = "Kafka"
+"2181" = "Zookeeper"
+"4222" = "NATS"
+"6222" = "NATS Cluster"
+"8222" = "NATS Monitoring"
+"1883" = "MQTT"
+"8883" = "MQTT SSL"
+"61613" = "ActiveMQ STOMP"
+"61614" = "ActiveMQ WS"
+"61616" = "ActiveMQ"
+
+[port_lists.system]
+description = "System and network services"
+
+[port_lists.system.ports]
+"22" = "SSH"
+"21" = "FTP"
+"23" = "Telnet"
+"25" = "SMTP"
+"53" = "DNS"
+"67" = "DHCP Server"
+"68" = "DHCP Client"
+"110" = "POP3"
+"143" = "IMAP"
+"993" = "IMAP SSL"
+"995" = "POP3 SSL"
+"161" = "SNMP"
+"162" = "SNMP Trap"
+"389" = "LDAP"
+"636" = "LDAP SSL"
+
+[port_lists.docker]
+description = "Docker and container services"
+
+[port_lists.docker.ports]
+"2375" = "Docker Daemon"
+"2376" = "Docker Daemon SSL"
+"2377" = "Docker Swarm"
+"4789" = "Docker Overlay"
+"7946" = "Docker Swarm"
+"8080" = "Docker Registry"
+"5000" = "Docker Registry"
+"9000" = "Portainer"
+"8000" = "Traefik Dashboard"
+"9090" = "Prometheus"
+"3000" = "Grafana"
+
+[port_lists.security]
+description = "Security and monitoring services"
+
+[port_lists.security.ports]
+"9200" = "Elasticsearch"
+"5601" = "Kibana"
+"8080" = "Jenkins"
+"9000" = "SonarQube"
+"3000" = "Grafana"
+"9090" = "Prometheus"
+"9093" = "Alertmanager"
+"4317" = "OpenTelemetry"
+"4318" = "OpenTelemetry HTTP"
+"6831" = "Jaeger"
+"14268" = "Jaeger"
+"16686" = "Jaeger UI"
+
+# Service detection settings
+[service_detection]
+connection_timeout = 5
+read_timeout = 3
+ssl_verify = false
+follow_redirects = true
+max_redirects = 3
+detect_frameworks = true
+extract_versions = true
+user_agent = "scan-ports/1.0.0"
 ```
 
-## 🔍 Port Scanner Configuration
+### Find Projects Configuration (`tools/find-projects/config/defaults.toml`)
 
-### Port Definitions (`config/ports.json`)
+```toml
+# find-projects configuration
 
-```json
-{
-  "version": "1.0.0",
-  "port_lists": {
-    "common": {
-      "description": "Most commonly used ports",
-      "ports": {
-        "22": "SSH",
-        "23": "Telnet",
-        "25": "SMTP",
-        "53": "DNS",
-        "80": "HTTP",
-        "110": "POP3",
-        "143": "IMAP",
-        "443": "HTTPS",
-        "993": "IMAPS",
-        "995": "POP3S"
-      }
-    },
-    "web": {
-      "description": "Web development and HTTP services",
-      "ports": {
-        "80": "HTTP",
-        "443": "HTTPS",
-        "3000": "Node.js Dev Server",
-        "3001": "React Dev Server",
-        "4000": "Ruby/Rails Dev",
-        "5000": "Flask/Python Dev",
-        "8000": "Django Dev/HTTP Alt",
-        "8080": "HTTP Proxy/Alt",
-        "8443": "HTTPS Alt",
-        "9000": "Various Dev Servers"
-      }
-    },
-    "database": {
-      "description": "Database services",
-      "ports": {
-        "1433": "SQL Server",
-        "3306": "MySQL/MariaDB",
-        "5432": "PostgreSQL",
-        "6379": "Redis",
-        "9200": "Elasticsearch",
-        "27017": "MongoDB",
-        "5984": "CouchDB",
-        "8086": "InfluxDB"
-      }
-    },
-    "docker": {
-      "description": "Docker and container services",
-      "ports": {
-        "2375": "Docker Daemon (HTTP)",
-        "2376": "Docker Daemon (HTTPS)",
-        "2377": "Docker Swarm",
-        "4789": "Docker Overlay Network",
-        "7946": "Docker Swarm Network",
-        "9000": "Portainer",
-        "19000": "Docker Registry"
-      }
-    },
-    "messaging": {
-      "description": "Message queues and communication",
-      "ports": {
-        "1883": "MQTT",
-        "4369": "Erlang Port Mapper",
-        "5671": "AMQP (TLS)",
-        "5672": "AMQP/RabbitMQ",
-        "6667": "IRC",
-        "9092": "Kafka",
-        "15672": "RabbitMQ Management"
-      }
-    },
-    "security": {
-      "description": "Security and monitoring tools",
-      "ports": {
-        "161": "SNMP",
-        "389": "LDAP",
-        "636": "LDAPS",
-        "1812": "RADIUS",
-        "8200": "HashiCorp Vault",
-        "9090": "Prometheus",
-        "3000": "Grafana",
-        "5601": "Kibana"
-      }
-    }
-  },
-  "service_detection": {
-    "http_user_agent": "intermcli/1.0.0",
-    "connection_timeout": 5,
-    "read_timeout": 3,
-    "ssl_verify": false,
-    "follow_redirects": true,
-    "max_redirects": 3,
-    "detect_frameworks": true,
-    "extract_versions": true
-  }
-}
-```
+# Directories to scan for projects
+development_dirs = [
+    "~/development",
+    "~/projects",
+    "~/code",
+    "~/workspace",
+    "~/src"
+]
 
-## 📁 Project Finder Configuration
+# Default editor - can be any shell command
+# Examples:
+#   "code"                    # VS Code
+#   "vim ."                   # Vim in current directory  
+#   "~/scripts/dev-setup.sh"  # Custom script
+#   "tmux new-session -d -s project \\; split-window -h \\; send-keys 'vim .' Enter"
+default_editor = "code"
 
-### Project Discovery Settings
+# Scan settings
+max_scan_depth = 3
 
-```json
-{
-  "finder": {
-    "search_paths": [
-      "~/Development",
-      "~/Projects", 
-      "~/Code",
-      "~/workspace",
-      "~/src"
-    ],
-    "exclude_paths": [
-      "~/Development/archive",
-      "~/Development/temp"
-    ],
-    "max_depth": 3,
-    "follow_symlinks": false,
-    "scan_hidden_dirs": false,
-    "project_types": {
-      "git": {
-        "indicators": [".git"],
-        "priority": 10,
-        "icon": "📁"
-      },
-      "node": {
-        "indicators": ["package.json"],
-        "priority": 9,
-        "icon": "📦"
-      },
-      "python": {
-        "indicators": ["requirements.txt", "setup.py", "pyproject.toml"],
-        "priority": 8,
-        "icon": "🐍"
-      },
-      "rust": {
-        "indicators": ["Cargo.toml"],
-        "priority": 8,
-        "icon": "🦀"
-      },
-      "go": {
-        "indicators": ["go.mod", "go.sum"],
-        "priority": 8,
-        "icon": "🐹"
-      },
-      "java": {
-        "indicators": ["pom.xml", "build.gradle"],
-        "priority": 7,
-        "icon": "☕"
-      },
-      "docker": {
-        "indicators": ["Dockerfile", "docker-compose.yml"],
-        "priority": 6,
-        "icon": "🐳"
-      }
-    },
-    "ignore_patterns": [
-      ".git",
-      "node_modules",
-      "__pycache__",
-      ".venv",
-      "venv",
-      ".env",
-      "target",
-      "build",
-      "dist",
-      ".next",
-      ".nuxt"
-    ],
-    "cache_results": true,
-    "cache_duration": 3600,
-    "auto_refresh": true
-  },
-  "editor_integration": {
-    "preferred_editor": "auto",
-    "editor_commands": {
-      "vscode": "code",
-      "vim": "vim",
-      "nvim": "nvim",
-      "emacs": "emacs",
-      "sublime": "subl",
-      "atom": "atom"
-    },
-    "auto_detect_editor": true,
-    "open_in_background": false
-  }
-}
-```
+# Directories to ignore during scanning
+skip_dirs = [
+    ".git",
+    "node_modules",
+    ".vscode",
+    "dist",
+    "build",
+    "__pycache__",
+    ".pytest_cache"
+]
 
-## 🎨 Output and UI Configuration
+# Project type detection
+[project_types]
+"Node.js" = { indicators = ["package.json", "package-lock.json", "yarn.lock"], icon = "🟨" }
+"Python" = { indicators = ["requirements.txt", "pyproject.toml", "setup.py", "Pipfile"], icon = "🐍" }
+"Rust" = { indicators = ["Cargo.toml"], icon = "🦀" }
+"Go" = { indicators = ["go.mod", "go.sum"], icon = "🐹" }
+"Java" = { indicators = ["pom.xml", "build.gradle", "build.gradle.kts"], icon = "☕" }
+"PHP" = { indicators = ["composer.json"], icon = "🐘" }
+"Ruby" = { indicators = ["Gemfile", "Gemfile.lock"], icon = "💎" }
+"C++" = { indicators = ["CMakeLists.txt", "Makefile"], icon = "⚙️" }
+"C#" = { indicators = [".csproj", ".sln"], icon = "🔷" }
 
-### Display Settings
-
-```json
-{
-  "output": {
-    "format": "auto",
-    "color_scheme": "auto",
-    "emoji_support": true,
-    "unicode_support": true,
-    "table_style": "rounded",
-    "show_timestamps": false,
-    "show_duration": true,
-    "verbosity": "normal",
-    "log_level": "info"
-  },
-  "ui": {
-    "interactive_mode": true,
-    "confirm_actions": {
-      "external_scans": true,
-      "destructive_operations": true,
-      "large_operations": true
-    },
-    "progress_indicators": {
-      "show_progress_bars": true,
-      "show_spinners": true,
-      "show_counters": true,
-      "update_interval": 0.1
-    },
-    "keyboard_shortcuts": {
-      "quit": ["q", "ctrl+c"],
-      "help": ["h", "?"],
-      "refresh": ["r", "f5"],
-      "toggle_details": ["d"],
-      "filter": ["/"]
-    }
-  }
-}
+# UI Settings
+[ui]
+show_icons = true
+group_by_type_default = false
+search_fuzzy = true
 ```
 
 ## 🔧 User Configuration Examples
 
-### Basic User Config (`~/.config/intermcli/config.json`)
+### Basic User Config (`~/.config/intermcli/scan-ports.toml`)
 
-```json
-{
-  "general": {
-    "default_timeout": 5,
-    "output_format": "rich",
-    "interactive_mode": true
-  },
-  "scanner": {
-    "enhanced_detection": true,
-    "show_closed_ports": false,
-    "default_host": "localhost"
-  },
-  "finder": {
-    "search_paths": [
-      "~/Code",
-      "~/Projects",
-      "~/Work"
-    ],
-    "max_depth": 4,
-    "auto_refresh": true
-  },
-  "ui": {
-    "preferred_editor": "code",
-    "auto_open_editor": true,
-    "confirm_external_scans": true
-  }
-}
+```toml
+# Custom port scanner configuration
+
+# Override some common ports with custom descriptions
+[port_lists.custom]
+description = "My custom development ports"
+
+[port_lists.custom.ports]
+"3000" = "My React App"
+"3001" = "My API Server"
+"5432" = "Local PostgreSQL"
+"6379" = "Local Redis"
+
+# Service detection preferences
+[service_detection]
+connection_timeout = 2
+enhanced_detection = true
 ```
 
-### Advanced User Config
+### Advanced User Config (`~/.config/intermcli/find-projects.toml`)
 
-```json
-{
-  "general": {
-    "max_threads": 100,
-    "default_timeout": 2,
-    "output_format": "json"
-  },
-  "scanner": {
-    "service_detection": true,
-    "enhanced_detection": true,
-    "confidence_threshold": "high",
-    "scan_delay": 0.1,
-    "retry_attempts": 3,
-    "custom_ports": {
-      "development": {
-        "3000": "React Dev",
-        "3001": "Next.js",
-        "4000": "Vue Dev",
-        "5000": "Flask",
-        "8080": "Spring Boot"
-      }
-    }
-  },
-  "finder": {
-    "search_paths": [
-      "~/Development",
-      "~/opensource",
-      "/workspace"
-    ],
-    "exclude_paths": [
-      "~/Development/archived"
-    ],
-    "max_depth": 5,
-    "follow_symlinks": true,
-    "custom_project_types": {
-      "terraform": {
-        "indicators": ["*.tf", "terraform.tfvars"],
-        "priority": 7,
-        "icon": "🏗️"
-      }
-    }
-  },
-  "output": {
-    "save_results": true,
-    "results_format": "json",
-    "results_dir": "~/logs/intermcli"
-  }
-}
+```toml
+# Custom project finder configuration
+
+# My development directories
+development_dirs = [
+    "~/Code",
+    "~/Work/projects",
+    "~/OpenSource",
+    "/workspace"
+]
+
+# Custom editor setup with tmux
+default_editor = "tmux new-session -d -s dev \\; split-window -h \\; split-window -v \\; send-keys -t 0 'nvim .' Enter \\; send-keys -t 1 'git status' Enter \\; send-keys -t 2 'npm run dev' Enter \\; attach-session -t dev"
+
+# Deeper scanning for complex projects
+max_scan_depth = 5
+
+# Additional directories to skip
+skip_dirs = [
+    ".git",
+    "node_modules",
+    ".vscode",
+    "dist",
+    "build",
+    "__pycache__",
+    ".pytest_cache",
+    "vendor",          # PHP
+    "target",          # Rust/Java
+    ".next",           # Next.js
+    ".nuxt",           # Nuxt.js
+    "coverage"         # Test coverage
+]
+
+# Custom project types
+[project_types.Terraform]
+indicators = ["*.tf", "terraform.tfvars"]
+icon = "🏗️"
+
+[project_types.Docker]
+indicators = ["Dockerfile", "docker-compose.yml", "docker-compose.yaml"]
+icon = "🐳"
+
+[project_types.Kubernetes]
+indicators = ["*.yaml", "*.yml"]  # In k8s directories
+icon = "☸️"
 ```
 
-### Project-Specific Config (`.intermcli.json`)
+### Project-Specific Config (`.intermcli.toml`)
 
-```json
-{
-  "scanner": {
-    "default_host": "dev.myproject.com",
-    "port_lists": ["web", "database"],
-    "custom_ports": {
-      "project_specific": {
-        "3001": "API Server",
-        "3002": "WebSocket Server",
-        "6000": "Debug Port"
-      }
-    }
-  },
-  "finder": {
-    "search_paths": ["./microservices", "./libs"],
-    "max_depth": 2
-  }
-}
+```toml
+# Project-specific overrides
+
+[scan-ports]
+default_host = "dev.myproject.com"
+
+# Custom ports for this project
+[scan-ports.port_lists.project]
+description = "Project-specific services"
+
+[scan-ports.port_lists.project.ports]
+"3001" = "API Server"
+"3002" = "WebSocket Server"
+"6000" = "Debug Port"
+"8080" = "Admin Panel"
+
+[find-projects]
+# Only scan subdirectories in this project
+development_dirs = ["./microservices", "./libs", "./tools"]
+max_scan_depth = 2
 ```
 
-## 🛠️ Configuration Commands
+## 🛠️ Environment Variables
 
-### View Configuration
+Each tool supports environment variable overrides:
 
+### Scan Ports
 ```bash
-# Show current effective configuration
-interm config show
-
-# Show specific section
-interm config show scanner
-interm config show finder
-
-# Show configuration sources
-interm config sources
-
-# Validate configuration
-interm config validate
+# Port scanner environment variables
+export SCAN_PORTS_HOST=localhost
+export SCAN_PORTS_TIMEOUT=5
+export SCAN_PORTS_ENHANCED=true
 ```
 
-### Modify Configuration
-
+### Find Projects
 ```bash
-# Set configuration value
-interm config set general.default_timeout 5
-interm config set scanner.enhanced_detection true
-
-# Add to list
-interm config add finder.search_paths ~/NewProjects
-
-# Remove from list  
-interm config remove finder.search_paths ~/OldProjects
-
-# Reset to defaults
-interm config reset
-interm config reset scanner
+# Project finder environment variables
+export FIND_PROJECTS_DIRS="~/Code:~/Work:~/Projects"
+export FIND_PROJECTS_EDITOR="nvim"
+export FIND_PROJECTS_DEPTH=4
 ```
-
-### Configuration Wizard
-
-```bash
-# Interactive configuration setup
-interm config init
-
-# Guided setup for specific features
-interm config setup scanner
-interm config setup finder
-```
-
-## 📋 Configuration Validation
-
-### Schema Validation
-
-IntermCLI validates configuration files against a JSON schema to ensure correctness:
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "properties": {
-    "version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
-    },
-    "general": {
-      "type": "object",
-      "properties": {
-        "default_timeout": {
-          "type": "number",
-          "minimum": 0.1,
-          "maximum": 300
-        },
-        "max_threads": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 1000
-        }
-      }
-    }
-  },
-  "required": ["version"]
-}
-```
-
-### Common Validation Errors
-
-| Error | Description | Solution |
-|-------|-------------|----------|
-| Invalid timeout | Timeout value out of range | Set between 0.1 and 300 seconds |
-| Invalid path | Path doesn't exist | Use absolute path or `~` for home |
-| Invalid port | Port number out of range | Use ports 1-65535 |
-| Invalid format | JSON syntax error | Check JSON formatting |
-| Missing required | Required field missing | Add required configuration fields |
-
-## 🔍 Environment Variables
-
-Configuration can also be set via environment variables:
-
-```bash
-# General settings
-export INTERM_TIMEOUT=5
-export INTERM_THREADS=100
-export INTERM_OUTPUT_FORMAT=json
-
-# Scanner settings
-export INTERM_SCANNER_HOST=localhost
-export INTERM_SCANNER_ENHANCED=true
-
-# Finder settings
-export INTERM_FINDER_PATHS=~/Code:~/Projects
-export INTERM_FINDER_DEPTH=3
-
-# UI settings
-export INTERM_EDITOR=code
-export INTERM_INTERACTIVE=true
-```
-
-Environment variables follow the pattern: `INTERM_<SECTION>_<KEY>=<VALUE>`
 
 ## 📊 Configuration Precedence
 
 Configuration values are resolved in the following order (highest to lowest priority):
 
 1. **Command line arguments** - `--timeout 5`
-2. **Environment variables** - `INTERM_TIMEOUT=5`
-3. **Project config** - `.intermcli.json`
-4. **User config** - `~/.config/intermcli/config.json`
-5. **System defaults** - `config/defaults.json`
+2. **Environment variables** - `SCAN_PORTS_TIMEOUT=5`
+3. **Project config** - `.intermcli.toml`
+4. **User tool-specific** - `~/.config/intermcli/scan-ports.toml`
+5. **User global** - `~/.config/intermcli/config.toml`
+6. **Tool defaults** - `tools/scan-ports/config/defaults.toml`
 
-## 🚀 Performance Configuration
+## 🔍 TOML Configuration Benefits
 
-### Optimization Settings
+### Comments and Documentation
+```toml
+# This is a comment explaining the setting
+default_editor = "code"
 
-```json
-{
-  "performance": {
-    "scanner": {
-      "connection_pool_size": 50,
-      "dns_cache_ttl": 300,
-      "keep_alive": true,
-      "batch_size": 100
-    },
-    "finder": {
-      "fs_cache_size": 1000,
-      "parallel_scan": true,
-      "memory_limit": "100MB"
-    },
-    "output": {
-      "buffer_size": 8192,
-      "flush_interval": 1.0
-    }
-  }
-}
+# Multi-line comments are supported
+# You can document complex settings
+# Like custom tmux session setups
+complex_editor_command = """
+tmux new-session -d -s project \; \
+split-window -h \; \
+send-keys 'vim .' Enter
+"""
 ```
 
-## 🔐 Security Configuration
+### Structured Data
+```toml
+# Nested sections are clean and readable
+[port_lists.web]
+description = "Web development ports"
 
-### Security Settings
+[port_lists.web.ports]
+"3000" = "React Dev"
+"3001" = "Next.js"
 
-```json
-{
-  "security": {
-    "scanner": {
-      "rate_limit": {
-        "enabled": true,
-        "max_requests_per_second": 100,
-        "burst_size": 200
-      },
-      "allowed_hosts": ["*"],
-      "blocked_hosts": [],
-      "respect_robots_txt": false
-    },
-    "finder": {
-      "respect_gitignore": true,
-      "follow_symlinks": false,
-      "max_file_size": "10MB"
-    },
-    "general": {
-      "log_sensitive_data": false,
-      "secure_temp_files": true
-    }
-  }
-}
+# Arrays are simple
+development_dirs = [
+    "~/development",
+    "~/projects",
+    "~/code"
+]
 ```
 
-## 🔧 Troubleshooting Configuration
+### Type Safety
+```toml
+# Numbers don't need quotes
+max_scan_depth = 3
+connection_timeout = 2.5
+
+# Booleans are clear
+enhanced_detection = true
+show_closed_ports = false
+
+# Strings are obvious
+default_editor = "code"
+```
+
+## 🚀 TOML Requirements
+
+### Python Dependencies
+
+**Python 3.11+**: TOML support is built-in
+```python
+import tomllib  # Built into Python 3.11+
+```
+
+**Python < 3.11**: Install tomli
+```bash
+pip install tomli
+```
+
+### Tool Detection
+Both tools automatically detect TOML support:
+- ✅ Available: Uses TOML configuration files
+- ❌ Missing: Falls back to default configuration with helpful error messages
+
+```bash
+# Check TOML support status
+scan-ports --check-deps
+find-projects --config
+```
+
+## 🔧 Configuration Commands (Future)
+
+When the unified configuration system is implemented:
+
+### View Configuration
+```bash
+# Show current effective configuration
+interm config show
+interm config show scan-ports
+interm config show find-projects
+
+# Show configuration sources and precedence
+interm config sources scan-ports
+
+# Validate TOML syntax
+interm config validate
+```
+
+### Modify Configuration
+```bash
+# Set configuration value
+interm config set scan-ports.connection_timeout 5
+interm config set find-projects.default_editor "nvim"
+
+# Add to arrays
+interm config add find-projects.development_dirs ~/NewProjects
+
+# Reset to defaults
+interm config reset scan-ports
+```
+
+## 🔍 Troubleshooting Configuration
 
 ### Common Issues
 
-1. **Configuration not loading**
+1. **TOML support not available**
+   ```bash
+   # Check Python version
+   python3 --version
+   
+   # Install tomli for Python < 3.11
+   pip install tomli
+   ```
+
+2. **TOML syntax errors**
+   ```bash
+   # Tools will show syntax errors with line numbers
+   scan-ports --check-config
+   find-projects --config
+   ```
+
+3. **Configuration not loading**
    ```bash
    # Check file permissions
-   ls -la ~/.config/intermcli/config.json
-   
-   # Validate JSON syntax
-   interm config validate
+   ls -la ~/.config/intermcli/scan-ports.toml
+   ls -la tools/scan-ports/config/defaults.toml
    ```
 
-2. **Settings not taking effect**
+4. **Environment variables not working**
    ```bash
-   # Check configuration precedence
-   interm config sources
-   
-   # Show effective configuration
-   interm config show
+   # Check variable names (tool-specific prefixes)
+   echo $SCAN_PORTS_TIMEOUT
+   echo $FIND_PROJECTS_DIRS
    ```
 
-3. **Performance issues**
-   ```bash
-   # Check thread and timeout settings
-   interm config show general.max_threads
-   interm config show general.default_timeout
-   ```
-
-### Debug Mode
-
+### Debug Configuration Loading
 ```bash
-# Enable debug output
-interm --debug config show
-interm --debug scan localhost
+# Enable debug output to see config loading process
+scan-ports --debug localhost
+find-projects --config  # Shows configuration details
+```
 
-# Verbose configuration loading
-interm --verbose config validate
+## 🔄 Migration from JSON
+
+If you have existing JSON configuration files, they need to be converted to TOML:
+
+### JSON to TOML Conversion
+```bash
+# Example conversion
+# OLD: ~/.config/intermcli/config.json
+{
+  "scanner": {
+    "default_host": "localhost",
+    "enhanced_detection": true
+  }
+}
+
+# NEW: ~/.config/intermcli/scan-ports.toml
+[scanner]
+default_host = "localhost"
+enhanced_detection = true
+```
+
+### Conversion Tools
+```bash
+# Online converters available at:
+# - https://transform.tools/json-to-toml
+# - https://www.convertsimple.com/convert-json-to-toml/
+
+# Or use Python:
+python3 -c "
+import json, tomli_w
+with open('config.json') as f:
+    data = json.load(f)
+with open('config.toml', 'wb') as f:
+    tomli_w.dump(data, f)
+"
 ```
 
 ---
 
-This configuration system provides flexibility while maintaining sensible defaults, allowing users to customize IntermCLI to their specific needs and workflows.
+This TOML-based configuration system provides better readability, comment support, and maintainability while maintaining the flexible hierarchical approach that allows users to customize IntermCLI tools to their specific needs and workflows.

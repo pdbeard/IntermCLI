@@ -52,7 +52,7 @@ class Config:
     max_query_length: int
     scan_timeout: int
     allowed_editors: List[str]
-    max_file_size: int = 1024 * 1024  # Add this field
+    max_file_size: int = 1024 * 1024 
 
 
 class SecurityValidator:
@@ -403,13 +403,24 @@ class InputHandler:
             try:
                 tty.setraw(sys.stdin.fileno())
                 char = sys.stdin.read(1)
+                
+                # Handle Ctrl+C (ASCII 3)
+                if ord(char) == 3:  # Ctrl+C
+                    raise KeyboardInterrupt()
+                
                 return char
             finally:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         except ImportError:
             # Windows fallback
             import msvcrt
-            return msvcrt.getch().decode('utf-8')
+            char = msvcrt.getch().decode('utf-8')
+            if ord(char) == 3:  # Ctrl+C on Windows
+                raise KeyboardInterrupt()
+            return char
+        except KeyboardInterrupt:
+            # Re-raise KeyboardInterrupt to let it bubble up
+            raise
         except:
             return None
     
@@ -610,6 +621,10 @@ class FindProjectsApp:
         
         self.config = self.config_manager.load_config()
         self.scanner = ProjectScanner(self.config)
+        
+        # Add instance variables for state
+        self.group_by_type = False
+        self.selected_index = 0
     
     def run(self, args) -> None:
         """Main application entry point"""
@@ -645,27 +660,21 @@ class FindProjectsApp:
     
     def _interactive_browse(self, projects: List[Project]) -> None:
         """Interactive project browsing"""
-        group_by_type = False
         current_projects = projects
-        selected_index = 0
         
         while True:
-            if group_by_type:
+            if self.group_by_type:
                 current_projects = self.grouper.group_projects_by_type(projects)
-                selected_index = self._find_next_selectable(current_projects, selected_index)
+                self.selected_index = self._find_next_selectable(current_projects, self.selected_index)
             else:
                 current_projects = projects
-                selected_index = min(selected_index, len(current_projects) - 1)
+                self.selected_index = min(self.selected_index, len(current_projects) - 1)
             
-            self.renderer.display_projects(current_projects, selected_index, group_by_type)
+            self.renderer.display_projects(current_projects, self.selected_index, self.group_by_type)
             
             try:
-                if not self._handle_input(current_projects, selected_index, group_by_type, projects):
+                if not self._handle_input(current_projects, projects):
                     break
-                    
-                # Update selected_index after input handling
-                if group_by_type:
-                    selected_index = self._find_next_selectable(current_projects, selected_index)
                     
             except KeyboardInterrupt:
                 break
@@ -678,39 +687,113 @@ class FindProjectsApp:
             return next((i for i, p in enumerate(projects) if not p.is_header), 0)
         return current_index
     
-    def _handle_input(self, current_projects: List[Project], selected_index: int, 
-                     group_by_type: bool, all_projects: List[Project]) -> bool:
+    def _handle_input(self, current_projects: List[Project], all_projects: List[Project]) -> bool:
         """Handle user input - returns False to exit"""
         char = self.input_handler.get_char()
         
+        if not char:  # Handle None from get_char()
+            return True
+            
         if char == 'q':
             return False
         elif char == 't':
-            group_by_type = not group_by_type
+            self.group_by_type = not self.group_by_type
+            print(f"Debug: Toggled group_by_type to {self.group_by_type}")  # Debug line
         elif char == '/':
-            self._handle_search_mode(all_projects, group_by_type)
+            self._handle_search_mode(all_projects)
         elif ord(char) == 13:  # Enter
-            self._handle_project_open(current_projects, selected_index)
+            self._handle_project_open(current_projects)
         elif char == '\x1b':  # Arrow keys
-            self._handle_arrow_keys(current_projects, selected_index, group_by_type)
+            self._handle_arrow_keys(current_projects)
         elif char.isdigit():
             self._handle_number_selection(current_projects, char)
         
         return True
     
-    def _handle_search_mode(self, projects: List[Project], group_by_type: bool) -> None:
+    def _handle_search_mode(self, projects: List[Project]) -> None:
         """Handle search mode"""
-        # Search mode implementation would go here
-        pass
+        query = ""
+        search_projects = [p for p in projects if not p.is_header]
+        search_selected = 0
+        
+        while True:
+            # Filter projects based on query
+            if query:
+                filtered = self.search_engine.fuzzy_search(
+                    query, 
+                    search_projects,
+                    key_func=lambda p: f"{p.name} {p.relative_path}"
+                )
+            else:
+                filtered = search_projects
+            
+            # Display search results
+            os.system('clear')
+            print(f"🔍 Search Mode")
+            print("=" * 60)
+            print(f"Query: {query}_")
+            print(f"Found {len(filtered)} matches\n")
+            
+            # Show results
+            for i, project in enumerate(filtered[:15]):
+                prefix = "► " if i == search_selected else "  "
+                type_icon = self.detector.get_type_icon(project.project_type)
+                print(f"{prefix}{i+1:2d}. {type_icon} {project.name} - {project.relative_path}")
+            
+            print("\n" + "─" * 60)
+            print("Type to search | ⬆️⬇️  Navigate | Enter: Open | Esc: Back")
+            
+            # Handle search input
+            char = self.input_handler.get_char()
+            if not char:
+                continue
+            
+            if ord(char) == 27:  # ESC - Check if it's arrow keys first
+                try:
+                    # Read the next characters without timeout first
+                    next_char1 = sys.stdin.read(1)
+                    next_char2 = sys.stdin.read(1)
+                    
+                    if next_char1 == '[':
+                        if next_char2 == 'A':  # Up arrow
+                            search_selected = max(0, search_selected - 1)
+                            continue  # IMPORTANT: Stay in search mode
+                        elif next_char2 == 'B':  # Down arrow
+                            search_selected = min(len(filtered) - 1, search_selected + 1)
+                            continue  # IMPORTANT: Stay in search mode
+                    
+                    # If not arrow keys, treat as ESC to exit search mode
+                    break
+                except:
+                    # Any error, treat as ESC and exit search mode
+                    break
+                
+            elif ord(char) == 13:  # Enter
+                if filtered and search_selected < len(filtered):
+                    project = filtered[search_selected]
+                    self.opener.open_project(project.path, project.name, self.config.default_editor)
+                    break
+            elif ord(char) == 127 or ord(char) == 8:  # Backspace
+                query = query[:-1]
+                search_selected = 0
+            elif char.isdigit():
+                num = int(char)
+                if 1 <= num <= min(15, len(filtered)):
+                    project = filtered[num - 1]
+                    self.opener.open_project(project.path, project.name, self.config.default_editor)
+                    break
+            elif self.input_handler.is_safe_printable(char):
+                query += char
+                search_selected = 0
     
-    def _handle_project_open(self, projects: List[Project], selected_index: int) -> None:
+    def _handle_project_open(self, projects: List[Project]) -> None:
         """Handle opening a project"""
-        if (projects and selected_index < len(projects) and 
-            not projects[selected_index].is_header):
-            project = projects[selected_index]
+        if (projects and self.selected_index < len(projects) and 
+            not projects[self.selected_index].is_header):
+            project = projects[self.selected_index]
             self.opener.open_project(project.path, project.name, self.config.default_editor)
     
-    def _handle_arrow_keys(self, projects: List[Project], selected_index: int, group_by_type: bool) -> int:
+    def _handle_arrow_keys(self, projects: List[Project]) -> None:
         """Handle arrow key navigation"""
         try:
             next_char1 = sys.stdin.read(1)
@@ -718,21 +801,20 @@ class FindProjectsApp:
             
             if next_char1 == '[':
                 if next_char2 == 'A':  # Up arrow
-                    return self._move_selection_up(projects, selected_index, group_by_type)
+                    self.selected_index = self._move_selection_up(projects, self.selected_index)
                 elif next_char2 == 'B':  # Down arrow
-                    return self._move_selection_down(projects, selected_index, group_by_type)
+                    self.selected_index = self._move_selection_down(projects, self.selected_index)
         except:
             pass
-        return selected_index
     
-    def _move_selection_up(self, projects: List[Project], selected_index: int, group_by_type: bool) -> int:
+    def _move_selection_up(self, projects: List[Project], selected_index: int) -> int:
         """Move selection up, skipping headers"""
         new_index = selected_index - 1
-        while new_index >= 0 and projects[new_index].is_header:
+        while new_index >= 0 and new_index < len(projects) and projects[new_index].is_header:
             new_index -= 1
         return max(0, new_index)
     
-    def _move_selection_down(self, projects: List[Project], selected_index: int, group_by_type: bool) -> int:
+    def _move_selection_down(self, projects: List[Project], selected_index: int) -> int:
         """Move selection down, skipping headers"""
         new_index = selected_index + 1
         while new_index < len(projects) and projects[new_index].is_header:
@@ -742,10 +824,10 @@ class FindProjectsApp:
     def _handle_number_selection(self, projects: List[Project], char: str) -> None:
         """Handle number-based project selection"""
         num = int(char)
-        selectable_projects = [(i, p) for i, p in enumerate(projects) if not p.is_header]
-        if 1 <= num <= len(selectable_projects):
-            selected_index = selectable_projects[num - 1][0]
-            project = projects[selected_index]
+        # Get visible projects (skip headers)
+        visible_projects = [(i, p) for i, p in enumerate(projects[:15]) if not p.is_header]
+        if 1 <= num <= len(visible_projects):
+            project_index, project = visible_projects[num - 1]
             self.opener.open_project(project.path, project.name, self.config.default_editor)
 
 

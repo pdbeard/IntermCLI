@@ -7,11 +7,19 @@ Check if ports/services are running on local or remote hosts
 import socket
 import sys
 import argparse
-import json
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import time
 import re
+
+# TOML support with fallback
+try:
+    import tomllib  # Python 3.11+
+except ImportError:
+    try:
+        import tomli as tomllib  # fallback for older Python
+    except ImportError:
+        tomllib = None
 
 # Optional dependencies with fallbacks
 try:
@@ -37,7 +45,8 @@ def check_optional_dependencies():
     deps = {
         'requests': HAS_REQUESTS,
         'urllib3': HAS_URLLIB3, 
-        'ssl': HAS_SSL
+        'ssl': HAS_SSL,
+        'tomllib': tomllib is not None
     }
     
     missing = [name for name, available in deps.items() if not available]
@@ -55,13 +64,17 @@ def print_dependency_status(verbose=False):
             print(f"  {name:10}: {status}")
         
         if missing:
-            print(f"\n💡 To enable enhanced service detection, install: pip3 install {' '.join(missing)}")
+            if 'tomllib' in missing:
+                print("\n💡 For TOML support on Python < 3.11: pip3 install tomli")
+            other_missing = [m for m in missing if m != 'tomllib']
+            if other_missing:
+                print(f"💡 To enable enhanced service detection: pip3 install {' '.join(other_missing)}")
         print()
 
 def load_port_config():
-    """Load port configuration from JSON file"""
-    script_dir = Path(__file__).parent.parent
-    config_file = script_dir / "config" / "ports.json"
+    """Load port configuration from TOML file"""
+    script_dir = Path(__file__).parent
+    config_file = script_dir / "config" / "ports.toml"
     
     # Default fallback config
     default_config = {
@@ -79,18 +92,71 @@ def load_port_config():
         }
     }
     
+    if not tomllib:
+        print("⚠️  TOML support not available")
+        print("💡 Install tomli for Python < 3.11: pip3 install tomli")
+        print("💡 Using default port list")
+        return default_config
+    
     try:
         if config_file.exists():
-            with open(config_file, 'r') as f:
-                return json.load(f)
+            with open(config_file, 'rb') as f:
+                return tomllib.load(f)
         else:
             print(f"⚠️  Config file not found: {config_file}")
             print("💡 Using default port list")
             return default_config
     except Exception as e:
-        print(f"⚠️  Error loading config: {e}")
+        print(f"⚠️  Error loading TOML config: {e}")
         print("💡 Using default port list")
         return default_config
+
+def list_available_port_lists():
+    """Display all available port lists from configuration"""
+    config = load_port_config()
+    
+    print("📋 Available Port Lists:")
+    print("=" * 60)
+    
+    for list_name, details in config["port_lists"].items():
+        description = details.get("description", "No description")
+        ports = details.get("ports", {})
+        
+        print(f"\n🏷️  {list_name.upper()}")
+        print(f"   Description: {description}")
+        print(f"   Ports: {len(ports)} defined")
+        
+        # Show first few ports as preview
+        port_preview = list(ports.items())[:5]
+        for port, service in port_preview:
+            print(f"   • {port}: {service}")
+        
+        if len(ports) > 5:
+            print(f"   ... and {len(ports) - 5} more")
+    
+    print("\n" + "=" * 60)
+    print("💡 Usage: scan-ports -l <list_name> or scan-ports -l <list1>,<list2>")
+    print("💡 Example: scan-ports -l web,database")
+
+def get_ports_from_lists(list_names, config):
+    """Get ports from specified lists"""
+    ports = {}
+    available_lists = list(config["port_lists"].keys())
+    
+    for list_name in list_names:
+        list_name = list_name.strip().lower()
+        
+        if list_name in config["port_lists"]:
+            list_ports = config["port_lists"][list_name]["ports"]
+            for port_str, service in list_ports.items():
+                port = int(port_str)
+                if port not in ports:
+                    ports[port] = service
+        else:
+            print(f"⚠️  Port list '{list_name}' not found")
+            print(f"Available lists: {', '.join(available_lists)}")
+    
+    return ports
 
 def check_port(host, port, timeout=3):
     """Check if a specific port is open"""
@@ -545,12 +611,37 @@ def scan_all_configured_ports(host, timeout=3, show_closed=False, detect_service
     
     return open_ports
 
-# ... (include all the other existing functions like list_available_port_lists, get_ports_from_lists, etc.)
+def scan_port_range(host, start_port, end_port, timeout=3, threads=50):
+    """Scan a range of ports"""
+    ports_to_scan = list(range(start_port, end_port + 1))
+    
+    print(f"🔍 Scanning ports {start_port}-{end_port} on {host} ({len(ports_to_scan)} ports)")
+    print("=" * 60)
+    
+    open_ports = []
+    
+    with ThreadPoolExecutor(max_workers=threads) as executor:
+        futures = {executor.submit(check_port, host, port, timeout): port 
+                  for port in ports_to_scan}
+        
+        for future in futures:
+            port = futures[future]
+            is_open = future.result()
+            if is_open:
+                open_ports.append(port)
+                print(f"Port {port:5}: ✅ OPEN")
+    
+    print("=" * 60)
+    print(f"📊 Summary: {len(open_ports)} open out of {len(ports_to_scan)} scanned")
+    if open_ports:
+        print(f"🔓 Open ports: {', '.join(map(str, sorted(open_ports)))}")
+    
+    return open_ports
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Port scanner and service checker with optional enhanced service detection",
-        epilog="By default, scans ALL ports defined in the configuration file with service detection."
+        description="Port scanner and service checker with TOML configuration",
+        epilog="By default, scans ALL ports defined in the TOML configuration file with service detection."
     )
     parser.add_argument("host", nargs="?", default="localhost", 
                        help="Host to scan (default: localhost)")
@@ -613,7 +704,82 @@ def main():
                 if service_info['version']:
                     print(f"Version: {service_info['version']}")
         
-        # ... (other conditions remain similar)
+        elif args.range:
+            # Scan port range (no service detection for ranges)
+            start_port, end_port = args.range
+            if start_port > end_port or start_port < 1 or end_port > 65535:
+                print("❌ Invalid port range. Ports must be 1-65535 and start <= end")
+                sys.exit(1)
+            
+            scan_port_range(args.host, start_port, end_port, args.timeout, args.threads)
+        
+        elif args.list:
+            # Scan specific port lists
+            config = load_port_config()
+            list_names = [name.strip() for name in args.list.split(',')]
+            ports = get_ports_from_lists(list_names, config)
+            
+            if not ports:
+                print("❌ No valid ports found in specified lists")
+                sys.exit(1)
+            
+            print(f"🔍 Scanning {len(ports)} ports from lists: {', '.join(list_names)}")
+            print("=" * 60)
+            
+            open_ports = []
+            service_results = {}
+            
+            # Check ports
+            with ThreadPoolExecutor(max_workers=args.threads) as executor:
+                futures = {executor.submit(check_port, args.host, port, args.timeout): (port, service) 
+                          for port, service in ports.items()}
+                
+                for future in futures:
+                    port, expected_service = futures[future]
+                    is_open = future.result()
+                    if is_open:
+                        open_ports.append(port)
+                    elif args.show_closed:
+                        print(f"Port {port:5} ({expected_service:25}): ❌ CLOSED")
+            
+            # Service detection on open ports
+            if detect_services and open_ports:
+                print(f"\n🔬 Detecting services on {len(open_ports)} open ports...")
+                
+                with ThreadPoolExecutor(max_workers=10) as executor:
+                    futures = {executor.submit(comprehensive_service_detection, args.host, port, args.timeout): port 
+                              for port in open_ports}
+                    
+                    for future in futures:
+                        port = futures[future]
+                        service_info = future.result()
+                        service_results[port] = service_info
+            
+            # Display results
+            print("\n" + "=" * 60)
+            for port in sorted(open_ports):
+                expected_service = ports[port]
+                
+                if detect_services and port in service_results:
+                    detected = service_results[port]
+                    confidence_emoji = {
+                        'high': '🎯',
+                        'medium': '🔍', 
+                        'low': '❓'
+                    }.get(detected['confidence'], '❓')
+                    
+                    method_emoji = '🚀' if detected['method'] == 'enhanced' else '🔧'
+                    service_display = detected['service']
+                    if detected['version']:
+                        service_display += f" ({detected['version'][:30]})"
+                    
+                    print(f"Port {port:5} | Expected: {expected_service:20} | "
+                          f"Detected: {confidence_emoji}{method_emoji} {service_display}")
+                else:
+                    print(f"Port {port:5} | {expected_service:25} | ✅ OPEN")
+            
+            print("=" * 60)
+            print(f"📊 Summary: {len(open_ports)} open out of {len(ports)} scanned")
         
         else:
             # DEFAULT: Scan ALL configured ports with optional service detection
