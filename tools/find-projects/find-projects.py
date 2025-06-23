@@ -2,11 +2,14 @@
 """
 find-projects: Interactive development project discovery and navigation
 
-This tool follows the IntermCLI architecture with progressive enhancement:
+Part of the IntermCLI suite - Interactive terminal utilities for developers.
+Follows action-target naming convention and progressive enhancement architecture.
+
+Features:
 - Core functionality works with Python stdlib only
-- Enhanced features available with optional dependencies (rich, gitpython, click)
-- Hierarchical configuration loading (tool -> suite -> environment -> defaults)
-- Backwards compatibility with legacy PF_ environment variables
+- Enhanced features with optional dependencies (rich, gitpython)
+- Auto-detects project types and provides intelligent sorting
+- Integrates with VS Code and other development tools
 
 Usage:
     find-projects [options]
@@ -17,105 +20,126 @@ Examples:
     find-projects --version    # Show version info
     find-projects --config     # Show configuration debug info
 
-Configuration Priority (highest to lowest):
-    1. Environment variables (FIND_PROJECTS_* or legacy PF_*)
-    2. Tool-specific config (tools/find-projects/config/defaults.json)
-    3. Suite-wide config (config/defaults.conf) 
-    4. Auto-detected defaults based on platform
-
-Architecture Notes:
+Architecture:
     - Progressive enhancement: graceful degradation without optional deps
-    - Shared config loading via shared/config_loader.py when available
-    - Tool-specific fallback config loading for independence
-    - Consistent CLI patterns across all IntermCLI tools
-    
-Contributing:
-    - Follow action-target naming convention (find-projects ✓)
-    - Test with both minimal and full dependency sets
-    - Update tool README for any new features
-    - Use tool:find-projects label for related issues/PRs
+    - Tool-specific configuration in tools/find-projects/config/
+    - Follows IntermCLI design patterns and conventions
 """
-
 
 import os
 import sys
 import subprocess
 import json
+import argparse
 from datetime import datetime
 from pathlib import Path
 from collections import defaultdict
 
+__version__ = "1.0.0"
+
+try:
+    import tomllib  # Python 3.11+
+except ImportError:
+    try:
+        import tomli as tomllib  # fallback for older Python
+    except ImportError:
+        tomllib = None
+
 def load_config():
-    """Load configuration from config file"""
-    script_dir = Path(__file__).parent.parent
-    config_file = script_dir / "config" / "defaults.conf"
+    """Load configuration with hierarchical precedence"""
+    script_dir = Path(__file__).parent
     
-    # Platform-aware default configuration
-    home = os.path.expanduser("~")
+    # Try TOML first, fall back to JSON
+    toml_config = script_dir / "config" / "defaults.toml"
+    json_config = script_dir / "config" / "defaults.json"
     
-    # Common development directory patterns for both macOS and Linux
-    default_dirs = [
-        f"{home}/development",
-        f"{home}/projects", 
-        f"{home}/code",
-        f"{home}/workspace",  # Common on Linux
-        f"{home}/src",        # Common on Linux
-        f"{home}/git",        # Alternative pattern
-    ]
+    # Platform-aware defaults
+    home = Path.home()
     
-    # Filter to only existing directories for defaults
-    existing_dirs = [d for d in default_dirs if os.path.exists(d)]
-    
-    config = {
-        'DEVELOPMENT_DIRS': existing_dirs if existing_dirs else default_dirs[:3],
-        'DEFAULT_EDITOR': 'code'
+    default_config = {
+        'development_dirs': [
+            str(home / "development"),
+            str(home / "projects"), 
+            str(home / "code"),
+            str(home / "workspace"),
+            str(home / "src"),
+            str(home / "git"),
+        ],
+        'default_editor': 'code',
+        'max_scan_depth': 3,
+        'skip_dirs': ['.git', 'node_modules', '.vscode', 'dist', 'build', '__pycache__', '.pytest_cache']
     }
     
-    # Override with config file if it exists
-    if config_file.exists():
-        try:
-            with open(config_file) as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        key, value = line.split('=', 1)
-                        key = key.strip()
-                        value = value.strip().strip('"')
-                        
-                        if key == 'PF_DEVELOPMENT_DIRS':
-                            # Expand environment variables like $HOME
-                            value = os.path.expandvars(value)
-                            config['DEVELOPMENT_DIRS'] = [
-                                os.path.expanduser(d.strip()) 
-                                for d in value.split(':')
-                            ]
-                        elif key == 'PF_DEFAULT_EDITOR':
-                            config['DEFAULT_EDITOR'] = value
-        except Exception as e:
-            print(f"⚠️  Warning: Could not load config file: {e}")
+    # Load tool-specific config
+    config_loaded = False
     
-    return config
+    if toml_config.exists() and tomllib:
+        try:
+            with open(toml_config, 'rb') as f:
+                file_config = tomllib.load(f)
+                if 'development_dirs' in file_config:
+                    file_config['development_dirs'] = [
+                        os.path.expanduser(d) for d in file_config['development_dirs']
+                    ]
+                default_config.update(file_config)
+                config_loaded = True
+        except Exception as e:
+            print(f"⚠️  Warning: Could not load TOML config: {e}")
+    
+    if not config_loaded and json_config.exists():
+        try:
+            with open(json_config) as f:
+                file_config = json.load(f)
+                # Expand tildes in config file paths
+                if 'development_dirs' in file_config:
+                    file_config['development_dirs'] = [
+                        os.path.expanduser(d) for d in file_config['development_dirs']
+                    ]
+                default_config.update(file_config)
+                config_loaded = True
+        except Exception as e:
+            print(f"⚠️  Warning: Could not load JSON config: {e}")
+    
+    # Environment variable overrides
+    if env_dirs := os.environ.get('FIND_PROJECTS_DIRS'):
+        default_config['development_dirs'] = [
+            os.path.expanduser(d.strip()) 
+            for d in env_dirs.split(':')
+        ]
+    
+    if env_editor := os.environ.get('FIND_PROJECTS_EDITOR'):
+        default_config['default_editor'] = env_editor
+    
+    # Filter to existing directories AFTER all config loading and path expansion
+    existing_dirs = [d for d in default_config['development_dirs'] if os.path.exists(d)]
+    if existing_dirs:
+        default_config['development_dirs'] = existing_dirs
+    else:
+        print("⚠️  Warning: No configured development directories exist")
+        print("Checked directories:")
+        for d in default_config['development_dirs']:
+            exists = "✅" if os.path.exists(d) else "❌"
+            print(f"  {exists} {d}")
+    
+    return default_config
 
-# Load configuration at module level
-CONFIG = load_config()
-DEVELOPMENT_DIRS = CONFIG['DEVELOPMENT_DIRS']
-
-def debug_config():
+def debug_config(config):
     """Print configuration debug information"""
     import platform
     print(f"🖥️  Platform: {platform.system()} ({platform.machine()})")
-    print(f"🏠 Home directory: {os.path.expanduser('~')}")
-    print(f"📁 Current working directory: {os.getcwd()}")
-    print(f"🔧 Config directories: {CONFIG['DEVELOPMENT_DIRS']}")
-    print(f"📝 Default editor: {CONFIG['DEFAULT_EDITOR']}")
+    print(f"🏠 Home directory: {Path.home()}")
+    print(f"📁 Current working directory: {Path.cwd()}")
+    print(f"🔧 Development directories: {config['development_dirs']}")
+    print(f"📝 Default editor: {config['default_editor']}")
+    print(f"🔍 Max scan depth: {config['max_scan_depth']}")
     print()
 
-def find_git_projects():
-    """Find all git repositories in development directories"""
+def find_git_projects(config):
+    """Find all git repositories in configured directories"""
     projects = []
     
     print("🔍 Scanning directories:")
-    for dev_dir in DEVELOPMENT_DIRS:
+    for dev_dir in config['development_dirs']:
         print(f"  Checking: {dev_dir}")
         if not os.path.exists(dev_dir):
             print(f"    ❌ Directory doesn't exist")
@@ -126,13 +150,19 @@ def find_git_projects():
         
         try:
             for root, dirs, files in os.walk(dev_dir):
-                # Skip common non-project directories
-                dirs[:] = [d for d in dirs if d not in ['.git', 'node_modules', '.vscode', 'dist', 'build', '__pycache__']]
+                # Limit scan depth
+                depth = root[len(dev_dir):].count(os.sep)
+                if depth >= config['max_scan_depth']:
+                    dirs.clear()
+                    continue
+                
+                # Skip configured directories
+                dirs[:] = [d for d in dirs if d not in config['skip_dirs']]
                 
                 if '.git' in os.listdir(root):
                     project_path = root
                     project_name = os.path.basename(project_path)
-                    relative_path = os.path.relpath(project_path, os.path.expanduser("~"))
+                    relative_path = os.path.relpath(project_path, Path.home())
                     
                     print(f"    📁 Found: {project_name} at {relative_path}")
                     
@@ -156,8 +186,7 @@ def find_git_projects():
                     project_count += 1
                     
                     # Don't recurse into git repositories
-                    if '.git' in dirs:
-                        dirs.remove('.git')
+                    dirs.clear()
         
         except Exception as e:
             print(f"    ❌ Error scanning {dev_dir}: {e}")
@@ -176,19 +205,34 @@ def detect_project_type(project_path):
     except:
         return 'Other'
     
-    if 'package.json' in files:
-        return 'Node.js'
-    elif any(f.endswith('.py') for f in files) or 'requirements.txt' in files or 'pyproject.toml' in files:
+    # Check for specific project markers
+    type_markers = {
+        'Node.js': ['package.json', 'package-lock.json', 'yarn.lock'],
+        'Python': ['requirements.txt', 'pyproject.toml', 'setup.py', 'Pipfile'],
+        'Rust': ['Cargo.toml'],
+        'Go': ['go.mod', 'go.sum'],
+        'Java': ['pom.xml', 'build.gradle', 'build.gradle.kts'],
+        'PHP': ['composer.json'],
+        'Ruby': ['Gemfile', 'Gemfile.lock'],
+        'C++': ['CMakeLists.txt', 'Makefile'],
+        'C#': ['.csproj', '.sln'],
+    }
+    
+    # Check for specific markers first
+    for project_type, markers in type_markers.items():
+        if any(marker in files for marker in markers):
+            return project_type
+    
+    # Check for file extensions as fallback
+    if any(f.endswith('.py') for f in files):
         return 'Python'
-    elif 'Cargo.toml' in files:
-        return 'Rust'
-    elif 'go.mod' in files or any(f.endswith('.go') for f in files):
+    elif any(f.endswith('.js') or f.endswith('.ts') for f in files):
+        return 'Node.js'
+    elif any(f.endswith('.go') for f in files):
         return 'Go'
-    elif 'pom.xml' in files or 'build.gradle' in files:
-        return 'Java'
-    elif 'composer.json' in files or any(f.endswith('.php') for f in files):
+    elif any(f.endswith('.php') for f in files):
         return 'PHP'
-    elif 'Gemfile' in files or any(f.endswith('.rb') for f in files):
+    elif any(f.endswith('.rb') for f in files):
         return 'Ruby'
     else:
         return 'Other'
@@ -205,7 +249,7 @@ def fuzzy_search(query, items, key_func=None):
         text = key_func(item) if key_func else str(item)
         text = text.lower()
         
-        # Exact match gets highest score
+        # Score based on match quality
         if query in text:
             if text.startswith(query):
                 score = 100
@@ -221,9 +265,9 @@ def fuzzy_search(query, items, key_func=None):
                     query_idx += 1
             
             if query_idx == len(query):
-                score += 10  # All characters found
+                score += 10
             else:
-                continue  # Skip if not all characters found
+                continue
         
         results.append((item, score))
     
@@ -241,6 +285,8 @@ def get_type_icon(project_type):
         'Java': '☕',
         'PHP': '🐘',
         'Ruby': '💎',
+        'C++': '⚙️',
+        'C#': '🔷',
         'Other': '📁'
     }
     return icons.get(project_type, '📁')
@@ -249,11 +295,10 @@ def group_projects_by_type(projects):
     """Group projects by type and return as a flat list with headers"""
     grouped = defaultdict(list)
     
-    # Group projects by type
     for project in projects:
         grouped[project['type']].append(project)
     
-    # Sort each group by last modified (newest first)
+    # Sort each group by last modified
     for project_type in grouped:
         grouped[project_type].sort(key=lambda x: x['last_modified'], reverse=True)
     
@@ -261,7 +306,6 @@ def group_projects_by_type(projects):
     flat_list = []
     for project_type in sorted(grouped.keys()):
         projects_of_type = grouped[project_type]
-        # Add type header
         flat_list.append({
             'name': f"{project_type} ({len(projects_of_type)} projects)",
             'path': '',
@@ -270,21 +314,20 @@ def group_projects_by_type(projects):
             'last_modified': 0,
             'is_header': True
         })
-        # Add projects
         flat_list.extend(projects_of_type)
     
     return flat_list
 
 def display_projects(projects, selected_index=0, group_by_type=False):
     """Display projects list with selection highlight"""
-    os.system('clear')  # Clear screen
+    os.system('clear')
     
     mode_text = "Grouped by Type" if group_by_type else "Recent Projects"
-    print(f"🔍 Project Finder - {mode_text}")
-    print("=" * 50)
+    print(f"🔍 find-projects - {mode_text}")
+    print("=" * 60)
     print(f"Found {len([p for p in projects if not p.get('is_header', False)])} projects\n")
     
-    # Show only a window of projects around the selection
+    # Show window around selection
     window_size = 15
     start_idx = max(0, selected_index - window_size // 2)
     end_idx = min(len(projects), start_idx + window_size)
@@ -296,56 +339,64 @@ def display_projects(projects, selected_index=0, group_by_type=False):
         project = projects[i]
         
         if project.get('is_header', False):
-            # Display type header
             print(f"🏷️  {project['name']}")
             continue
         
         prefix = "► " if i == selected_index else "  "
         type_icon = get_type_icon(project['type'])
-        
-        # Format date as YYYY-MM-DD
         modified_date = datetime.fromtimestamp(project['last_modified']).strftime('%Y-%m-%d')
         
-        # Extract just the project path without "development/"
+        # Clean up path display
         path_parts = project['relative_path'].split('/')
-        if path_parts[0] == 'development' and len(path_parts) > 1:
+        if len(path_parts) > 1 and path_parts[0] in ['development', 'projects', 'code']:
             clean_path = '/'.join(path_parts[1:])
         else:
             clean_path = project['relative_path']
         
-        # Remove project name from end of path to avoid duplication
         if clean_path.endswith('/' + project['name']):
             clean_path = clean_path[:-len('/' + project['name'])]
         
         if group_by_type:
-            # Indented format for grouped view
-            print(f"   {prefix}• {project['name']} - {clean_path} (modified: {modified_date})")
+            print(f"   {prefix}• {project['name']} - {clean_path} ({modified_date})")
         else:
-            # Standard format for recent view
-            print(f"{prefix}{type_icon} {project['name']} - {clean_path} (modified: {modified_date})")
+            print(f"{prefix}{type_icon} {project['name']} - {clean_path} ({modified_date})")
     
     if len(projects) > window_size:
         print(f"\n... showing {start_idx + 1}-{end_idx} of {len(projects)}")
     
-    print("\n" + "─" * 50)
+    print("\n" + "─" * 60)
     print("⬆️⬇️  Navigate | Enter: Open | /: Search | t: Toggle Sort | q: Quit")
 
-def open_in_vscode(project_path, project_name):
-    """Open project in VSCode and print cd command for shell wrapper"""
+def open_project(project_path, project_name, editor='code'):
+    """Open project in specified editor"""
     try:
-        subprocess.run(['code', project_path], check=True)
-        print(f"✅ Opened {project_name} in VSCode")
-        print(f"CD_TO:{project_path}")
-        return True
-    except subprocess.CalledProcessError:
-        print(f"❌ Failed to open {project_path} in VSCode")
-        return False
-    except FileNotFoundError:
-        print("❌ VSCode command 'code' not found")
+        # Change to project directory first
+        original_cwd = os.getcwd()
+        os.chdir(project_path)
+        
+        print(f"🚀 Opening {project_name} in {editor}...")
+        
+        # Just use os.system - it handles everything properly
+        exit_code = os.system(f"{editor} .")
+        
+        # Restore original directory
+        os.chdir(original_cwd)
+        
+        if exit_code == 0:
+            print(f"✅ Opened {project_name} in {editor}")
+            # Output for shell wrapper to change directory
+            print(f"CD_TO:{project_path}")
+            return True
+        else:
+            print(f"❌ Editor exited with code {exit_code}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error opening project: {e}")
         return False
 
 def get_char():
-    """Get a single character from stdin"""
+    """Get single character input (cross-platform)"""
     try:
         import termios, tty
         fd = sys.stdin.fileno()
@@ -357,38 +408,35 @@ def get_char():
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         return char
     except ImportError:
-        # Fallback for Windows
+        # Windows fallback
         import msvcrt
         return msvcrt.getch().decode('utf-8')
 
 def search_mode(all_projects, group_by_type=False):
-    """Interactive search mode that respects the current view"""
+    """Interactive search mode"""
     query = ""
-    # Get only actual projects, not headers
     original_projects = [p for p in all_projects if not p.get('is_header', False)]
     
     while True:
-        # Filter projects based on current query
         filtered_projects = fuzzy_search(
             query, 
             original_projects, 
             key_func=lambda p: f"{p['name']} {p['relative_path']}"
         )
         
-        # Apply grouping if needed
         if group_by_type and filtered_projects:
             display_projects_list = group_projects_by_type(filtered_projects)
         else:
             display_projects_list = filtered_projects
         
         os.system('clear')
-        search_mode_text = "Search - Grouped by Type" if group_by_type else "Search - Recent"
-        print(f"🔍 {search_mode_text}")
-        print("=" * 50)
+        search_mode_text = "Search - Grouped" if group_by_type else "Search - Recent"
+        print(f"🔍 find-projects - {search_mode_text}")
+        print("=" * 60)
         print(f"Query: {query}_")
         print(f"Found {len(filtered_projects)} matches\n")
         
-        # Show top 15 results
+        # Show top results
         count = 0
         for i, project in enumerate(display_projects_list[:15]):
             if project.get('is_header', False):
@@ -398,9 +446,8 @@ def search_mode(all_projects, group_by_type=False):
             count += 1
             type_icon = get_type_icon(project['type'])
             
-            # Extract clean path
             path_parts = project['relative_path'].split('/')
-            if path_parts[0] == 'development' and len(path_parts) > 1:
+            if len(path_parts) > 1 and path_parts[0] in ['development', 'projects', 'code']:
                 clean_path = '/'.join(path_parts[1:])
             else:
                 clean_path = project['relative_path']
@@ -413,7 +460,7 @@ def search_mode(all_projects, group_by_type=False):
             else:
                 print(f"{count:2d}. {type_icon} {project['name']} - {clean_path}")
         
-        print("\n" + "─" * 50)
+        print("\n" + "─" * 60)
         print("Type to search | Enter: Browse results | Esc: Back | Ctrl+C: Quit")
         
         try:
@@ -438,46 +485,66 @@ def get_next_selectable_index(projects, current_index, direction):
     while True:
         new_index += direction
         
-        # Bounds checking
         if new_index < 0:
-            # Find first selectable item
             new_index = next((i for i, p in enumerate(projects) if not p.get('is_header', False)), 0)
             break
         elif new_index >= len(projects):
-            # Find last selectable item
             new_index = next((i for i in range(len(projects)-1, -1, -1) if not projects[i].get('is_header', False)), len(projects) - 1)
             break
         
-        # Check if this is a selectable project (not a header)
         if not projects[new_index].get('is_header', False):
             break
     
     return new_index
 
 def main():
-    # Uncomment for debugging
-    debug_config()
+    """Main application entry point"""
+    parser = argparse.ArgumentParser(
+        description='Interactive development project discovery and navigation',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+Examples:
+  find-projects              Interactive project browser
+  find-projects --config     Show configuration information
+  find-projects --version    Show version information
+
+Environment Variables:
+  FIND_PROJECTS_DIRS         Colon-separated list of directories to scan
+  FIND_PROJECTS_EDITOR       Default editor command (default: code)
+        '''
+    )
     
-    print("🔍 Scanning directories:")
-    projects = find_git_projects()
+    parser.add_argument('--version', action='version', version=f'find-projects {__version__}')
+    parser.add_argument('--config', action='store_true', help='Show configuration debug info')
+    
+    args = parser.parse_args()
+    
+    # Load configuration
+    config = load_config()
+    
+    if args.config:
+        debug_config(config)
+        return
+    
+    # Find projects
+    projects = find_git_projects(config)
     
     if not projects:
         print("\n❌ No git repositories found")
         print("\nTip: Make sure you have git repositories in one of these directories:")
-        for dev_dir in DEVELOPMENT_DIRS:
+        for dev_dir in config['development_dirs']:
             print(f"  - {dev_dir}")
-        print("\nOr modify the DEVELOPMENT_DIRS list in the script to match your setup.")
+        print(f"\nOr set FIND_PROJECTS_DIRS environment variable to specify custom directories.")
         return
     
+    # Interactive browsing
     group_by_type = False
     current_projects = projects
     selected_index = 0
     
     while True:
-        # Update display based on current sort mode
         if group_by_type:
             current_projects = group_projects_by_type(projects)
-            # Ensure selected index is on a selectable item
             if selected_index >= len(current_projects) or current_projects[selected_index].get('is_header', False):
                 selected_index = next((i for i, p in enumerate(current_projects) if not p.get('is_header', False)), 0)
         else:
@@ -492,24 +559,21 @@ def main():
             if char == 'q':
                 break
             elif char == 't':
-                # Toggle sort mode
                 group_by_type = not group_by_type
                 continue
             elif char == '/':
                 search_results = search_mode(projects, group_by_type)
                 if search_results:
                     current_projects = search_results
-                    # Find first selectable item in search results
                     selected_index = next((i for i, p in enumerate(current_projects) if not p.get('is_header', False)), 0)
-                    # Don't change group_by_type - stay in current view mode
             elif ord(char) == 13:  # Enter
                 if (current_projects and 
                     selected_index < len(current_projects) and 
                     not current_projects[selected_index].get('is_header', False)):
                     project = current_projects[selected_index]
-                    if open_in_vscode(project['path'], project['name']):
+                    if open_project(project['path'], project['name'], config['default_editor']):
                         break
-            elif char == '\x1b':  # Arrow keys start with escape
+            elif char == '\x1b':  # Arrow keys
                 next_chars = sys.stdin.read(2)
                 if next_chars == '[A':  # Up arrow
                     if group_by_type:
@@ -522,19 +586,18 @@ def main():
                     else:
                         selected_index = min(len(current_projects) - 1, selected_index + 1)
             elif char.isdigit():
-                # Quick selection by number (find the nth selectable project)
+                # Quick selection by number
                 num = int(char)
                 selectable_projects = [(i, p) for i, p in enumerate(current_projects) if not p.get('is_header', False)]
                 if 1 <= num <= len(selectable_projects):
                     selected_index = selectable_projects[num - 1][0]
                     project = current_projects[selected_index]
-                    if open_in_vscode(project['path'], project['name']):
+                    if open_project(project['path'], project['name'], config['default_editor']):
                         break
                         
         except KeyboardInterrupt:
             break
         except:
-            # Handle any input errors gracefully
             continue
     
     print("\n👋 Goodbye!")

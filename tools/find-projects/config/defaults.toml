@@ -1,0 +1,33 @@
+# find-projects configuration file
+# Supports full shell commands in default_editor for custom workflows
+
+# Directories to scan for git repositories
+development_dirs = [
+    "~/development",
+    "~/projects", 
+    "~/code",
+    "~/workspace",
+    "~/src"
+]
+
+# Default editor/command to open projects
+# Can be any shell command - supports tmux, custom scripts, etc.
+# Examples:
+#   "code"  # VS Code
+#   "vim ." # Vim
+#   "tmux new-session -d -s project \\; split-window -h \\; send-keys 'vim .' Enter"
+default_editor = "code"
+
+# Maximum directory depth to scan
+max_scan_depth = 3
+
+# Directories to skip during scanning
+skip_dirs = [
+    ".git",
+    "node_modules", 
+    ".vscode",
+    "dist",
+    "build",
+    "__pycache__",
+    ".pytest_cache"
+]
