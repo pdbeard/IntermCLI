@@ -163,7 +163,7 @@ class ConfigManager:
         
         config_dict = {
             'development_dirs': default_dirs,
-            'default_editor': 'code',
+            'default_editor': 'vim',
             'max_scan_depth': 3,
             'skip_dirs': ['.git', 'node_modules', '.vscode', 'dist', 'build', '__pycache__', '.pytest_cache'],
             **self.validator.SECURE_DEFAULTS
@@ -573,8 +573,8 @@ class UIRenderer:
             print(f"\n... showing {start_idx + 1}-{end_idx} of {len(projects)}")
         
         print("\n" + "─" * 60)
-        print("⬆️⬇️  Navigate | Enter: Open | /: Search | t: Toggle Sort | q: Quit")
-    
+        print("⬆️⬇️  Navigate | Enter: Open | /: Search | t: Toggle Sort | Ctrl+C: Back")
+
     def _render_project_line(self, project: Project, index: int, selected_index: int, group_by_type: bool) -> None:
         """Render a single project line"""
         if project.is_header:
@@ -677,8 +677,9 @@ class FindProjectsApp:
                     break
                     
             except KeyboardInterrupt:
+                # In main mode, Ctrl+C immediately quits
                 break
-        
+    
         print("\n👋 Goodbye!")
     
     def _find_next_selectable(self, projects: List[Project], current_index: int) -> int:
@@ -741,50 +742,59 @@ class FindProjectsApp:
                 print(f"{prefix}{i+1:2d}. {type_icon} {project.name} - {project.relative_path}")
             
             print("\n" + "─" * 60)
-            print("Type to search | ⬆️⬇️  Navigate | Enter: Open | Esc: Back")
+            print("Type to search | ⬆️⬇️  Navigate | Enter: Open | Ctrl+C: Back")
             
-            # Handle search input
-            char = self.input_handler.get_char()
-            if not char:
-                continue
-            
-            if ord(char) == 27:  # ESC - Check if it's arrow keys first
-                try:
-                    # Read the next characters without timeout first
-                    next_char1 = sys.stdin.read(1)
-                    next_char2 = sys.stdin.read(1)
-                    
-                    if next_char1 == '[':
-                        if next_char2 == 'A':  # Up arrow
-                            search_selected = max(0, search_selected - 1)
-                            continue  # IMPORTANT: Stay in search mode
-                        elif next_char2 == 'B':  # Down arrow
-                            search_selected = min(len(filtered) - 1, search_selected + 1)
-                            continue  # IMPORTANT: Stay in search mode
-                    
-                    # If not arrow keys, treat as ESC to exit search mode
-                    break
-                except:
-                    # Any error, treat as ESC and exit search mode
-                    break
+            # Handle search input - WRAP IN TRY-EXCEPT
+            try:
+                char = self.input_handler.get_char()
+                if not char:
+                    continue
                 
-            elif ord(char) == 13:  # Enter
-                if filtered and search_selected < len(filtered):
-                    project = filtered[search_selected]
-                    self.opener.open_project(project.path, project.name, self.config.default_editor)
-                    break
-            elif ord(char) == 127 or ord(char) == 8:  # Backspace
-                query = query[:-1]
-                search_selected = 0
-            elif char.isdigit():
-                num = int(char)
-                if 1 <= num <= min(15, len(filtered)):
-                    project = filtered[num - 1]
-                    self.opener.open_project(project.path, project.name, self.config.default_editor)
-                    break
-            elif self.input_handler.is_safe_printable(char):
-                query += char
-                search_selected = 0
+                if ord(char) == 27:  # Arrow keys
+                    try:
+                        # Read the next character immediately without timeout
+                        next_char1 = sys.stdin.read(1)
+                        
+                        if next_char1 == '[':
+                            # We have an arrow key sequence, read the direction
+                            next_char2 = sys.stdin.read(1)
+                            
+                            if next_char2 == 'A':  # Up arrow
+                                search_selected = max(0, search_selected - 1)
+                                continue  # IMPORTANT: Stay in search mode
+                            elif next_char2 == 'B':  # Down arrow
+                                search_selected = min(len(filtered) - 1, search_selected + 1)
+                                continue  # IMPORTANT: Stay in search mode
+                            else:
+                                # Unknown arrow key sequence, ignore
+                                continue
+                        # If not arrow keys, ignore
+                        continue
+                    except Exception:
+                        # Ignore arrow key errors
+                        continue
+                        
+                elif ord(char) == 13:  # Enter
+                    if filtered and search_selected < len(filtered):
+                        project = filtered[search_selected]
+                        self.opener.open_project(project.path, project.name, self.config.default_editor)
+                        break
+                elif ord(char) == 127 or ord(char) == 8:  # Backspace
+                    query = query[:-1]
+                    search_selected = 0
+                elif char.isdigit():
+                    num = int(char)
+                    if 1 <= num <= min(15, len(filtered)):
+                        project = filtered[num - 1]
+                        self.opener.open_project(project.path, project.name, self.config.default_editor)
+                        break
+                elif self.input_handler.is_safe_printable(char):
+                    query += char
+                    search_selected = 0
+                    
+            except KeyboardInterrupt:
+                # Ctrl+C in search mode - go back to main browser
+                break
     
     def _handle_project_open(self, projects: List[Project]) -> None:
         """Handle opening a project"""

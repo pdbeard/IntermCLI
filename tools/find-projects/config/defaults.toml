@@ -15,8 +15,7 @@ development_dirs = [
 # Examples:
 #   "code"  # VS Code
 #   "vim ." # Vim
-#   "tmux new-session -d -s project \\; split-window -h \\; send-keys 'vim .' Enter"
-default_editor = "tmux new-session -d -s project \\; split-window -h \\; send-keys 'nvim .' Enter"
+default_editor = "code"
 
 # Maximum directory depth to scan
 max_scan_depth = 3
