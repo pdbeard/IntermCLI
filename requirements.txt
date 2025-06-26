@@ -1,3 +1,6 @@
+# TOML support for Python < 3.11
+tomli>=2.0.0; python_version < "3.11"
+
 # Optional dependencies for enhanced functionality
 # All tools work without these but unlock additional features when available
 
@@ -16,7 +19,6 @@ python-nmap>=0.7.1
 
 # Configuration and data handling
 pyyaml>=6.0
-toml>=0.10.0
 
 # Development project detection enhancements (for find-projects)
 gitpython>=3.1.0

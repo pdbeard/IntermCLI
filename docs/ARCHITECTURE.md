@@ -13,7 +13,7 @@ intermcli/
 ├── CHANGELOG.md              # Version history for entire suite
 ├── requirements.txt          # Optional dependencies for all tools
 ├── requirements-dev.txt      # Development dependencies
-├── install.sh               # Installation script for all tools
+├── install.sh               # Installation script for all tools (requirments.txt only)
 ├── todo                     # Development todo list
 ├── .gitignore
 ├── .github/                 # GitHub-specific files

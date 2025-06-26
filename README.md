@@ -67,11 +67,16 @@ find-projects --help         # Show all options
 
 ## 🔧 Installation
 
-### Automatic Installation
+For end users:
 ```bash
-git clone https://github.com/yourusername/intermcli.git
-cd intermcli
 ./install.sh
+# OR manually:
+pip3 install --user -r requirements.txt
+```
+
+For developers:
+```bash
+pip3 install -r requirements-dev.txt  # Includes requirements.txt
 ```
 
 This will:
