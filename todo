@@ -6,9 +6,73 @@
 - Add naming convention
 
 
+tool ideas
+- Scripty things?
+    - renaming scripts/ backupscripts/ all the things i use on the webserver?
+    - aliases for common things I do? aka docker mass quit
+
+-checking common services?
+    custom list, active monitoring? 
+git stat
+- Good logging Scripts? 
+    multifile support/filtering/highlighting
+- analyze logs?
+    -dunno even know how I would do this
+-User management info and scripts
+    - users/groups/last logins, fast enable/disable, fast create? 
+
+-Disk scripts
+    - find large files? 
+
+-backups for config files
+
+-General update script? 
+    - possibly pull info from api's, list security warnings from comminity
+-rotate log scripts
+-rotate keys, ssh, api
+-more individualised process monitor? 
+ - maybe something cool like watch specific ones that hit certain blah blah
+ find suid/sgid\
 
 
+-web dev scripts
+    - check-ssl
+    - test-enpoints (postman style?)
+    - lint-configs
+    - find-secrets
+    - deploy static 
+    - monitor uptime
+    check-cors
+    analyse-deps
+    -generate-envs
+    - check accessibility
+    test-webhooks?
+    generate sitemap
+    check redirects
+    - gen favicons
+    - check headers
+    - test csp headers/ headers
+    - love to be able to set and generate json templates
 
+-general
+    - terminal color schemes
+    - find open prs
+    -sync dotfiles
+    -check-dns
+    -test-smtp 
+    - generate password
+    -ripgrep/grep wrapper?
+    -encrypt decrypt files
+    -generate password
+    -better pop popd? include something like Z? 
+    -Download manager and watcher 
+    -clipboard manager? 
+    - firewalls stuff
+    - install and configure my fav stuff? fail2ban general security settings, ssh
+    -find duplicates
+    -color picker and profiles
+        - color picker and profile lists from terminal?
 
+    
 
 
