@@ -23,14 +23,9 @@ Interactive terminal utilities for developers. A collection of independent, self
 git clone https://github.com/yourusername/intermcli.git
 cd intermcli
 ./install.sh
-
-# Optional: Install enhanced features
-pip3 install -r requirements.txt
-
-# Start using tools
-scan-ports localhost
-find-projects
 ```
+- This will install all tools to `~/.local/bin/`, set up configuration, and offer to add to your PATH.
+- You will be prompted to optionally install enhanced Python dependencies for extra features.
 
 ## 🛠️ Available Tools
 
@@ -70,37 +65,40 @@ find-projects --help         # Show all options
 For end users:
 ```bash
 ./install.sh
-# OR manually:
-pip3 install --user -r requirements.txt
 ```
+- This will install all tools to `~/.local/bin/`, set up configuration files, and offer to add to your PATH.
+- The installer will prompt you to optionally install enhanced Python dependencies for extra features.
 
 For developers:
 ```bash
 pip3 install -r requirements-dev.txt  # Includes requirements.txt
 ```
 
-This will:
-- Install tools to `~/.local/bin/`
-- Set up configuration files
-- Add to PATH if needed
-
 ### Manual Installation
+Copy individual tools to your PATH and ensure they are executable.  
+Optional features require manual installation of Python packages:
+
 ```bash
-# Copy individual tools
 cp tools/scan-ports/scan-ports.py ~/.local/bin/scan-ports
 cp tools/find-projects/find-projects.py ~/.local/bin/find-projects
 chmod +x ~/.local/bin/scan-ports ~/.local/bin/find-projects
-
-# Ensure ~/.local/bin is in PATH
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+pip3 install --user -r requirements.txt  # For enhanced features
 ```
 
 ### Optional Dependencies
-```bash
-# Enhanced features (recommended)
-pip3 install requests urllib3 rich
 
-# Development tools
+The install script will detect and offer to install optional Python packages for enhanced features (e.g., `requests`, `rich`, `gitpython`).  
+You can also install them manually:
+
+```bash
+pip3 install --user -r requirements.txt
+```
+
+### Development Tools
+
+For development, install all dev dependencies:
+
+```bash
 pip3 install -r requirements-dev.txt
 ```
 
@@ -108,7 +106,7 @@ pip3 install -r requirements-dev.txt
 
 - **Python 3.8+** (tested on 3.8-3.11)
 - **Linux or macOS**
-- Optional: `requests`, `urllib3`, `rich` for enhanced features
+- Optional: Python packages in `requirements.txt` for enhanced features (installer will prompt)
 
 ## 📖 Usage Examples
 
@@ -170,6 +168,7 @@ tools/
 - **Progressive Enhancement**: Core features use stdlib, optional deps add enhancements
 - **Action-Target Naming**: `scan-ports`, `find-projects`, future: `check-services`
 - **Minimal Shared Code**: Only when proven beneficial
+- **Tool Manifest**: All tools are listed in `tools_manifest.toml` for modular installation and management.
 
 ## 📚 Documentation
 
@@ -217,4 +216,4 @@ Please read our [Contributing Guidelines](docs/CONTRIBUTING.md) for details on:
 
 ## 📄 License
 
-This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.# filepath: /home/swipe/dev/scripts/IntermCLI/README.md
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.

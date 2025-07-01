@@ -1,54 +1,111 @@
-# bin/interm (pseudocode)
 #!/usr/bin/env python3
+import sys
+import os
+import subprocess
+from pathlib import Path
 
+SUITE_VERSION = "1.0.0"
+TOOLS = ["scan-ports", "find-projects"]  # Add more as you grow
 
+def show_suite_help():
+    print(f"""IntermCLI Suite v{SUITE_VERSION}
+Usage:
+  interm <command> [args...]
 
-# Possible commands for the 'interm' suite:
+Suite management:
+  interm install           Manage installation
+  interm config            Global configuration
+  interm update            Update all tools
+  interm list              Show available tools
+  interm status            Check installation/dependencies
+  interm version           Show suite version
+  interm help [tool]       Tool-specific help
 
-# Suite Management (Primary Purpose)
+Tool discovery:
+  interm tools             List all available tools
+  interm docs              Open documentation
+  interm examples          Show cross-tool workflows
 
-# interm install                    # Manage installation
-# interm config                     # Global configuration
-# interm update                     # Update all tools
-# interm list                       # Show available tools
-# interm help scan-ports           # Tool-specific help
-# interm version                   # Suite version info
+Delegation:
+  interm scan-ports ...    Run scan-ports tool
+  interm find-projects ... Run find-projects tool
+""")
 
-# Tool Discovery & Documentation
+def handle_suite_command(command, args):
+    if command == "install":
+        print("🔧 Installation is managed by the install.sh script.")
+    elif command == "config":
+        print("🛠️  Edit your config at ~/.config/intermcli/config.toml")
+    elif command == "update":
+        print("⬆️  To update, pull latest from git and rerun install.sh.")
+    elif command == "list" or command == "tools":
+        print("Available tools:")
+        for tool in TOOLS:
+            print(f"  {tool}")
+    elif command == "status":
+        print("Checking installation status...")
+        for tool in TOOLS:
+            path = find_tool_executable(tool)
+            if path:
+                print(f"  ✅ {tool} found at {path}")
+            else:
+                print(f"  ❌ {tool} not found in PATH")
+    elif command == "version":
+        print(f"IntermCLI Suite version {SUITE_VERSION}")
+    elif command == "docs":
+        print("📖 Documentation: https://github.com/yourrepo/intermcli/docs")
+    elif command == "examples":
+        print("🔗 Examples: See docs/examples.md")
+    elif command == "help":
+        if args:
+            tool = args[0]
+            delegate_to_tool(tool, ["--help"])
+        else:
+            show_suite_help()
+    else:
+        print(f"Unknown suite command: {command}")
+        show_suite_help()
 
-# interm tools                     # List all available tools
-# interm examples                  # Show cross-tool workflows
-# interm docs                      # Open documentation
-# interm status                    # Check installation/dependencies
+def find_tool_executable(tool_name):
+    # Try local bin, then PATH
+    local_bin = Path(__file__).parent.parent / "tools" / tool_name / f"{tool_name}.py"
+    if local_bin.exists():
+        return str(local_bin)
+    # Try just the tool name (if installed in PATH)
+    return shutil.which(tool_name) or tool_name
 
-# Simple Delegation (Secondary)
+def tool_exists(tool_name):
+    return tool_name in TOOLS or shutil.which(tool_name) is not None
 
-# interm scan-ports localhost      # Same as: scan-ports localhost
-# interm find-projects             # Same as: find-projects
-
-
+def delegate_to_tool(tool_name, args):
+    tool_path = find_tool_executable(tool_name)
+    if not tool_path or not os.path.exists(tool_path):
+        print(f"❌ Tool '{tool_name}' not found.")
+        sys.exit(1)
+    # Use python for .py scripts, else run directly
+    if tool_path.endswith(".py"):
+        cmd = [sys.executable, tool_path] + args
+    else:
+        cmd = [tool_path] + args
+    subprocess.run(cmd)
 
 def main():
     if len(sys.argv) < 2:
         show_suite_help()
         return
-    
+
     command = sys.argv[1]
-    
-    # Suite management commands
-    if command in ['install', 'config', 'update', 'list', 'status']:
+
+    # Suite management and discovery commands
+    if command in ['install', 'config', 'update', 'list', 'status', 'version', 'tools', 'docs', 'examples', 'help']:
         handle_suite_command(command, sys.argv[2:])
-    
     # Tool delegation
     elif tool_exists(command):
         delegate_to_tool(command, sys.argv[2:])
-    
-    # Default help
     else:
+        print(f"Unknown command: {command}")
         show_suite_help()
 
-def delegate_to_tool(tool_name, args):
-    """Simply call the standalone tool"""
-    import subprocess
-    tool_path = find_tool_executable(tool_name)
-    subprocess.run([tool_path] + args)
+if __name__ == "__main__":
+    import shutil
+    main()

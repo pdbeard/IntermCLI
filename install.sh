@@ -1,5 +1,7 @@
 #!/bin/bash
 set -e
+set -u
+set -o pipefail
 
 # Colors FIRST (before any usage)
 RED='\033[0;31m'
@@ -7,6 +9,13 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
+
+# Things to have early
+OPTIONAL_MISSING=()
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TOOLS_MANIFEST="$SCRIPT_ROOT/tools_manifest.toml"
+INSTALL_OPTIONAL=false
+
 
 # IntermCLI Installation Script
 # Interactive terminal utilities for developers
@@ -42,18 +51,47 @@ detect_shell_profile() {
     fi
 }
 
+
+if [ ! -f "$TOOLS_MANIFEST" ]; then
+    echo -e "${RED}❌ tools_manifest.toml not found at $TOOLS_MANIFEST${NC}"
+    exit 1
+fi
+
+parse_tools() {
+    python3 -c "
+import sys
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
+try:
+    with open('$TOOLS_MANIFEST', 'rb') as f:
+        data = tomllib.load(f)
+    for tool in data['tool']:
+        print(f\"{tool['name']}|{tool['script']}|{tool.get('is_executable', False)}\")
+except Exception as e:
+    print('Error parsing tools_manifest.toml:', e, file=sys.stderr)
+    sys.exit(1)
+"
+}
+
 verify_installation() {
     echo -e "${BLUE}🔍 Verifying installation...${NC}"
-    
-    for tool in "scan-ports" "find-projects"; do
-        if [ -f "$INSTALL_DIR/$tool" ] && [ -x "$INSTALL_DIR/$tool" ]; then
-            echo -e "${GREEN}  ✅ $tool installed and executable${NC}"
+    parse_tools | while IFS="|" read -r tool_name _ _; do
+        if [ -f "$INSTALL_DIR/$tool_name" ] && [ -x "$INSTALL_DIR/$tool_name" ]; then
+            echo -e "${GREEN}  ✅ $tool_name installed and executable${NC}"
         else
-            echo -e "${RED}  ❌ $tool installation failed${NC}"
+            echo -e "${RED}  ❌ $tool_name installation failed${NC}"
             return 1
         fi
+
+        if command -v "$tool_name" >/dev/null 2>&1; then
+            echo -e "${GREEN}  ✅ $tool_name is in PATH${NC}"
+        else
+            echo -e "${YELLOW}  ⚠️  $tool_name not in PATH${NC}"
+        fi
     done
-    
+
     # Test basic functionality
     if command -v python3 >/dev/null && python3 -c "import sys; print('Python', sys.version)" >/dev/null 2>&1; then
         echo -e "${GREEN}  ✅ Python environment working${NC}"
@@ -65,21 +103,31 @@ ask_yes_no() {
     local prompt="$1"
     local default="$2"
     local response
-    
+
     if [ "$default" = "y" ]; then
         prompt="$prompt [Y/n]: "
     else
         prompt="$prompt [y/N]: "
     fi
-    
+
     while true; do
-        read -p "$prompt" response
-        # Convert to lowercase using tr instead of ${response,,}
+        # Temporarily disable set -e for read
+        set +e
+        read -r -p "$prompt" response
+        local read_exit_code=$?
+        set -e
+
+        if [ $read_exit_code -ne 0 ]; then
+            echo ""
+            echo -e "${YELLOW}Installation cancelled by user${NC}"
+            exit 130
+        fi
+
         response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
         case $response in
             y|yes) return 0 ;;
             n|no) return 1 ;;
-            "") 
+            "")
                 if [ "$default" = "y" ]; then
                     return 0
                 else
@@ -92,12 +140,13 @@ ask_yes_no() {
 }
 
 # Handle command-line arguments
-if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+if [ $# -eq 0 ] || [ "$1" = "install" ]; then
     echo "IntermCLI Installation Script"
     echo ""
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
+    echo "  --install, -i  Install IntermCLI tools"
     echo "  --help, -h     Show this help message"
     echo "  --version, -v  Show version information"
     echo "  --uninstall    Remove IntermCLI"
@@ -110,19 +159,25 @@ if [ "$1" = "--version" ] || [ "$1" = "-v" ]; then
     exit 0
 fi
 
+# Check for pip3
+if ! command -v pip3 &> /dev/null; then
+    echo -e "${RED}❌ pip3 not found${NC}"
+    exit 1
+fi
+
+# Uninstall section: remove all tools from manifest
 if [ "$1" = "--uninstall" ]; then
     echo -e "${BLUE}🗑️  Uninstalling IntermCLI...${NC}"
-    
     if ask_yes_no "Remove installed tools?" "y"; then
-        rm -f "$HOME/.local/bin/scan-ports" "$HOME/.local/bin/find-projects"
-        echo -e "${GREEN}  ✅ Tools removed${NC}"
+        parse_tools | while IFS="|" read -r tool_name _ _; do
+            rm -f "$HOME/.local/bin/$tool_name"
+            echo -e "${GREEN}  ✅ $tool_name removed${NC}"
+        done
     fi
-    
     if ask_yes_no "Remove configuration?" "n"; then
         rm -rf "$HOME/.config/intermcli"
         echo -e "${GREEN}  ✅ Configuration removed${NC}"
     fi
-    
     echo -e "${GREEN}✅ Uninstall complete${NC}"
     exit 0
 fi
@@ -147,12 +202,16 @@ else
     exit 1
 fi
 
-SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALLED_FILES=()
 INSTALLED_DIRS=()
 
 # Add logging capability
-LOG_FILE="$HOME/.intermcli-install.log"
+CONFIG_DIR="$HOME/.config/intermcli"
+LOG_FILE="$CONFIG_DIR/install.log"
+
+# Ensure config dir exists before logging
+mkdir -p "$CONFIG_DIR"
+: > "$LOG_FILE"
 
 log() {
     echo "$(date): $1" >> "$LOG_FILE"
@@ -168,7 +227,6 @@ cleanup_on_failure() {
     done
 }
 
-trap cleanup_on_failure ERR
 # Global interrupt and error handling
 cleanup_on_exit() {
     local exit_code=$?
@@ -244,27 +302,19 @@ echo ""
 
 # Check dependencies using requirements.txt
 echo -e "${BLUE}📦 Checking dependencies...${NC}"
-MISSING_DEPS=()
-OPTIONAL_MISSING=()
 
+OPTIONAL_MISSING=()
 if [ "$NEEDS_TOMLI" = true ]; then
-    MISSING_DEPS+=("tomli")
+    OPTIONAL_MISSING+=("tomli")
 fi
 
-# Read and check requirements.txt
 if [ -f "$SCRIPT_ROOT/requirements.txt" ]; then
     echo -e "${BLUE}  Reading requirements.txt...${NC}"
-    
-    # Use mktemp for secure temp files
     TEMP_FILE=$(mktemp -t intermcli.XXXXXX)
-    trap 'rm -f "$TEMP_FILE"' EXIT INT TERM
-    
-    # Parse requirements.txt and check each package
     python3 -c "
 import sys
 import re
 
-# Read requirements.txt
 with open('$SCRIPT_ROOT/requirements.txt', 'r') as f:
     lines = f.readlines()
 
@@ -273,96 +323,53 @@ available_deps = []
 
 for line in lines:
     line = line.strip()
-    # Skip comments and empty lines
-    if not line or line.startswith('#'):
+    if not line or line.startswith('#') or line.startswith('-r'):
         continue
-    
-    # Handle conditional dependencies (e.g., tomli for Python < 3.11)
     if ';' in line:
         pkg_part, condition_part = line.split(';', 1)
         pkg_part = pkg_part.strip()
         condition_part = condition_part.strip()
-        
-        # Check if condition applies to current Python version
         if 'python_version' in condition_part:
-            # Simple evaluation for common cases
             if 'python_version < \"3.11\"' in condition_part:
                 if sys.version_info >= (3, 11):
-                    # Skip this package for Python 3.11+
                     continue
             elif 'python_version >= \"3.11\"' in condition_part:
                 if sys.version_info < (3, 11):
-                    # Skip this package for Python < 3.11
                     continue
     else:
         pkg_part = line
-    
-    # Extract package name (before >= or other version specifiers)
     pkg_name = re.split(r'[><=!]', pkg_part)[0].strip()
-    
     try:
-        __import__(pkg_name.replace('-', '_'))  # Handle package name differences
+        __import__(pkg_name.replace('-', '_'))
         available_deps.append(pkg_name)
     except ImportError:
         missing_deps.append(pkg_name)
 
-# Display results
 for pkg in available_deps:
     print(f'  ✅ {pkg}')
-
 for pkg in missing_deps:
     print(f'  ⚪ {pkg} - optional')
-
-# Write missing deps to temp file
 with open('$TEMP_FILE', 'w') as f:
     f.write('\n'.join(missing_deps))
 "
-    
-    # Read the temp file
-    OPTIONAL_MISSING=($(cat "$TEMP_FILE" 2>/dev/null || true))
-    
-    # Clean up temp file
+    OPTIONAL_MISSING+=($(cat "$TEMP_FILE" 2>/dev/null || true))
     rm -f "$TEMP_FILE"
 else
     echo -e "${YELLOW}  ⚠️  requirements.txt not found${NC}"
 fi
 
-# Dependency installation prompt
-if [ ${#MISSING_DEPS[@]} -gt 0 ] || [ ${#OPTIONAL_MISSING[@]} -gt 0 ]; then
+INSTALL_OPTIONAL=false
+if [ ${#OPTIONAL_MISSING[@]} -gt 0 ]; then
     echo ""
-    echo -e "${YELLOW}📋 Dependency Summary:${NC}"
-    
-    if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
-        echo -e "${RED}  Required:${NC}"
-        for dep in "${MISSING_DEPS[@]}"; do
-            echo -e "    • $dep"
-        done
-    fi
-    
-    if [ ${#OPTIONAL_MISSING[@]} -gt 0 ]; then
-        echo -e "${BLUE}  Optional (from requirements.txt):${NC}"
-        for dep in "${OPTIONAL_MISSING[@]}"; do
-            echo -e "    • $dep"
-        done
-    fi
-    
+    echo -e "${YELLOW}📋 Optional Python packages not found:${NC}"
+    for dep in "${OPTIONAL_MISSING[@]}"; do
+        echo -e "    • $dep"
+    done
     echo ""
-    echo -e "${BLUE}Dependencies will be installed to user environment (~/.local/)${NC}"
-    
-    if ask_yes_no "Install dependencies automatically?" "y"; then
-        INSTALL_DEPS=true
-        
-        if [ ${#OPTIONAL_MISSING[@]} -gt 0 ]; then
-            if ask_yes_no "Include optional dependencies for enhanced features?" "y"; then
-                INSTALL_OPTIONAL=true
-            else
-                INSTALL_OPTIONAL=false
-            fi
-        fi
+    if ask_yes_no "Install optional Python dependencies for enhanced features?" "y"; then
+        INSTALL_OPTIONAL=true
     else
-        INSTALL_DEPS=false
-        echo -e "${YELLOW}  ⚠️  You can install dependencies manually later:${NC}"
-        echo -e "${BLUE}     pip3 install --user -r $SCRIPT_ROOT/requirements.txt${NC}"
+        echo -e "${YELLOW}Some features may be unavailable without optional dependencies.${NC}"
     fi
 fi
 
@@ -418,10 +425,10 @@ echo -e "  Platform: $PLATFORM"
 echo -e "  Python: $PYTHON_VERSION"
 echo -e "  Install to: $INSTALL_DIR"
 echo -e "  Config: $CONFIG_DIR"
-if [ "$INSTALL_DEPS" = true ]; then
-    echo -e "  Dependencies: Will install"
+if [ "$INSTALL_OPTIONAL" = true ]; then
+    echo -e "  Optional dependencies: Will install"
 else
-    echo -e "  Dependencies: Skip"
+    echo -e "  Optional dependencies: Skip"
 fi
 
 echo ""
@@ -434,29 +441,18 @@ fi
 echo ""
 echo -e "${BLUE}🚀 Starting installation...${NC}"
 
-# Install dependencies
-if [ "$INSTALL_DEPS" = true ]; then
-    echo -e "${BLUE}📦 Installing Python dependencies...${NC}"
-    
-    # Build list of packages to install
-    DEPS_TO_INSTALL=("${MISSING_DEPS[@]}")
-    if [ "$INSTALL_OPTIONAL" = true ]; then
-        DEPS_TO_INSTALL+=("${OPTIONAL_MISSING[@]}")
-    fi
-    
-    if [ ${#DEPS_TO_INSTALL[@]} -gt 0 ]; then
-        echo -e "${BLUE}  Installing: ${DEPS_TO_INSTALL[*]}${NC}"
-        
-        if [ "$DRY_RUN" = false ]; then
-            if pip3 install --user "${DEPS_TO_INSTALL[@]}"; then
-                echo -e "${GREEN}  ✅ Dependencies installed${NC}"
-            else
-                echo -e "${YELLOW}  ⚠️  Failed to install some packages${NC}"
-                echo -e "${YELLOW}     Manual install: pip3 install --user ${DEPS_TO_INSTALL[*]}${NC}"
-            fi
+# Install optional dependencies if chosen
+if [ "$INSTALL_OPTIONAL" = true ] && [ ${#OPTIONAL_MISSING[@]} -gt 0 ]; then
+    echo -e "${BLUE}📦 Installing optional Python dependencies...${NC}"
+    if [ "$DRY_RUN" = false ]; then
+        if python3 -m pip install --user "${OPTIONAL_MISSING[@]}"; then
+            echo -e "${GREEN}  ✅ Optional dependencies installed${NC}"
         else
-            echo -e "${BLUE}  Would install: ${DEPS_TO_INSTALL[*]}${NC}"
+            echo -e "${YELLOW}  ⚠️  Failed to install some packages${NC}"
+            echo -e "${YELLOW}     Manual install: python3 -m pip install --user ${OPTIONAL_MISSING[*]}${NC}"
         fi
+    else
+        echo -e "${BLUE}  Would install: ${OPTIONAL_MISSING[*]}${NC}"
     fi
 fi
 
@@ -503,11 +499,28 @@ fi"
 
 # Install tools
 echo -e "${BLUE}🔧 Installing tools...${NC}"
-create_tool_wrapper "scan-ports" "tools/scan-ports/scan-ports.py"
-# FIX: Use the correct filename for find-projects
-create_tool_wrapper "find-projects" "tools/find-projects/find-projects.py"
+parse_tools | while IFS="|" read -r tool_name tool_script is_executable; do
+    # Use case-insensitive check for is_executable
+    if [ "$(echo "$is_executable" | tr '[:upper:]' '[:lower:]')" = "true" ]; then
+        if [ -f "$SCRIPT_ROOT/$tool_script" ]; then
+            if [ "$INSTALL_SCOPE" = "global" ]; then
+                sudo cp "$SCRIPT_ROOT/$tool_script" "$INSTALL_DIR/$tool_name"
+                sudo chmod +x "$INSTALL_DIR/$tool_name"
+            else
+                cp "$SCRIPT_ROOT/$tool_script" "$INSTALL_DIR/$tool_name"
+                chmod +x "$INSTALL_DIR/$tool_name"
+            fi
+            INSTALLED_FILES+=("$INSTALL_DIR/$tool_name")
+            echo -e "${GREEN}  ✅ $tool_name (suite entry point)${NC}"
+        else
+            echo -e "${YELLOW}  ⚠️  $tool_name not found at $SCRIPT_ROOT/$tool_script, skipping${NC}"
+        fi
+    else
+        create_tool_wrapper "$tool_name" "$tool_script"
+    fi
+done
 
-# PATH check
+# PATH check (improved)
 echo ""
 echo -e "${BLUE}🛤️  Checking PATH configuration...${NC}"
 if [[ ":$PATH:" == *":$INSTALL_DIR:"* ]]; then
@@ -519,13 +532,16 @@ else
     
     if ask_yes_no "Add to PATH automatically?" "y"; then
         SHELL_RC=$(detect_shell_profile)
-        
         if [ -n "$SHELL_RC" ]; then
-            echo "" >> "$SHELL_RC"
-            echo "# IntermCLI PATH" >> "$SHELL_RC"
-            echo "export PATH=\"$INSTALL_DIR:\$PATH\"" >> "$SHELL_RC"
-            echo -e "${GREEN}  ✅ Added to $SHELL_RC${NC}"
-            echo -e "${YELLOW}     Restart your terminal or run: source $SHELL_RC${NC}"
+            if ! grep -q "export PATH=\"$INSTALL_DIR" "$SHELL_RC"; then
+                echo "" >> "$SHELL_RC"
+                echo "# IntermCLI PATH" >> "$SHELL_RC"
+                echo "export PATH=\"$INSTALL_DIR:\$PATH\"" >> "$SHELL_RC"
+                echo -e "${GREEN}  ✅ Added to $SHELL_RC${NC}"
+                echo -e "${YELLOW}     Restart your terminal or run: source $SHELL_RC${NC}"
+            else
+                echo -e "${YELLOW}  ⚠️  PATH already set in $SHELL_RC${NC}"
+            fi
         else
             echo -e "${YELLOW}  ⚠️  Cannot detect shell, please add manually${NC}"
         fi
@@ -538,6 +554,8 @@ verify_installation
 # Installation complete
 echo ""
 echo -e "${GREEN}✅ IntermCLI installation complete!${NC}"
+echo ""
+echo -e "${BLUE}📝 Install log: $LOG_FILE${NC}"
 echo ""
 echo -e "${BLUE}🚀 Quick start:${NC}"
 echo -e "  ${GREEN}scan-ports localhost${NC}        # Scan local ports"

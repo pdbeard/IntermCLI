@@ -23,7 +23,7 @@ Configuration files are loaded in the following priority order (later files over
 ├── scan-ports.toml      # Port scanner specific settings
 ├── find-projects.toml   # Project finder specific settings
 ├── plugins/             # User plugins directory
-└── cache/              # Cached data
+└── cache/               # Cached data
 ```
 
 ## 🔧 Tool-Specific Configuration
@@ -502,43 +502,6 @@ interm config reset scan-ports
 # Enable debug output to see config loading process
 scan-ports --debug localhost
 find-projects --config  # Shows configuration details
-```
-
-## 🔄 Migration from JSON
-
-If you have existing JSON configuration files, they need to be converted to TOML:
-
-### JSON to TOML Conversion
-```bash
-# Example conversion
-# OLD: ~/.config/intermcli/config.json
-{
-  "scanner": {
-    "default_host": "localhost",
-    "enhanced_detection": true
-  }
-}
-
-# NEW: ~/.config/intermcli/scan-ports.toml
-[scanner]
-default_host = "localhost"
-enhanced_detection = true
-```
-
-### Conversion Tools
-```bash
-# Online converters available at:
-# - https://transform.tools/json-to-toml
-# - https://www.convertsimple.com/convert-json-to-toml/
-
-# Or use Python:
-python3 -c "
-import json, tomli_w
-with open('config.json') as f:
-    data = json.load(f)
-with open('config.toml', 'wb') as f:
-    tomli_w.dump(data, f)
-"
 ```
 
 ---

@@ -4,6 +4,7 @@
 - **Repository**: intermcli
 - **Naming Convention**: action-target (e.g., `scan-ports`, `find-projects`)
 - **Tagline**: "Interactive terminal utilities for developers"
+- **Tool Manifest**: All tools are listed in `tools_manifest.toml` for modular installation and management.
 
 ## 🎨 Core Design Philosophy
 
@@ -22,6 +23,8 @@
 ### Progressive Enhancement
 - Core functionality works with Python standard library only
 - Optional dependencies unlock enhanced features
+- The install script (`install.sh`) automatically detects and offers to install optional Python dependencies for enhanced features.
+- Users can skip optional dependencies and still use all core features.
 - Graceful degradation when dependencies unavailable
 - Clear feedback about available/missing features
 
@@ -44,12 +47,14 @@
 - No complex dependencies required
 - Cross-platform compatibility (Linux, macOS)
 - Individual tool symlinks in PATH
+- New tools should be added to `tools_manifest.toml` for automatic installation.
 
 ### 3. Progressive Enhancement Architecture
 - **Core Layer**: Python stdlib only - always works
 - **Enhanced Layer**: Optional deps unlock advanced features
 - **Detection**: Tools auto-detect available dependencies
 - **Fallbacks**: Graceful degradation with helpful messages
+- **Installer**: Prompts user to install optional dependencies for enhanced features
 
 ### 4. Tool Independence Over Shared Libraries
 - Each tool in its own directory with own executable
@@ -82,10 +87,11 @@
 ```
 tools/action-target/
 ├── action-target.py    # Self-contained executable
-├── config/             # Tool-specific configuration
-├── README.md          # Tool-specific documentation
-└── tests/             # Tool-specific tests (optional)
+├── config/             # Tool-specific configuration (JSON recommended)
+├── README.md           # Tool-specific documentation
+└── tests/              # Tool-specific tests (optional)
 ```
+- **Global tool manifest**: `tools_manifest.toml` (TOML format) for modular installation and management.
 
 ### Optional Enhancements
 - Rich text formatting with `rich`
@@ -156,9 +162,9 @@ tools/action-target/
 - Avoid: Shared CLI frameworks, complex abstractions
 
 ### Configuration Philosophy
-- Tool-specific configs in tool directories
+- Tool-specific configs in tool directories (JSON recommended)
+- Global tool manifest in TOML (`tools_manifest.toml`)
 - Global configs only for suite-wide settings
-- JSON for simplicity and wide tool support
 - Environment variable overrides where sensible
 
 ## 🚀 Development Workflow
@@ -167,7 +173,7 @@ tools/action-target/
 1. Create `tools/action-target/` directory
 2. Implement self-contained `action-target.py`
 3. Add tool-specific configuration and docs
-4. Update install script to create symlink
+4. Add your tool to `tools_manifest.toml` for automatic installation.
 5. Test both core and enhanced functionality
 
 ### Testing Strategy
