@@ -27,10 +27,7 @@ intermcli/
 │   ├── CONTRIBUTING.md        # How to contribute to any tool
 │   ├── ARCHITECTURE.md        # This document
 │   ├── CONFIGURATION.md       # Comprehensive config documentation
-│   ├── commands/              # Command-specific documentation
-│   │   ├── scan-ports.md
-│   │   └── find-projects.md
-│   ├── tools/                 # Individual tool documentation
+│   ├── tools/                 # Individual tool documentation (one .md per tool)
 │   │   ├── scan-ports.md
 │   │   ├── find-projects.md
 │   │   └── tool-template.md   # Template for new tools
@@ -73,7 +70,7 @@ Each tool in [`tools/`](tools/) is designed to be:
 - **Self-contained**: Can run with just its own directory
 - **Independently testable**: Has its own test suite
 - **Minimally coupled**: Uses shared utilities only when there's clear benefit
-- **Separately documented**: Complete documentation in its README
+- **Separately documented**: Complete documentation in its README and in `docs/tools/`
 
 **Current Status**: Both [`scan-ports`](tools/scan-ports/) and [`find-projects`](tools/find-projects/) follow this pattern.
 

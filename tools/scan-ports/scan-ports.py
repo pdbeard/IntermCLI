@@ -139,13 +139,22 @@ def list_available_port_lists():
     print("💡 Example: scan-ports -l web,database")
 
 def get_ports_from_lists(list_names, config):
-    """Get ports from specified lists"""
+    """Get ports from specified lists, or all if 'all' is specified"""
     ports = {}
     available_lists = list(config["port_lists"].keys())
-    
+
+    # If 'all' is in the list, combine all ports from all lists
+    if any(name.strip().lower() == "all" for name in list_names):
+        for list_name in available_lists:
+            list_ports = config["port_lists"][list_name]["ports"]
+            for port_str, service in list_ports.items():
+                port = int(port_str)
+                if port not in ports:
+                    ports[port] = service
+        return ports
+
     for list_name in list_names:
         list_name = list_name.strip().lower()
-        
         if list_name in config["port_lists"]:
             list_ports = config["port_lists"][list_name]["ports"]
             for port_str, service in list_ports.items():
@@ -155,7 +164,7 @@ def get_ports_from_lists(list_names, config):
         else:
             print(f"⚠️  Port list '{list_name}' not found")
             print(f"Available lists: {', '.join(available_lists)}")
-    
+
     return ports
 
 def check_port(host, port, timeout=3):

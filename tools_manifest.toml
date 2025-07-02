@@ -7,6 +7,10 @@ name = "find-projects"
 script = "tools/find-projects/find-projects.py"
 
 [[tool]]
+name = "sort-files"
+script = "tools/sort-files/sort-files.py"
+
+[[tool]]
 name = "interm"
 script = "bin/interm"
 is_executable = true

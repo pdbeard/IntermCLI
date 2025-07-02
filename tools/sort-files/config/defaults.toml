@@ -1,0 +1,33 @@
+# Default configuration for sort-files
+
+# General options
+dry_run = false         # If true, only show what would be moved
+safe = true             # If true, never overwrite files in destination
+skip_hidden = true      # Skip hidden files and folders (starting with .)
+skip_dirs = []          # List of directory names to skip (e.g., ["node_modules", "venv"])
+
+[rules]
+by_type = true      # Sort files by type (extension) by default
+by_date = false     # Set true to sort by date instead
+by_size = false     # Set true to sort by size instead
+
+# Custom rules: move files matching these patterns to specific folders
+[rules.custom]
+"*-receipt.pdf" = "Receipts"
+"*-bill.pdf" = "Bills"
+
+[type_folders]
+images = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".webp"]
+documents = [".pdf", ".docx", ".doc", ".txt", ".md", ".odt", ".rtf", ".xls", ".xlsx", ".csv"]
+archives = [".zip", ".tar", ".gz", ".bz2", ".xz", ".rar", ".7z"]
+audio = [".mp3", ".wav", ".ogg", ".flac", ".aac", ".m4a"]
+video = [".mp4", ".mkv", ".mov", ".avi", ".wmv", ".webm"]
+code = [".py", ".js", ".ts", ".java", ".c", ".cpp", ".go", ".rb", ".php", ".sh", ".rs"]
+
+
+# Example for future expansion:
+# [size_ranges]
+# huge = 104857600      # >100MB
+# large = 10485760      # >10MB
+# medium = 1048576      # >1MB
+# small = 0             # <=1MB
