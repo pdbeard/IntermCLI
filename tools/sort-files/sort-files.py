@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
 """
-sort-files: Organize files in a directory by type, date, size, or custom rules.
+sort-files: Organize and declutter directories by automatically sorting files into subfolders
+based on file type, date, size, or user-defined custom rules.
 
-Part of the IntermCLI suite - Interactive terminal utilities for developers.
-Follows action-target naming convention and progressive enhancement architecture.
+Part of the IntermCLI suite – interactive terminal utilities for developers and power users.
+
+Example usage:
+    sort-files ~/Downloads
+    sort-files --by date ~/Documents
+    sort-files --dry-run --show-skipped ~/Desktop
+    sort-files --config ~/.config/intermcli/sort-files.toml ~/Downloads
+
+Author: pdbeard
 """
 
 import os
@@ -145,10 +153,14 @@ def sort_files(
         if dry_run:
             print(f"[DRY RUN] Would move: {entry.name} → {dest_dir}/")
         else:
-            dest_dir.mkdir(exist_ok=True)
-            shutil.move(str(entry), str(dest))
-            print(f"Moved: {entry.name} → {dest_dir}/")
-        moved.append((entry, dest_dir))
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                shutil.move(str(entry), str(dest))
+                print(f"Moved: {entry.name} → {dest_dir}/")
+                moved.append((entry, dest_dir))
+            except Exception as e:
+                print(f"❌ Failed to move {entry.name}: {e}")
+                skipped.append((entry, f"error: {e}"))
     return moved, skipped
 
 # --- CLI ---
@@ -177,14 +189,22 @@ def main():
     config["dry_run"] = args.dry_run
     config["safe"] = not args.unsafe
 
-    target_dir = Path(os.path.expanduser(args.directory)).resolve()
+    target_dir = Path(args.directory).expanduser().resolve()
     if not target_dir.exists() or not target_dir.is_dir():
         print(f"❌ Directory does not exist: {target_dir}")
         sys.exit(1)
 
     print(f"🗃️  sort-files {__version__}")
     print(f"Target: {target_dir}")
-    print(f"Rule: {'type' if config['rules']['by_type'] else 'date' if config['rules']['by_date'] else 'size'}")
+    if config['rules']['by_type']:
+        rule = "type"
+    elif config['rules']['by_date']:
+        rule = "date"
+    elif config['rules']['by_size']:
+        rule = "size"
+    else:
+        rule = "custom/other"
+    print(f"Rule: {rule}")
     print(f"Dry run: {'ON' if config['dry_run'] else 'OFF'}")
     print("")
 
@@ -198,8 +218,20 @@ def main():
         skip_dirs=config.get("skip_dirs", []),
     )
 
+    # --- Summary Table ---
+    from collections import Counter
+
+    folder_counts = Counter()
+    for entry, dest_dir in moved:
+        folder_counts[str(dest_dir.name)] += 1
+
     print(f"\n✅ Done. {len(moved)} files moved.")
-    if args.show_skipped and skipped:
+    if folder_counts:
+        print("\nSummary:")
+        for folder, count in sorted(folder_counts.items()):
+            print(f"  {folder:<15}: {count} file{'s' if count != 1 else ''}")
+
+    if (args.show_skipped or config["dry_run"]) and skipped:
         print(f"\nSkipped files:")
         for entry, reason in skipped:
             print(f"  {entry.name}: {reason}")
