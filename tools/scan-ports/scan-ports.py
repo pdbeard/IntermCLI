@@ -1,7 +1,19 @@
 #!/usr/bin/env python3
 """
-Port scanner and service checker
-Check if ports/services are running on local or remote hosts
+scan-ports: Scan local or remote hosts for open ports and detect running services.
+Supports configurable port lists, service detection, and both basic and enhanced detection modes.
+
+Part of the IntermCLI suite – interactive terminal utilities for developers and power users.
+
+Example usage:
+    scan-ports localhost
+    scan-ports 192.168.1.1
+    scan-ports --list web
+    scan-ports -p 8080
+    scan-ports --show-lists
+    scan-ports --check-deps
+
+Author: pdbeard
 """
 
 import socket
@@ -647,6 +659,8 @@ def scan_port_range(host, start_port, end_port, timeout=3, threads=50):
     
     return open_ports
 
+__version__ = "0.1.0"
+
 def main():
     parser = argparse.ArgumentParser(
         description="Port scanner and service checker with TOML configuration",
@@ -674,6 +688,8 @@ def main():
                        help="Fast scan with shorter timeout")
     parser.add_argument("--threads", type=int, default=50,
                        help="Number of concurrent threads (default: 50)")
+    parser.add_argument("--version", action="version", version=f"scan-ports {__version__}",
+                       help="Show version and exit")
     
     args = parser.parse_args()
     

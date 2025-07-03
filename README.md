@@ -5,13 +5,13 @@
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos-lightgrey.svg)](https://github.com/yourusername/intermcli)
 [![CI](https://github.com/yourusername/intermcli/workflows/CI/badge.svg)](https://github.com/yourusername/intermcli/actions)
 
-Interactive terminal utilities for developers. A collection of independent, self-contained CLI tools that follow the **action-target** naming convention for consistency and discoverability.
+Interactive terminal utilities for developers. A collection of independent, self-contained CLI tools for common developer and sysadmin tasks.
 
 ## ✨ Features
 
 - 🔍 **Port Scanner** (`scan-ports`) - Network port scanning with service detection
 - 📁 **Project Finder** (`find-projects`) - Interactive git repository discovery and VS Code integration
-- 🎯 **Action-Target Naming** - Consistent `verb-noun` command structure
+- 🗃️ **Sort Files** (`sort-files`) - Organize directories by type, date, size, or custom rules
 - 🔧 **Progressive Enhancement** - Core functionality works with Python standard library only
 - 🚀 **Optional Dependencies** - Enhanced features with `requests`, `rich`, and other libraries
 - 📊 **Rich Terminal Output** - Colorful, organized output when enhanced libraries are available
@@ -60,6 +60,24 @@ find-projects --help         # Show all options
 - VS Code integration
 - Project type detection and grouping
 
+### Sort Files (`sort-files`)
+Organize files in a directory by type, date, size, or custom rules.
+
+```bash
+sort-files ~/Downloads
+sort-files --by type ~/Desktop
+sort-files --by date --dry-run ~/Documents
+sort-files --config ~/.config/intermcli/sort-files.toml ~/Downloads
+```
+
+**Features:**
+- Sort by file type, date, or size
+- Custom rules via TOML config (e.g., move `*-receipt.pdf` to `Receipts/`)
+- Dry run mode for safe preview
+- Safe by default (never overwrites files)
+- Cross-platform (Linux, macOS)
+- TOML-based configuration
+
 ## 🔧 Installation
 
 For end users:
@@ -81,7 +99,8 @@ Optional features require manual installation of Python packages:
 ```bash
 cp tools/scan-ports/scan-ports.py ~/.local/bin/scan-ports
 cp tools/find-projects/find-projects.py ~/.local/bin/find-projects
-chmod +x ~/.local/bin/scan-ports ~/.local/bin/find-projects
+cp tools/sort-files/sort-files.py ~/.local/bin/sort-files
+chmod +x ~/.local/bin/scan-ports ~/.local/bin/find-projects ~/.local/bin/sort-files
 pip3 install --user -r requirements.txt  # For enhanced features
 ```
 
@@ -146,6 +165,24 @@ find-projects --config         # Edit search paths
 ```
 </details>
 
+<details>
+<summary>Sort Files Examples</summary>
+
+```bash
+# Basic usage
+sort-files ~/Downloads
+
+# Sort by date
+sort-files --by date ~/Documents
+
+# Dry run (preview)
+sort-files --dry-run ~/Downloads
+
+# Use a custom config
+sort-files --config ~/.config/intermcli/sort-files.toml ~/Downloads
+```
+</details>
+
 ## 🏗️ Architecture
 
 IntermCLI follows a **tool-independent** architecture:
@@ -159,6 +196,10 @@ tools/
 ├── find-projects/           # Independent project finder
 │   ├── find-projects.py    # Main executable
 │   └── README.md
+├── sort-files/              # Independent file organizer
+│   ├── sort-files.py       # Main executable
+│   ├── config/defaults.toml# Tool-specific config
+│   └── README.md
 └── shared/                  # Shared utilities (minimal)
     └── config_loader.py     # Common patterns only
 ```
@@ -166,7 +207,7 @@ tools/
 **Design Principles:**
 - **Independence**: Each tool works standalone
 - **Progressive Enhancement**: Core features use stdlib, optional deps add enhancements
-- **Action-Target Naming**: `scan-ports`, `find-projects`, future: `check-services`
+- **Consistent Naming**: Tools use a clear `verb-noun` pattern for discoverability
 - **Minimal Shared Code**: Only when proven beneficial
 - **Tool Manifest**: All tools are listed in `tools_manifest.toml` for modular installation and management.
 
@@ -180,11 +221,12 @@ tools/
 ### Tool-Specific Documentation
 - **[Port Scanner](docs/tools/scan-ports.md)** - Detailed usage and configuration
 - **[Project Finder](docs/tools/find-projects.md)** - Setup and customization
+- **[Sort Files](docs/tools/sort-files.md)** - Usage and configuration
 
 ## 🤝 Contributing
 
 We welcome contributions! Whether you want to:
-- **Add a new tool** following our action-target convention
+- **Add a new tool** (please follow our naming and architecture conventions)
 - **Enhance existing tools** with new features
 - **Improve documentation** or fix bugs
 
@@ -202,7 +244,7 @@ Please read our [Contributing Guidelines](docs/CONTRIBUTING.md) for details on:
 
 ## 🔄 Roadmap
 
-### Planned Tools (Following Action-Target Convention)
+### Planned Tools
 - `check-services` - Enhanced service detection and analysis
 - `list-processes` - Process monitoring and management
 - `monitor-network` - Network traffic monitoring  

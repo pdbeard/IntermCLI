@@ -2,7 +2,7 @@
 
 ## Project Overview
 - **Repository**: intermcli
-- **Naming Convention**: action-target (e.g., `scan-ports`, `find-projects`)
+- **Naming Convention**: action-target (e.g., `scan-ports`, `find-projects`, `sort-files`)
 - **Tagline**: "Interactive terminal utilities for developers"
 - **Tool Manifest**: All tools are listed in `tools_manifest.toml` for modular installation and management.
 
@@ -38,7 +38,7 @@
 
 ### 1. Action-Target Naming Convention
 - All tools follow `verb-noun` pattern for consistency
-- **Examples**: `scan-ports`, `find-projects`, `check-services`
+- **Examples**: `scan-ports`, `find-projects`, `sort-files`, `check-services`
 - **Benefits**: Self-documenting, tab-completable, professional
 - **Avoids**: Mixed patterns, unclear command purposes
 
@@ -63,7 +63,7 @@
 - Easy to understand, debug, and maintain
 
 ### 5. Optional Unified Interface
-- **Primary Usage**: Individual tools (`scan-ports`, `find-projects`)
+- **Primary Usage**: Individual tools (`scan-ports`, `find-projects`, `sort-files`)
 - **Secondary Usage**: Optional `interm` command for suite-wide functionality
 - **Global Functions**: Installation management, configuration, tool discovery
 - **Delegation**: `interm scan-ports` delegates to standalone tool
@@ -87,7 +87,7 @@
 ```
 tools/action-target/
 ├── action-target.py    # Self-contained executable
-├── config/             # Tool-specific configuration (JSON recommended)
+├── config/             # Tool-specific configuration (TOML recommended)
 ├── README.md           # Tool-specific documentation
 └── tests/              # Tool-specific tests (optional)
 ```
@@ -136,6 +136,7 @@ tools/action-target/
 ### ✅ Implemented
 - **scan-ports**: Network port scanning with service detection
 - **find-projects**: Development project discovery with VS Code integration
+- **sort-files**: Directory organization by type, date, size, or custom rules
 
 ### 🔄 Planned (Following Action-Target Pattern)
 - **check-services**: Enhanced service detection and analysis
@@ -162,7 +163,7 @@ tools/action-target/
 - Avoid: Shared CLI frameworks, complex abstractions
 
 ### Configuration Philosophy
-- Tool-specific configs in tool directories (JSON recommended)
+- Tool-specific configs in tool directories (TOML recommended)
 - Global tool manifest in TOML (`tools_manifest.toml`)
 - Global configs only for suite-wide settings
 - Environment variable overrides where sensible
