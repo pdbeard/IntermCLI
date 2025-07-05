@@ -19,6 +19,7 @@ import sys
 import argparse
 from pathlib import Path
 from datetime import datetime
+from collections import Counter
 import shutil
 import fnmatch
 
@@ -107,7 +108,11 @@ def sort_files(
 ):
     moved = []
     skipped = []
-    for entry in target_dir.iterdir():
+    entries = list(target_dir.iterdir())
+    total_files = sum(1 for entry in entries if entry.is_file() and not (skip_hidden and entry.name.startswith(".")))
+    print(f"Processing {total_files} files...")
+
+    for entry in entries:
         if entry.is_dir():
             if entry.name in skip_dirs or (skip_hidden and entry.name.startswith(".")):
                 continue
@@ -158,6 +163,12 @@ def sort_files(
                 shutil.move(str(entry), str(dest))
                 print(f"Moved: {entry.name} → {dest_dir}/")
                 moved.append((entry, dest_dir))
+            except PermissionError as e:
+                print(f"❌ Failed to move {entry.name}: Permission denied. Try running with elevated permissions.")
+                skipped.append((entry, "permission denied"))
+            except FileNotFoundError as e:
+                print(f"❌ Failed to move {entry.name}: File not found. It may have been moved or deleted.")
+                skipped.append((entry, "file not found"))
             except Exception as e:
                 print(f"❌ Failed to move {entry.name}: {e}")
                 skipped.append((entry, f"error: {e}"))
@@ -219,7 +230,6 @@ def main():
     )
 
     # --- Summary Table ---
-    from collections import Counter
 
     folder_counts = Counter()
     for entry, dest_dir in moved:

@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
 """
-find-projects: Interactive development project discovery and navigation
+find-projects: Interactive development project discovery and navigation.
+Scan configured directories for git repositories, group and search projects, and open them in your preferred editor.
 
-Part of the IntermCLI suite - Interactive terminal utilities for developers.
-Follows action-target naming convention and progressive enhancement architecture.
+Part of the IntermCLI suite – interactive terminal utilities for developers and power users.
+
+Example usage:
+    find-projects
+    find-projects --config
+    find-projects --version
+
+Author: pdbeard
 """
 
 import os

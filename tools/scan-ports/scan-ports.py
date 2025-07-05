@@ -19,10 +19,10 @@ Author: pdbeard
 import socket
 import sys
 import argparse
-from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
 import time
 import re
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 # TOML support with fallback
 try:
