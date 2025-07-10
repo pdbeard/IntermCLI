@@ -9,6 +9,7 @@ pytest-mock>=3.10.0
 flake8>=5.0.0
 black>=22.0.0
 isort>=5.10.0
+ruff
 
 # Type checking
 mypy>=1.0.0
