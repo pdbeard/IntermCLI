@@ -1,6 +1,41 @@
-tool ideas
+
+
+
+
+
+
+IntermCLI 1.0 Release Checklist
+
+1. Documentation
+- [ ] Ensure every tool has a complete doc: usage, config, troubleshooting, feature list.
+- [ ] Update suite-level docs (README.md, architecture, contributing, design).
+- [ ] Add naming conventions and enhancement descriptions.
+- [ ] Document branching strategy (even if PRs aren’t enforced yet).
+- [ ] Update or finalize CHANGELOG.md (or rely on Release Drafter).
+
+2. Testing
+- [ ] Confirm all tools and features have unit/integration tests.
+- [ ] Add tests for error handling and config overrides.
+- [ ] Ensure CI passes for all supported Python versions/OSes.
+
+3. CI/CD & Automation
+- [ ] Confirm CI workflow covers lint, format, audit, docs build, and dependency caching.
+- [ ] Ensure release automation and changelog automation are working.
+- [ ] (Optional) Add artifact build/upload if relevant.
+
+4. Features & Polish
+- [ ] Finalize local config support for tools.
+- [ ] Review and update tools_manifest.toml and suite-level docs.
+- [ ] Decide on any last features or polish from your TODO list.
+
+5. Project Management
+- [ ] Add actionable TODOs for each tool/folder.
+- [ ] Clean up and organize enhancement descriptions.
+
+Other Ideas/TODOS
 
 # CI/Automation
+- set up branch protection rules/ Mandate PR for changes to main to help with release automation
 - Add MkDocs documentation build
 - Add macOS/Windows runners
 - Release automation
