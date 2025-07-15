@@ -100,7 +100,7 @@ code = [".py", ".js", ".ts", ".java", ".c", ".cpp", ".go", ".rb", ".php", ".sh",
 
 ## 🐍 Requirements
 
-- Python 3.8+
+
 - No dependencies required for core features
 - Optional: `rich` for colorized output, `tomli` for config on Python <3.11
 

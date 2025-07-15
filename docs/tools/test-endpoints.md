@@ -289,7 +289,7 @@ Body (formatted):
 
 ## 🐍 Requirements
 
-- Python 3.8+
+
 - No dependencies required for core features
 - Optional: `requests` for enhanced HTTP features, `rich` for colorized output
 

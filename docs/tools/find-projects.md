@@ -95,7 +95,7 @@ find-projects --version      # Show version information
 
 ## 🐍 Requirements
 
-- Python 3.8+
+
 - No dependencies required for basic usage
 - For Python <3.11, install `tomli` for TOML config support:
   `pip install tomli`

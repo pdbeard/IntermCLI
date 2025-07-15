@@ -114,7 +114,7 @@ If you have `requests`, `urllib3`, or other optional dependencies installed, you
 
 ## 🐍 Requirements
 
-- Python 3.8+
+
 - No dependencies required for basic usage
 - Optional: `requests`, `urllib3`, `rich`, `textual`, `tomli` (for Python <3.11)
 

@@ -29,7 +29,7 @@ We welcome contributions of all kinds—new tools, features, bug fixes, and docu
 - Test with minimal dependencies (stdlib only)
 - Test with all optional dependencies installed
 - Include both unit and integration tests
-- Test on multiple Python versions (3.8–3.11 recommended)
+ - Test on multiple Python versions (3.9–3.13 recommended)
 - Use `pytest`, `pytest-cov`, and other tools from `requirements-dev.txt`
 
 ---
