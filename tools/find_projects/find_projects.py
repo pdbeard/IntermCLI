@@ -124,7 +124,7 @@ class SecurityValidator:
             resolved_path = Path(path).resolve()
             for base_dir in allowed_base_dirs:
                 base_resolved = Path(base_dir).resolve()
-                if resolved_path.is_relative_to(base_resolved):
+                if resolved_path.is_relative_to(str(base_resolved)):
                     return True
             return False
         except Exception:
