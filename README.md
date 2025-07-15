@@ -1,4 +1,3 @@
-
 # 🖥️ IntermCLI
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
@@ -42,6 +41,22 @@ cd intermcli
 - [Contributing](docs/CONTRIBUTING.md): How to contribute, code style, PR workflow
 - [Configuration](docs/CONFIGURATION.md): Config file locations and examples
 - [Design Philosophy](docs/DESIGN.md): Naming conventions and project vision
+
+## Branching Strategy  (not yet used)
+Planned branching strategy for development and releases:
+
+- **main**: Stable release branch. All production-ready code is merged here.
+- **dev**: Active development branch. New features, fixes, and enhancements are merged here first.
+- **feature/*, bugfix/*, enhancement/***: Short-lived branches for specific changes. Merge into `dev` via pull request.
+- **release/***: (Optional) Used for preparing major releases.
+
+**Workflow:**
+1. Create a feature branch from `dev` (e.g., `feature/my-feature`).
+2. Open a pull request to merge into `dev`.
+3. After review and testing, changes are merged into `main` for release.
+4. Branch protection rules may require PRs for changes to `main`.
+
+See [Contributing](docs/CONTRIBUTING.md) for PR and code review details.
 
 ## License
 GPL v3. See [LICENSE](LICENSE).

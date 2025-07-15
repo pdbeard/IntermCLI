@@ -1,10 +1,4 @@
-
-
-
-
-
-
-IntermCLI 1.0 Release Checklist
+## IntermCLI 1.0 Release Checklist
 
 1. Documentation
 - [ ] Ensure every tool has a complete doc: usage, config, troubleshooting, feature list.
@@ -31,6 +25,25 @@ IntermCLI 1.0 Release Checklist
 5. Project Management
 - [ ] Add actionable TODOs for each tool/folder.
 - [ ] Clean up and organize enhancement descriptions.
+
+
+
+## Hardcoded Values Refactor Checklist
+
+- [ ] Move all default values (ports, directories, editors, timeouts, etc.) to TOML config files for each tool
+- [ ] Ensure all file paths are configurable via environment variables or CLI arguments
+- [ ] Replace hardcoded port numbers and service names with config-driven lists
+- [ ] Document all overridable settings in each tool's README
+- [ ] Allow CLI arguments and environment variables to override any config value
+- [ ] Remove hardcoded extensions/types; use config for file type rules
+- [ ] Refactor test code to use config-driven values where possible
+- [ ] Audit for any remaining hardcoded strings, numbers, or paths in Python code
+- [ ] Add tests to confirm config overrides work as expected
+- [ ] Update documentation to reflect new dynamic configuration approach
+
+
+
+
 
 Other Ideas/TODOS
 
@@ -118,3 +131,6 @@ Other Ideas/TODOS
 - Install/configure favorite tools (fail2ban, security settings, SSH)
 - Find duplicates
 - Color picker and profiles (from terminal)
+
+---
+
