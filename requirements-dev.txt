@@ -20,5 +20,8 @@ mypy>=1.0.0
 mkdocs>=1.4.0
 mkdocs-material>=8.5.0
 
+# Security: ensure safe setuptools version
+setuptools>=78.1.1
+
 # Include optional dependencies for testing
 -r requirements.txt
