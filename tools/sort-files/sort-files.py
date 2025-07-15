@@ -14,7 +14,6 @@ Example usage:
 Author: pdbeard
 """
 
-import os
 import sys
 import argparse
 from pathlib import Path
@@ -34,23 +33,42 @@ except ImportError:
 
 __version__ = "0.1.0"
 
+
 # --- Config loading ---
 def load_config(config_path=None):
     """Load TOML config if available, else return defaults."""
     config = {
-        "rules": {
-            "by_type": True,
-            "by_date": False,
-            "by_size": False,
-            "custom": {}
-        },
+        "rules": {"by_type": True, "by_date": False, "by_size": False, "custom": {}},
         "type_folders": {
             "images": [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".webp"],
-            "documents": [".pdf", ".docx", ".doc", ".txt", ".md", ".odt", ".rtf", ".xls", ".xlsx", ".csv"],
+            "documents": [
+                ".pdf",
+                ".docx",
+                ".doc",
+                ".txt",
+                ".md",
+                ".odt",
+                ".rtf",
+                ".xls",
+                ".xlsx",
+                ".csv",
+            ],
             "archives": [".zip", ".tar", ".gz", ".bz2", ".xz", ".rar", ".7z"],
             "audio": [".mp3", ".wav", ".ogg", ".flac", ".aac", ".m4a"],
             "video": [".mp4", ".mkv", ".mov", ".avi", ".wmv", ".webm"],
-            "code": [".py", ".js", ".ts", ".java", ".c", ".cpp", ".go", ".rb", ".php", ".sh", ".rs"],
+            "code": [
+                ".py",
+                ".js",
+                ".ts",
+                ".java",
+                ".c",
+                ".cpp",
+                ".go",
+                ".rb",
+                ".php",
+                ".sh",
+                ".rs",
+            ],
         },
         "dry_run": False,
         "safe": True,
@@ -80,6 +98,7 @@ def load_config(config_path=None):
             break  # Use the first config found
     return config
 
+
 # --- Core logic ---
 def get_file_type(file: Path, type_folders: dict):
     ext = file.suffix.lower()
@@ -90,12 +109,14 @@ def get_file_type(file: Path, type_folders: dict):
             return folder
     return "other"
 
+
 def match_custom_rule(filename, custom_rules):
     """Return the folder name if filename matches a custom rule pattern."""
     for pattern, folder in custom_rules.items():
         if fnmatch.fnmatch(filename, pattern):
             return folder
     return None
+
 
 def sort_files(
     target_dir: Path,
@@ -109,7 +130,11 @@ def sort_files(
     moved = []
     skipped = []
     entries = list(target_dir.iterdir())
-    total_files = sum(1 for entry in entries if entry.is_file() and not (skip_hidden and entry.name.startswith(".")))
+    total_files = sum(
+        1
+        for entry in entries
+        if entry.is_file() and not (skip_hidden and entry.name.startswith("."))
+    )
     print(f"Processing {total_files} files...")
 
     for entry in entries:
@@ -163,30 +188,55 @@ def sort_files(
                 shutil.move(str(entry), str(dest))
                 print(f"Moved: {entry.name} → {dest_dir}/")
                 moved.append((entry, dest_dir))
-            except PermissionError as e:
-                print(f"❌ Failed to move {entry.name}: Permission denied. Try running with elevated permissions.")
+            except PermissionError:
+                print(
+                    "❌ Failed to move {}: Permission denied. Try running with elevated permissions.".format(entry.name)
+                )
                 skipped.append((entry, "permission denied"))
-            except FileNotFoundError as e:
-                print(f"❌ Failed to move {entry.name}: File not found. It may have been moved or deleted.")
+            except FileNotFoundError:
+                print(
+                    "❌ Failed to move {}: File not found. It may have been moved or deleted.".format(entry.name)
+                )
                 skipped.append((entry, "file not found"))
             except Exception as e:
                 print(f"❌ Failed to move {entry.name}: {e}")
                 skipped.append((entry, f"error: {e}"))
     return moved, skipped
 
+
 # --- CLI ---
 def main():
     parser = argparse.ArgumentParser(
         description="Organize files in a directory by type, date, size, or custom rules.",
-        epilog="Example: sort-files --by type ~/Downloads"
+        epilog="Example: sort-files --by type ~/Downloads",
     )
-    parser.add_argument("directory", nargs="?", default=".", help="Directory to organize (default: current)")
-    parser.add_argument("--by", choices=["type", "date", "size"], default="type", help="Sort files by this rule")
-    parser.add_argument("--dry-run", action="store_true", help="Show what would be moved, but don't move files")
+    parser.add_argument(
+        "directory",
+        nargs="?",
+        default=".",
+        help="Directory to organize (default: current)",
+    )
+    parser.add_argument(
+        "--by",
+        choices=["type", "date", "size"],
+        default="type",
+        help="Sort files by this rule",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be moved, but don't move files",
+    )
     parser.add_argument("--config", help="Path to TOML config file")
-    parser.add_argument("--unsafe", action="store_true", help="Allow overwriting files in destination")
-    parser.add_argument("--show-skipped", action="store_true", help="Show skipped files")
-    parser.add_argument("--version", action="version", version=f"sort-files {__version__}")
+    parser.add_argument(
+        "--unsafe", action="store_true", help="Allow overwriting files in destination"
+    )
+    parser.add_argument(
+        "--show-skipped", action="store_true", help="Show skipped files"
+    )
+    parser.add_argument(
+        "--version", action="version", version=f"sort-files {__version__}"
+    )
 
     args = parser.parse_args()
 
@@ -195,7 +245,7 @@ def main():
         "by_type": args.by == "type",
         "by_date": args.by == "date",
         "by_size": args.by == "size",
-        "custom": config.get("rules", {}).get("custom", {})
+        "custom": config.get("rules", {}).get("custom", {}),
     }
     config["dry_run"] = args.dry_run
     config["safe"] = not args.unsafe
@@ -207,11 +257,11 @@ def main():
 
     print(f"🗃️  sort-files {__version__}")
     print(f"Target: {target_dir}")
-    if config['rules']['by_type']:
+    if config["rules"]["by_type"]:
         rule = "type"
-    elif config['rules']['by_date']:
+    elif config["rules"]["by_date"]:
         rule = "date"
-    elif config['rules']['by_size']:
+    elif config["rules"]["by_size"]:
         rule = "size"
     else:
         rule = "custom/other"
@@ -242,9 +292,10 @@ def main():
             print(f"  {folder:<15}: {count} file{'s' if count != 1 else ''}")
 
     if (args.show_skipped or config["dry_run"]) and skipped:
-        print(f"\nSkipped files:")
+        print("\nSkipped files:")
         for entry, reason in skipped:
             print(f"  {entry.name}: {reason}")
+
 
 if __name__ == "__main__":
     main()

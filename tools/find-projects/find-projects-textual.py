@@ -17,6 +17,7 @@ from textual.widgets import Header, Footer, Input, DataTable, Static
 from textual.containers import Horizontal
 from textual.reactive import reactive
 
+
 # --- Config loading (TOML) ---
 def load_config() -> dict:
     config_paths = [
@@ -29,15 +30,18 @@ def load_config() -> dict:
             try:
                 if sys.version_info >= (3, 11):
                     import tomllib
+
                     with open(path, "rb") as f:
                         config.update(tomllib.load(f))
                 else:
                     import tomli
+
                     with open(path, "rb") as f:
                         config.update(tomli.load(f))
             except Exception as e:
                 print(f"Error loading config {path}: {e}", file=sys.stderr)
     return config
+
 
 # --- Project type detection ---
 DEFAULT_PROJECT_TYPES = {
@@ -56,6 +60,7 @@ DEFAULT_PROJECT_TYPES = {
     "Generic": [".git"],
 }
 
+
 def detect_project_type(proj_path: Path, project_types: Dict[str, List[str]]) -> str:
     for ptype, indicators in project_types.items():
         for indicator in indicators:
@@ -68,6 +73,7 @@ def detect_project_type(proj_path: Path, project_types: Dict[str, List[str]]) ->
                     return ptype
     return "Unknown"
 
+
 # --- Project scanning ---
 class Project:
     def __init__(self, name, path, project_type, last_modified):
@@ -75,6 +81,7 @@ class Project:
         self.path = path
         self.project_type = project_type
         self.last_modified = last_modified
+
 
 def scan_projects(
     dirs: List[str],
@@ -84,7 +91,17 @@ def scan_projects(
 ) -> List[Project]:
     """Scan for projects in given dirs, detect type, limit depth, skip heavy dirs."""
     if skip_dirs is None:
-        skip_dirs = {".git", "node_modules", ".venv", "venv", "__pycache__", ".mypy_cache", ".pytest_cache", "dist", "build"}
+        skip_dirs = {
+            ".git",
+            "node_modules",
+            ".venv",
+            "venv",
+            "__pycache__",
+            ".mypy_cache",
+            ".pytest_cache",
+            "dist",
+            "build",
+        }
     else:
         skip_dirs = set(skip_dirs)
     projects = []
@@ -106,25 +123,32 @@ def scan_projects(
             dirs_[:] = [d for d in dirs_ if d not in skip_dirs]
             dir_path = Path(root)
             # Project detection: .git or any indicator file
-            if (dir_path / ".git").exists() or any((dir_path / ind).exists() for ind in indicators if "*" not in ind):
+            if (dir_path / ".git").exists() or any(
+                (dir_path / ind).exists() for ind in indicators if "*" not in ind
+            ):
                 if dir_path in seen:
                     continue
                 seen.add(dir_path)
                 proj_type = detect_project_type(dir_path, project_types)
-                projects.append(Project(
-                    name=dir_path.name,
-                    path=str(dir_path),
-                    project_type=proj_type,
-                    last_modified=dir_path.stat().st_mtime
-                ))
+                projects.append(
+                    Project(
+                        name=dir_path.name,
+                        path=str(dir_path),
+                        project_type=proj_type,
+                        last_modified=dir_path.stat().st_mtime,
+                    )
+                )
     projects.sort(key=lambda p: p.last_modified, reverse=True)
     return projects
+
 
 def format_time(epoch: float) -> str:
     dt = datetime.datetime.fromtimestamp(epoch)
     return dt.strftime("%Y-%m-%d %H:%M")
 
+
 # --- Textual App ---
+
 
 class ProjectTable(DataTable):
     """A DataTable widget for displaying projects."""
@@ -134,11 +158,9 @@ class ProjectTable(DataTable):
         self.add_columns("Name", "Type", "Path", "Last Modified")
         for proj in projects:
             self.add_row(
-                proj.name,
-                proj.project_type,
-                proj.path,
-                format_time(proj.last_modified)
+                proj.name, proj.project_type, proj.path, format_time(proj.last_modified)
             )
+
 
 class FindProjectsTextualApp(App):
     BINDINGS = [
@@ -155,9 +177,11 @@ class FindProjectsTextualApp(App):
         super().__init__(**kwargs)
         config = load_config()
         self.development_dirs = [
-            os.path.expanduser(d) for d in config.get("development_dirs", [
-                "~/development", "~/projects", "~/code", "~/workspace", "~/src"
-            ])
+            os.path.expanduser(d)
+            for d in config.get(
+                "development_dirs",
+                ["~/development", "~/projects", "~/code", "~/workspace", "~/src"],
+            )
         ]
         self.editor = config.get("default_editor", "code")
         self.project_types = config.get("project_types", DEFAULT_PROJECT_TYPES)
@@ -195,7 +219,8 @@ class FindProjectsTextualApp(App):
         self.search_query = event.value
         q = self.search_query.lower()
         self.filtered_projects = [
-            p for p in self.projects
+            p
+            for p in self.projects
             if q in p.name.lower() or q in p.project_type.lower() or q in p.path.lower()
         ]
         self.project_table.update_projects(self.filtered_projects)
@@ -215,6 +240,7 @@ class FindProjectsTextualApp(App):
     def action_open_project(self):
         if self.selected_project:
             import subprocess
+
             try:
                 subprocess.Popen([self.editor, self.selected_project.path])
             except Exception as e:
@@ -223,6 +249,7 @@ class FindProjectsTextualApp(App):
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected):
         self.action_open_project()
+
 
 if __name__ == "__main__":
     FindProjectsTextualApp().run()
