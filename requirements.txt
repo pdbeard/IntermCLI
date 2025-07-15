@@ -3,7 +3,8 @@ tomli>=2.0.0; python_version < "3.11"
 
 
 # Security: ensure safe setuptools version
-setuptools>=78.1.1
+setuptools>=78.1.1; python_version >= "3.10"
+setuptools>=65.5.1; python_version < "3.10"
 
 # Optional dependencies for enhanced functionality
 # All tools work without these but unlock additional features when available
