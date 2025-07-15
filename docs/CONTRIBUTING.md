@@ -1,43 +1,45 @@
 # Contributing to IntermCLI
 
-We welcome contributions of all kinds—new tools, features, bug fixes, and documentation improvements!
 
----
+# Contributing to IntermCLI
 
-## 🚀 Quick Start
+We welcome contributions—new tools, features, bug fixes, and docs!
 
-1. Fork the repository
+## Quick Contribution Guide
+1. Fork the repo
 2. Create a feature branch: `git checkout -b feature/my-feature`
-3. Make your changes following our conventions (see below)
-4. Test thoroughly (core + enhanced functionality, multiple Python versions if possible)
-5. Submit a pull request (PR) with a clear description
+3. Add your tool in `tools/` with its own README and config
+4. Add your tool to `tools_manifest.toml`
+5. Test with both minimal and enhanced dependencies
+6. Submit a PR with a clear description
 
----
+## Tool Guidelines
+- Use `action-target` naming (e.g., `scan-ports`, `find-projects`)
+- Each tool should be self-contained, with its own config and README
+- Use TOML for all config files
+- Progressive enhancement: stdlib core, optional enhancements
 
-## 🎯 Tool Development Guidelines
+## Testing
+- Test with stdlib only and with all optional dependencies
+- Include unit and integration tests
+- Test on Python 3.9+
+- Use `pytest` and tools from `requirements-dev.txt`
 
-- **Naming:** Use the action-target naming convention (e.g., `scan-ports`, `find-projects`)
-- **Manifest:** Add your tool to `tools_manifest.toml` for automatic installation and discovery
-- **Progressive Enhancement:** Implement a stdlib-only core, with optional enhancements if extra dependencies are available
-- **Configuration:** Use TOML for all configuration files (no JSON)
-- **Documentation:** Include a comprehensive README and configuration examples in your tool's directory
-
----
-
-## 🧪 Testing
-
-- Test with minimal dependencies (stdlib only)
-- Test with all optional dependencies installed
-- Include both unit and integration tests
- - Test on multiple Python versions (3.9–3.13 recommended)
-- Use `pytest`, `pytest-cov`, and other tools from `requirements-dev.txt`
-
----
-
-## 🖋️ Code Style
-
-- Use [black](https://github.com/psf/black) for code formatting
+## Code Style
+- Use [black](https://github.com/psf/black) for formatting
 - Use [isort](https://github.com/PyCQA/isort) for import sorting
+
+## PR Workflow
+- All changes should be submitted via pull request
+- PRs must pass CI (lint, tests, audit)
+- Write clear commit messages and PR descriptions
+
+## Branching & Releases
+- Main development happens on `main` branch
+- Use feature branches for new tools/features
+- Releases are tagged and changelog is updated automatically
+
+---
 - Run [flake8](https://flake8.pycqa.org/) for linting
 - Type annotations are encouraged (use [mypy](http://mypy-lang.org/))
 - Keep code readable and modular

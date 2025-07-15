@@ -2,62 +2,35 @@
 
 ## Overview
 
-IntermCLI is designed as a collection of independent, self-contained terminal utilities that can optionally share common functionality when it makes sense. Each tool is designed to work standalone while benefiting from shared infrastructure for dependency management, configuration, and documentation.
+IntermCLI is a suite of independent CLI tools for developers and sysadmins. Each tool is standalone, with minimal shared code and simple configuration. The project is organized for clarity, modularity, and ease of contribution.
 
-## 📁 Project Structure
+## Project Structure (Short Version)
 
 ```
 intermcli/
-├── README.md                  # Project overview, quick start
-├── LICENSE                    # GPL v3
-├── CHANGELOG.md               # Version history for entire suite
-├── requirements.txt           # Optional dependencies for all tools
-├── requirements-dev.txt       # Development dependencies
-├── install.sh                 # Installation script for all tools (requirements.txt only)
-├── todo                       # Development todo list
-├── .gitignore
-├── .github/                   # GitHub-specific files
-│   ├── ISSUE_TEMPLATE/
-│   │   ├── bug_report.md
-│   │   └── feature_request.md
-│   ├── PULL_REQUEST_TEMPLATE.md
-│   └── workflows_future/      # Future GitHub Actions (not active yet)
-├── docs/                      # Suite-wide documentation
-│   ├── DESIGN.md              # Overall design philosophy
-│   ├── CONTRIBUTING.md        # How to contribute to any tool
-│   ├── ARCHITECTURE.md        # This document
-│   ├── CONFIGURATION.md       # Comprehensive config documentation
-│   ├── tools/                 # Individual tool documentation (one .md per tool)
-│   │   ├── scan-ports.md
-│   │   ├── find-projects.md
-│   │   └── tool-template.md   # Template for new tools
-│   └── examples/              # Cross-tool usage examples
-│       ├── basic-usage.md
-│       └── workflow-examples.md
-├── tools_manifest.toml        # Tool manifest for modular install/discovery
-├── tools/                     # Independent tool implementations
-│   ├── scan-ports/
-│   │   ├── scan-ports.py      # Main executable
-│   │   ├── config/
-│   │   │   └── defaults.toml  # Tool-specific config (TOML)
-│   │   └── README.md          # Tool-specific docs
-│   ├── find-projects/
-│   │   ├── find-projects.py   # Main executable
-│   │   ├── config/
-│   │   │   └── defaults.toml  # Tool-specific config (TOML)
-│   │   └── README.md          # Tool-specific docs
-│   └── template-tool/         # Template for new tools
-│       ├── action-target.py   # Template executable
-│       └── README.md
-├── shared/                    # Shared utilities (minimal, TOML-focused)
-│   ├── __init__.py
-│   ├── config_loader.py       # Common TOML config loading patterns
-│   ├── enhancement_loader.py  # Progressive enhancement helpers
-│   └── network_utils.py       # Common network utilities
-├── bin/                       # Executable entry points
-│   ├── scan-ports             # Wrapper to tools/scan-ports/scan-ports.py
-│   ├── find-projects          # Wrapper to tools/find-projects/find-projects.py
-│   ├── interm                 # Optional unified dispatcher
+├── README.md            # Project overview, tool index, install
+├── docs/                # Suite-level docs (architecture, contributing, config, design)
+├── tools/               # Individual CLI tools (each with its own README)
+├── shared/              # Minimal shared utilities (config, enhancement, network)
+├── bin/                 # Executable wrappers for CLI tools
+├── requirements*.txt    # Dependencies (main/dev)
+├── install.sh           # Installer script
+├── tools_manifest.toml  # Tool manifest for modular install/discovery
+├── .github/             # GitHub Actions, templates
+├── todo                 # Development todo list
+```
+
+## Design Principles
+- **Independence:** Each tool works standalone, with its own config and docs
+- **Minimal Shared Code:** Only share code when it’s proven useful
+- **Progressive Enhancement:** Core features use stdlib; optional deps add enhancements
+- **Consistent Naming:** Tools use a clear `verb-noun` pattern
+- **Modular Install:** All tools listed in `tools_manifest.toml` for easy management
+
+## How to Contribute
+- Add new tools in `tools/` with their own README and config
+- Follow naming and architecture conventions
+- See [CONTRIBUTING.md](CONTRIBUTING.md) for details
 │   └── install-tool           # Script to add new tools
 └── tests/                     # Suite-wide integration tests (planned)
 ```

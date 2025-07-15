@@ -9,54 +9,42 @@
 [![CI main](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/pdbeard/intermcli/actions?query=branch%3Amain)
 [![CI dev](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=dev/testing)](https://github.com/pdbeard/intermcli/actions?query=branch%3Adev%2Ftesting)
 
-Interactive terminal utilities for developers. A collection of independent, self-contained CLI tools for common developer and sysadmin tasks.
+git clone https://github.com/pdbeard/intermcli.git
 
-## ✨ Features
+# 🖥️ IntermCLI
 
-- 🔍 **Port Scanner** (`scan-ports`) - Network port scanning with service detection
-- 📁 **Project Finder** (`find-projects`) - Interactive git repository discovery and VS Code integration
-- 🗃️ **Sort Files** (`sort-files`) - Organize directories by type, date, size, or custom rules
-- 🔧 **Progressive Enhancement** - Core functionality works with Python standard library only
-- 🚀 **Optional Dependencies** - Enhanced features with `requests`, `rich`, and other libraries
-- 📊 **Rich Terminal Output** - Colorful, organized output when enhanced libraries are available
+Interactive terminal utilities for developers. A suite of independent CLI tools for common developer and sysadmin tasks.
 
-## 🚀 Quick Start
+## Features
+- Fast, self-contained CLI tools for port scanning, project discovery, file sorting, and endpoint testing
+- Progressive enhancement: works with Python stdlib, optional dependencies add features
+- Cross-platform: Linux and macOS
 
+## Quick Start
 ```bash
-# Clone and install
 git clone https://github.com/pdbeard/intermcli.git
 cd intermcli
 ./install.sh
 ```
-- This will install all tools to `~/.local/bin/`, set up configuration, and offer to add to your PATH.
-- You will be prompted to optionally install enhanced Python dependencies for extra features.
+- Installs all tools to `~/.local/bin/`, sets up config, and offers to add to your PATH
+- Optionally installs enhanced Python dependencies for extra features
 
-## 🛠️ Available Tools
+## Tool Index
+| Tool           | Description                        | Usage Doc                                      |
+| -------------- | ---------------------------------- | ---------------------------------------------- |
+| scan-ports     | Port scanner with service detection| [scan-ports README](tools/scan-ports/README.md) |
+| find-projects  | Project discovery & navigation     | [find-projects README](tools/find-projects/README.md) |
+| sort-files     | File organizer by type/date/size   | [sort-files README](tools/sort-files/README.md) |
+| test-endpoints | API endpoint testing tool          | [test-endpoints README](tools/test-endpoints/README.md) |
 
-### Port Scanner (`scan-ports`)
-Advanced port scanner with progressive service detection.
+## Documentation
+- [Architecture](docs/ARCHITECTURE.md): Project structure and design principles
+- [Contributing](docs/CONTRIBUTING.md): How to contribute, code style, PR workflow
+- [Configuration](docs/CONFIGURATION.md): Config file locations and examples
+- [Design Philosophy](docs/DESIGN.md): Naming conventions and project vision
 
-```bash
-scan-ports                    # Scan localhost with default ports
-scan-ports 192.168.1.1       # Scan remote host
-scan-ports --list web         # Scan only web service ports
-scan-ports -p 3000,8080      # Scan specific ports
-scan-ports --check-deps      # Show optional dependency status
-```
-
-**Features:**
-- Configurable port lists (web, database, messaging, etc.)
-- Service detection with HTTP header analysis
-- Progressive enhancement (basic → enhanced with `requests`)
-- Concurrent scanning for speed
-
-### Project Finder (`find-projects`)
-Interactive project discovery and navigation tool.
-
-```bash
-find-projects                # Launch interactive finder
-find-projects --help         # Show all options
-```
+## License
+GPL v3. See [LICENSE](LICENSE).
 
 **Features:**
 - Git repository discovery
@@ -222,10 +210,9 @@ tools/
 - **[Contributing](docs/CONTRIBUTING.md)** - How to contribute new tools or features
 - **[Configuration](docs/CONFIGURATION.md)** - Config file reference and examples
 
-### Tool-Specific Documentation
-- **[Port Scanner](docs/tools/scan-ports.md)** - Detailed usage and configuration
-- **[Project Finder](docs/tools/find-projects.md)** - Setup and customization
-- **[Sort Files](docs/tools/sort-files.md)** - Usage and configuration
+
+### CLI Tool Reference
+- See the [CLI Tool Reference](docs/cli-tools.md) for a complete index of all available CLI tools and links to their documentation in each tool's directory.
 
 ## 🤝 Contributing
 

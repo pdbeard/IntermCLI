@@ -1,43 +1,27 @@
 # 🎯 IntermCLI Design Goals Document
 
-## Project Overview
-- **Repository**: intermcli
-- **Naming Convention**: action-target (e.g., `scan-ports`, `find-projects`, `sort-files`)
-- **Tagline**: "Interactive terminal utilities for developers"
-- **Tool Manifest**: All tools are listed in `tools_manifest.toml` for modular installation and management.
 
-## 🎨 Core Design Philosophy
+# IntermCLI Design Philosophy
 
-### Interactive First
-- Tools should engage with users, not just execute silently
-- Provide helpful prompts, confirmations, and guidance
-- Use colors, emojis, and clear formatting for better UX
-- Offer both interactive and non-interactive modes
+## Naming & Structure
+- All tools use the `action-target` (verb-noun) naming convention (e.g., `scan-ports`, `find-projects`, `sort-files`)
+- Each tool is self-contained, with its own config and README
+- All tools are listed in `tools_manifest.toml` for modular install and management
 
-### Terminal Native
-- Built for command-line workflows
-- Respect terminal conventions and standards
-- Work seamlessly with pipes, redirects, and scripting
-- Fast startup times for responsive interaction
+## Core Principles
+- **Interactive First:** Tools provide prompts, confirmations, and clear feedback
+- **Terminal Native:** Fast startup, works with pipes/redirects, respects CLI conventions
+- **Progressive Enhancement:** Core features use stdlib; optional dependencies add enhancements
+- **Tool Independence:** Minimal shared code; only abstract when proven useful
+- **Simple Evolution:** Start simple, refactor only when duplication is a burden
 
-### Progressive Enhancement
-- Core functionality works with Python standard library only
-- Optional dependencies unlock enhanced features
-- The install script (`install.sh`) automatically detects and offers to install optional Python dependencies for enhanced features.
-- Users can skip optional dependencies and still use all core features.
-- Graceful degradation when dependencies unavailable
-- Clear feedback about available/missing features
+## Design Goals
+- Consistent naming and structure for discoverability
+- Clear, concise documentation for each tool
+- Easy contribution: add new tools in `tools/` with their own README/config
+- Modular install and future plugin support
 
-### Tool Independence
-- Each tool is self-contained and can run standalone
-- Avoid premature abstraction - shared code only when proven necessary
-- Monolithic tools are acceptable and often preferable
-- "Start simple, evolve naturally" approach
-
-## 🎯 Design Goals
-
-### 1. Action-Target Naming Convention
-- All tools follow `verb-noun` pattern for consistency
+---
 - **Examples**: `scan-ports`, `find-projects`, `sort-files`, `check-services`
 - **Benefits**: Self-documenting, tab-completable, professional
 - **Avoids**: Mixed patterns, unclear command purposes

@@ -1,0 +1,49 @@
+
+## sort-files
+
+Organize and declutter directories by automatically sorting files into subfolders based on file type, date, size, or user-defined custom rules.
+
+### Usage
+
+```bash
+sort-files ~/Downloads                # Sort files by type in Downloads
+sort-files --by date ~/Documents      # Sort files by date
+sort-files --dry-run --show-skipped ~/Desktop   # Preview actions, show skipped files
+sort-files --config ~/.config/intermcli/sort-files.toml ~/Downloads  # Use custom config
+```
+
+### Features
+- Sort by type, date, or size
+- Custom rules via TOML config
+- Dry run mode for preview
+- Safe by default (never overwrites files)
+- Cross-platform (Linux, macOS)
+- TOML-based configuration
+
+### Configuration
+- Uses TOML config at `tools/sort-files/config/defaults.toml` (or custom path)
+- You can add, remove, or customize type folders and rules.
+- If TOML support is missing, a default set of rules is used.
+
+**Example TOML snippet:**
+```toml
+[rules]
+by_type = true
+by_date = false
+by_size = false
+
+[type_folders]
+images = [".jpg", ".jpeg", ".png", ".gif"]
+documents = [".pdf", ".docx", ".txt"]
+archives = [".zip", ".tar", ".gz"]
+```
+
+### Customizing
+- Edit the TOML config to add new folders, rules, or patterns.
+- Use `sort-files --config <path>` to specify a custom config file.
+
+### Troubleshooting
+- If you see "TOML support not available", install `tomli` for Python < 3.11: `pip install tomli`
+- If the config file is missing, the tool will fall back to built-in defaults.
+
+---
