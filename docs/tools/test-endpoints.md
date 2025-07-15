@@ -12,28 +12,28 @@ Provide developers with a lightweight, terminal-native tool for API testing that
 
 ## ✨ Features
 
-- **Multiple HTTP Methods**  
+- **Multiple HTTP Methods**
   Support for GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS
 
-- **Request Building**  
+- **Request Building**
   Headers, query parameters, request bodies (JSON, form-data, raw text)
 
-- **Response Analysis**  
+- **Response Analysis**
   Status codes, headers, response time, body formatting (JSON, XML, HTML)
 
-- **Collections & Environments**  
+- **Collections & Environments**
   Save and organize requests, use variables for different environments (dev, staging, prod)
 
-- **Authentication Support**  
+- **Authentication Support**
   Bearer tokens, basic auth, API keys, custom headers
 
-- **Progressive Enhancement**  
+- **Progressive Enhancement**
   Core functionality with stdlib, enhanced features with `requests` and `rich`
 
-- **Export/Import**  
+- **Export/Import**
   Compatible with Postman collections (basic import/export)
 
-- **Scripting Support**  
+- **Scripting Support**
   Pre-request and post-response scripts (simple Python expressions)
 
 ---
@@ -303,5 +303,5 @@ Body (formatted):
 
 ---
 
-Help us shape this tool!  
+Help us shape this tool!
 Open an issue or PR with your API testing use cases and feature ideas.

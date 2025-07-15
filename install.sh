@@ -29,7 +29,7 @@ validate_environment() {
             exit 1
         fi
     fi
-    
+
     # Validate write permissions
     if [ "$INSTALL_SCOPE" = "user" ] && [ ! -w "$(dirname "$USER_INSTALL_DIR")" ]; then
         echo -e "${RED}❌ Cannot write to $USER_INSTALL_DIR${NC}"
@@ -467,12 +467,12 @@ fi
 create_tool_wrapper() {
     local tool_name="$1"
     local tool_script="$2"
-    
+
     if [ ! -f "$SCRIPT_ROOT/$tool_script" ]; then
         echo -e "${YELLOW}  ⚠️  $tool_name not found at $SCRIPT_ROOT/$tool_script, skipping${NC}"
         return
     fi
-    
+
     local wrapper_content="#!/bin/bash
 # IntermCLI $tool_name wrapper
 SCRIPT_ROOT=\"$SCRIPT_ROOT\"
@@ -484,7 +484,7 @@ else
     echo \"❌ $tool_name tool not found at \$TOOL_PATH\"
     exit 1
 fi"
-    
+
     if [ "$INSTALL_SCOPE" = "global" ]; then
         echo "$wrapper_content" | sudo tee "$INSTALL_DIR/$tool_name" > /dev/null
         sudo chmod +x "$INSTALL_DIR/$tool_name"
@@ -492,7 +492,7 @@ fi"
         echo "$wrapper_content" > "$INSTALL_DIR/$tool_name"
         chmod +x "$INSTALL_DIR/$tool_name"
     fi
-    
+
     INSTALLED_FILES+=("$INSTALL_DIR/$tool_name")
     echo -e "${GREEN}  ✅ $tool_name${NC}"
 }
@@ -529,7 +529,7 @@ else
     echo -e "${YELLOW}  ⚠️  $INSTALL_DIR is not in PATH${NC}"
     echo -e "${YELLOW}     Add this to your shell profile (~/.bashrc, ~/.zshrc, etc.):${NC}"
     echo -e "${BLUE}     export PATH=\"$INSTALL_DIR:\$PATH\"${NC}"
-    
+
     if ask_yes_no "Add to PATH automatically?" "y"; then
         SHELL_RC=$(detect_shell_profile)
         if [ -n "$SHELL_RC" ]; then

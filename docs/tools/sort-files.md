@@ -1,6 +1,6 @@
 # 🗃️ sort-files
 
-**sort-files** is a terminal utility for organizing files in a directory by type, date, size, or custom rules.  
+**sort-files** is a terminal utility for organizing files in a directory by type, date, size, or custom rules.
 It is part of the IntermCLI suite and follows the action-target naming convention.
 
 ---
@@ -13,28 +13,28 @@ Help users quickly organize cluttered directories (like Downloads, Desktop, or p
 
 ## ✨ Features
 
-- **Sort by File Type**  
+- **Sort by File Type**
   Move files into folders by extension (e.g., `images/`, `documents/`, `archives/`, etc.)
 
-- **Sort by Date**  
+- **Sort by Date**
   Organize files into folders by creation or modification date (e.g., `2025-07/`, `2025-07-02/`).
 
-- **Sort by Size**  
+- **Sort by Size**
   Move large files into a separate folder, or group by size ranges.
 
-- **Custom Rules**  
+- **Custom Rules**
   User-defined patterns via TOML config (e.g., move `*-receipt.pdf` to `Receipts/`).
 
-- **Dry Run Mode**  
+- **Dry Run Mode**
   Preview what changes would be made without actually moving files.
 
-- **Safe by Default**  
+- **Safe by Default**
   Never overwrite files without confirmation; handle name collisions gracefully.
 
-- **Configurable via TOML**  
+- **Configurable via TOML**
   User and project-level config files for custom rules and folder mappings.
 
-- **Cross-Platform**  
+- **Cross-Platform**
   Works on Linux, macOS, and Windows.
 
 ---
@@ -114,5 +114,5 @@ code = [".py", ".js", ".ts", ".java", ".c", ".cpp", ".go", ".rb", ".php", ".sh",
 
 ---
 
-Help us shape this tool!  
+Help us shape this tool!
 Open an issue or PR with your feature ideas or use cases.

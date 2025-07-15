@@ -193,7 +193,7 @@ development_dirs = [
 # Default editor - can be any shell command
 # Examples:
 #   "code"                    # VS Code
-#   "vim ."                   # Vim in current directory  
+#   "vim ."                   # Vim in current directory
 #   "~/scripts/dev-setup.sh"  # Custom script
 #   "tmux new-session -d -s project \\; split-window -h \\; send-keys 'vim .' Enter"
 default_editor = "code"
@@ -471,7 +471,7 @@ interm config reset scan-ports
    ```bash
    # Check Python version
    python3 --version
-   
+
    # Install tomli for Python < 3.11
    pip install tomli
    ```

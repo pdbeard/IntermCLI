@@ -1,77 +1,88 @@
-- Ditermine github strat
-- Update docs with new strategy 
-- TODO's for each tool/folder
-- Clear descriptions for what the enhancements do (aka reduced flickering)
-
-- Add naming convention
-
-
 tool ideas
-- Scripty things?
-    - renaming scripts/ backupscripts/ all the things i use on the webserver?
-    - aliases for common things I do? aka docker mass quit
 
--checking common services?
-    custom list, active monitoring? 
+# CI/Automation
+- Add MkDocs documentation build
+- Add macOS/Windows runners
+- Release automation
+- Cache dependencies
+- Build and upload artifacts
+- Custom test markers
+- Discord alerts for fun
 
-- Good logging Scripts? 
-    multifile support/filtering/highlighting
-- analyze logs?
-    -dunno even know how I would do this
--User management info and scripts
-    - users/groups/last logins, fast enable/disable, fast create? 
+# Tool Config/Enhancements
+- Local config files for tool customization
+  - find-projects: run custom commands when opening projects
+  - sort-files: custom rule sets per directory (for automation)
 
--Disk scripts
-    - find large files? 
+# Project Management
+- Determine GitHub branching strategy
+- Update docs with new strategy
+- Add TODOs for each tool/folder
+- Write clear descriptions for enhancements (e.g., reduced flickering)
+- Add naming convention documentation
 
--backups for config files
+# Tool Ideas
+## Scripty things
+- Renaming scripts, backup scripts, webserver utilities
+- Aliases for common tasks (e.g., docker mass quit)
 
--General update script? 
-    - possibly pull info from api's, list security warnings from comminity
--rotate log scripts
--rotate keys, ssh, api
--more individualised process monitor? 
- - maybe something cool like watch specific ones that hit certain blah blah
- find suid/sgid\
+## Service/Monitoring
+- Check common services (custom list, active monitoring)
 
+## Logging/Analysis
+- Good logging scripts (multifile support, filtering, highlighting)
+- Analyze logs (how to approach?)
 
--web dev scripts
-    - check-ssl
-    - test-enpoints (postman style?)
-    - lint-configs
-    - find-secrets
-    - deploy static 
-    - monitor uptime
-    check-cors
-    analyse-deps
-    -generate-envs
-    - check accessibility
-    test-webhooks?
-    generate sitemap
-    check redirects
-    - gen favicons
-    - check headers
-    - test csp headers/ headers
-    - love to be able to set and generate json templates
+## User Management
+- User/group info scripts
+- Last logins, fast enable/disable/create
 
--general
-    - terminal color schemes
-    - find open prs
-    -sync dotfiles
-    -check-dns
-    -test-smtp 
-    - generate password
-    -ripgrep/grep wrapper?
-    -encrypt decrypt files
-    -generate password
-    -better pop popd? include something like Z? 
-    -Download manager and watcher 
-    -clipboard manager? 
-    - firewalls stuff
-    - install and configure my fav stuff? fail2ban general security settings, ssh
-    -find duplicates
-    -color picker and profiles
-        - color picker and profile lists from terminal?
+## Disk/Backup
+- Find large files
+- Backups for config files
+
+## General Maintenance
+- General update script (pull info from APIs, list community security warnings)
+- Rotate log scripts
+- Rotate keys (SSH, API)
+- More individualized process monitor (watch specific processes)
+- Find suid/sgid files
+
+# Web Dev Scripts
+- Check SSL
+- Test endpoints (Postman style)
+- Lint configs
+- Find secrets
+- Deploy static sites
+- Monitor uptime
+- Check CORS
+- Analyze dependencies
+- Generate env files
+- Check accessibility
+- Test webhooks
+- Generate sitemap
+- Check redirects
+- Generate favicons
+- Check headers
+- Test CSP headers
+- Generate JSON templates
+
+# General Utilities
+- Terminal color schemes
+- Find open PRs
+- Sync dotfiles
+- Check DNS
+- Test SMTP
+- Generate password
+- Ripgrep/grep wrapper
+- Encrypt/decrypt files
+- Better pop/popd (like Z)
+- Download manager/watcher
+- Clipboard manager
+- Firewall scripts
+- Install/configure favorite tools (fail2ban, security settings, SSH)
+- Find duplicates
+- Color picker and profiles (from terminal)
 
     
 

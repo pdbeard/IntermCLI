@@ -94,7 +94,7 @@ Before submitting a PR, please ensure:
 ## 🏷️ Semantic Versioning
 
 - `v1.0.0`    Major: Breaking changes, new tool additions
-- `v1.1.0`    Minor: New features, non-breaking changes  
+- `v1.1.0`    Minor: New features, non-breaking changes
 - `v1.1.1`    Patch: Bug fixes, documentation updates
 
 ---
