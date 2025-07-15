@@ -1,12 +1,9 @@
 
 import sys
 import os
-import shutil
-import tempfile
 import pytest
 import importlib.util
 from pathlib import Path
-import types
 from datetime import datetime
 
 # Dynamically import the sort-files tool as a module

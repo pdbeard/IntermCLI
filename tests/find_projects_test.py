@@ -1,7 +1,4 @@
 import os
-import tempfile
-import shutil
-from pathlib import Path
 import pytest
 import importlib.util
 
@@ -63,7 +60,6 @@ def test_security_validator_editor(monkeypatch):
     monkeypatch.setenv("PATH", os.environ["PATH"])
     assert validator.validate_editor_command("vim") == "vim"
     # Invalid editor name
-    import pytest
 
     with pytest.raises(ValueError):
         validator.validate_editor_command("invalid editor!")

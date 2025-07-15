@@ -1,8 +1,5 @@
 import sys
 import os
-import tempfile
-import types
-import pytest
 import json
 import importlib.util
 
