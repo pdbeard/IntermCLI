@@ -12,14 +12,11 @@ Example usage:
     scan-ports -p 8080
     scan-ports --show-lists
     scan-ports --check-deps
-
-Author: pdbeard
 """
 
 import socket
 import sys
 import argparse
-  # ...existing code...
 import re
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -239,6 +236,7 @@ def detect_http_service_basic(host, port, timeout=5):
     try:
         import urllib.request
         import urllib.error
+
         # ...existing code...
 
         protocols = ["http"]

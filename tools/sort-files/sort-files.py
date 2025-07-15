@@ -10,8 +10,6 @@ Example usage:
     sort-files --by date ~/Documents
     sort-files --dry-run --show-skipped ~/Desktop
     sort-files --config ~/.config/intermcli/sort-files.toml ~/Downloads
-
-Author: pdbeard
 """
 
 import sys
@@ -190,12 +188,16 @@ def sort_files(
                 moved.append((entry, dest_dir))
             except PermissionError:
                 print(
-                    "❌ Failed to move {}: Permission denied. Try running with elevated permissions.".format(entry.name)
+                    "❌ Failed to move {}: Permission denied. Try running with elevated permissions.".format(
+                        entry.name
+                    )
                 )
                 skipped.append((entry, "permission denied"))
             except FileNotFoundError:
                 print(
-                    "❌ Failed to move {}: File not found. It may have been moved or deleted.".format(entry.name)
+                    "❌ Failed to move {}: File not found. It may have been moved or deleted.".format(
+                        entry.name
+                    )
                 )
                 skipped.append((entry, "file not found"))
             except Exception as e:

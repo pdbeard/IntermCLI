@@ -9,8 +9,6 @@ Example usage:
     find-projects
     find-projects --config
     find-projects --version
-
-Author: pdbeard
 """
 
 import os

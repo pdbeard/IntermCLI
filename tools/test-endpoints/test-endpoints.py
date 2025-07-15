@@ -11,8 +11,6 @@ Example usage:
     test-endpoints POST https://httpbin.org/post --json '{"name": "test"}'
     test-endpoints GET https://api.example.com/data --header "Authorization: Bearer token123"
     test-endpoints --collection my-api --request "Get Users" --env dev
-
-Author: pdbeard
 """
 
 import sys
