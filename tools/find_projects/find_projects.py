@@ -119,13 +119,16 @@ class SecurityValidator:
 
     @staticmethod
     def validate_project_path(path: str, allowed_base_dirs: List[str]) -> bool:
-        """Validate that project path is within allowed directories"""
+        """Validate that project path is within allowed directories (compatible with Python <3.9)"""
         try:
             resolved_path = Path(path).resolve()
             for base_dir in allowed_base_dirs:
                 base_resolved = Path(base_dir).resolve()
-                if resolved_path.is_relative_to(str(base_resolved)):
+                try:
+                    resolved_path.relative_to(base_resolved)
                     return True
+                except ValueError:
+                    continue
             return False
         except Exception:
             return False
