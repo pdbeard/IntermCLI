@@ -49,8 +49,7 @@ except ImportError:
     HAS_URLLIB3 = False
 
 try:
-    import ssl
-    HAS_SSL = True
+    HAS_SSL = True  # ssl is only imported inside functions when needed
 except ImportError:
     HAS_SSL = False
 
