@@ -3,11 +3,11 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos-lightgrey.svg)](https://github.com/yourusername/intermcli)
+[![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos-lightgrey.svg)](https://github.com/pdbeard/intermcli)
 
 <!-- CI Badges for main and dev branches -->
-[![CI (main)](https://github.com/yourusername/intermcli/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yourusername/intermcli/actions?query=branch%3Amain)
-[![CI (dev)](https://github.com/yourusername/intermcli/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/yourusername/intermcli/actions?query=branch%3Adev)
+[![CI (main)](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/pdbeard/intermcli/actions?query=branch%3Amain)
+[![CI (dev)](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=dev/testing)](https://github.com/pdbeard/intermcli/actions?query=branch%3Adev%2Ftesting)
 
 Interactive terminal utilities for developers. A collection of independent, self-contained CLI tools for common developer and sysadmin tasks.
 
@@ -24,7 +24,7 @@ Interactive terminal utilities for developers. A collection of independent, self
 
 ```bash
 # Clone and install
-git clone https://github.com/yourusername/intermcli.git
+git clone https://github.com/pdbeard/intermcli.git
 cd intermcli
 ./install.sh
 ```
