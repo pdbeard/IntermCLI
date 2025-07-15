@@ -7,7 +7,6 @@
 
 <!-- CI Badges for main and dev branches -->
 [![CI (main)](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/pdbeard/intermcli/actions?query=branch%3Amain)
-[![CI (dev)](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=dev/testing)](https://github.com/pdbeard/intermcli/actions?query=branch%3Adev%2Ftesting)
 
 Interactive terminal utilities for developers. A collection of independent, self-contained CLI tools for common developer and sysadmin tasks.
 
