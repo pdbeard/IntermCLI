@@ -10,6 +10,15 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+# Detect Python and pip (prefer venv if active)
+if [ -n "$VIRTUAL_ENV" ] && [ -x "$VIRTUAL_ENV/bin/python" ]; then
+    PYTHON_BIN="$VIRTUAL_ENV/bin/python"
+    PIP_BIN="$VIRTUAL_ENV/bin/pip"
+else
+    PYTHON_BIN="python3"
+    PIP_BIN="pip3"
+fi
+
 # Things to have early
 OPTIONAL_MISSING=()
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -311,7 +320,7 @@ fi
 if [ -f "$SCRIPT_ROOT/requirements.txt" ]; then
     echo -e "${BLUE}  Reading requirements.txt...${NC}"
     TEMP_FILE=$(mktemp -t intermcli.XXXXXX)
-    python3 -c "
+    "$PYTHON_BIN" -c "
 import sys
 import re
 
@@ -351,7 +360,7 @@ for pkg in missing_deps:
     print(f'  ⚪ {pkg} - optional')
 with open('$TEMP_FILE', 'w') as f:
     f.write('\n'.join(missing_deps))
-"
+"    
     OPTIONAL_MISSING+=($(cat "$TEMP_FILE" 2>/dev/null || true))
     rm -f "$TEMP_FILE"
 else
@@ -445,11 +454,21 @@ echo -e "${BLUE}🚀 Starting installation...${NC}"
 if [ "$INSTALL_OPTIONAL" = true ] && [ ${#OPTIONAL_MISSING[@]} -gt 0 ]; then
     echo -e "${BLUE}📦 Installing optional Python dependencies...${NC}"
     if [ "$DRY_RUN" = false ]; then
-        if python3 -m pip install --user "${OPTIONAL_MISSING[@]}"; then
-            echo -e "${GREEN}  ✅ Optional dependencies installed${NC}"
+        # Use --user only if not in venv
+        if [ -n "$VIRTUAL_ENV" ]; then
+            if "$PIP_BIN" install "${OPTIONAL_MISSING[@]}"; then
+                echo -e "${GREEN}  ✅ Optional dependencies installed in venv${NC}"
+            else
+                echo -e "${YELLOW}  ⚠️  Failed to install some packages in venv${NC}"
+                echo -e "${YELLOW}     Manual install: $PIP_BIN install ${OPTIONAL_MISSING[*]}${NC}"
+            fi
         else
-            echo -e "${YELLOW}  ⚠️  Failed to install some packages${NC}"
-            echo -e "${YELLOW}     Manual install: python3 -m pip install --user ${OPTIONAL_MISSING[*]}${NC}"
+            if "$PYTHON_BIN" -m pip install --user "${OPTIONAL_MISSING[@]}"; then
+                echo -e "${GREEN}  ✅ Optional dependencies installed${NC}"
+            else
+                echo -e "${YELLOW}  ⚠️  Failed to install some packages${NC}"
+                echo -e "${YELLOW}     Manual install: $PYTHON_BIN -m pip install --user ${OPTIONAL_MISSING[*]}${NC}"
+            fi
         fi
     else
         echo -e "${BLUE}  Would install: ${OPTIONAL_MISSING[*]}${NC}"

@@ -27,6 +27,11 @@
 - [ ] Clean up and organize enhancement descriptions.
 
 
+6. Alignment with project goals
+  - Add additional enhancedments into tools with optional dependencies
+    - Create stucture for dep management (clear organization of what tool needs what dependecy, or 'global' deps like rich. skip deps for certain tools)
+    - Implement some TUI through rich for interaction 
+
 
 ## Hardcoded Values Refactor Checklist
 
@@ -43,7 +48,21 @@
 
 
 
+## Optional Dependencies Enhancement Checklist
 
+- [ ] Detect and use rich for colorized output, tables, and panels
+- [ ] Use requests for enhanced HTTP features (timeouts, SSL, redirects)
+- [ ] Use click for improved CLI parsing and help output
+- [ ] Use python-nmap for advanced port scanning (scan-ports)
+- [ ] Use pyyaml for YAML config support if needed
+- [ ] Use gitpython for advanced git operations (find-projects)
+- [ ] Add enhanced error messages and suggestions when optional deps are missing
+- [ ] Add a --check-deps or --status command to show enhancement status
+- [ ] Document which features are unlocked by each optional dependency in README
+- [ ] Add tests for enhanced features and fallback behavior
+- [ ] Ensure graceful fallback to stdlib-only features if optional deps are not installed
+- [ ] Add config options to enable/disable enhanced features
+- [ ] Show a summary of available enhancements at tool startup
 
 Other Ideas/TODOS
 
@@ -133,4 +152,3 @@ Other Ideas/TODOS
 - Color picker and profiles (from terminal)
 
 ---
-

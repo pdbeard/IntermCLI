@@ -1,4 +1,9 @@
 [[tool]]
+name = "interm"
+script = "bin/interm"
+is_executable = true
+
+[[tool]]
 name = "scan-ports"
 script = "tools/scan-ports/scan-ports.py"
 
@@ -11,6 +16,5 @@ name = "sort-files"
 script = "tools/sort-files/sort-files.py"
 
 [[tool]]
-name = "interm"
-script = "bin/interm"
-is_executable = true
+name = "test-endpoints"
+script = "tools/test-endpoints/test-endpoints.py"

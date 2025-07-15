@@ -45,8 +45,24 @@ try:
 except ImportError:
     HAS_URLLIB3 = False
 
+# Add rich support
 try:
-    HAS_SSL = True  # ssl is only imported inside functions when needed
+    from rich.console import Console
+    from rich.table import Table
+    from rich.panel import Panel
+    from rich import box
+
+    HAS_RICH = True
+    console = Console()
+except ImportError:
+    HAS_RICH = False
+    console = None
+
+# SSL support detection
+try:
+    import ssl
+
+    HAS_SSL = True
 except ImportError:
     HAS_SSL = False
 
@@ -236,8 +252,6 @@ def detect_http_service_basic(host, port, timeout=5):
     try:
         import urllib.request
         import urllib.error
-
-        # ...existing code...
 
         protocols = ["http"]
         if port in [443, 8443] and HAS_SSL:
@@ -530,6 +544,67 @@ def comprehensive_service_detection(host, port, timeout=3, enhanced=None):
     return service_info
 
 
+def print_scan_results_rich(open_ports, closed_ports, all_ports, service_results, config, detect_services):
+    """Print scan results using rich tables and panels"""
+    # Summary Table
+    summary_table = Table(title="Port Scan Results", box=box.SIMPLE)
+    summary_table.add_column("Port", style="bold cyan", justify="right")
+    summary_table.add_column("Expected Service", style="magenta")
+    summary_table.add_column("Status", style="green")
+    summary_table.add_column("Detected Service", style="yellow")
+
+    for port in sorted(all_ports.keys()):
+        expected_service = all_ports[port]
+        status = "OPEN" if port in open_ports else "CLOSED"
+        status_color = "green" if status == "OPEN" else "red"
+        detected = service_results.get(port) if detect_services else None
+        detected_service = ""
+        if detect_services and detected:
+            confidence_emoji = {"high": "🎯", "medium": "🔍", "low": "❓"}.get(
+                detected["confidence"], "❓"
+            )
+            method_emoji = "🚀" if detected["method"] == "enhanced" else "🔧"
+            detected_service = f"{confidence_emoji}{method_emoji} {detected['service']}"
+            if detected["version"]:
+                detected_service += f" ({detected['version'][:30]})"
+        summary_table.add_row(
+            str(port),
+            expected_service,
+            f"[{status_color}]{status}[/{status_color}]",
+            detected_service,
+        )
+
+    console.print(summary_table)
+
+    # Category breakdown
+    category_table = Table(title="Results by Category", box=box.SIMPLE)
+    category_table.add_column("Category", style="bold blue")
+    category_table.add_column("Open", style="green")
+    category_table.add_column("Total", style="white")
+    category_table.add_column("Open Ports", style="cyan")
+    for list_name, details in config["port_lists"].items():
+        category_open = []
+        category_total = 0
+        for port_str, service in details["ports"].items():
+            port = int(port_str)
+            category_total += 1
+            if port in open_ports:
+                category_open.append(port)
+        category_table.add_row(
+            list_name,
+            str(len(category_open)),
+            str(category_total),
+            ", ".join(map(str, sorted(category_open))) if category_open else "-",
+        )
+    console.print(category_table)
+
+    # Summary panel
+    summary_text = f"[bold green]Open:[/bold green] {len(open_ports)}  "
+    summary_text += f"[bold red]Closed:[/bold red] {len(closed_ports)}  "
+    summary_text += f"[bold white]Total:[/bold white] {len(all_ports)}"
+    console.print(Panel(summary_text, title="Scan Summary", style="bold magenta"))
+
+
 def scan_all_configured_ports(host, timeout=3, show_closed=False, detect_services=True):
     """Scan all ports from all configured port lists with optional service detection"""
     config = load_port_config()
@@ -600,70 +675,61 @@ def scan_all_configured_ports(host, timeout=3, show_closed=False, detect_service
 
     # Display results
     print("\n" + "=" * 90)
-    if detect_services:
-        print("📊 OPEN PORTS WITH SERVICE DETECTION:")
+    if HAS_RICH and console:
+        print_scan_results_rich(open_ports, closed_ports, all_ports, service_results, config, detect_services)
     else:
-        print("📊 OPEN PORTS:")
-    print("=" * 90)
-
-    for port in sorted(open_ports):
-        expected_service = all_ports[port]
-
-        if detect_services and port in service_results:
-            detected = service_results[port]
-            confidence_emoji = {"high": "🎯", "medium": "🔍", "low": "❓"}.get(
-                detected["confidence"], "❓"
-            )
-
-            method_emoji = "🚀" if detected["method"] == "enhanced" else "🔧"
-
-            service_display = detected["service"]
-            if detected["version"]:
-                service_display += f" ({detected['version'][:30]})"
-
-            print(
-                f"Port {port:5} | Expected: {expected_service:20} | "
-                f"Detected: {confidence_emoji}{method_emoji} {service_display}"
-            )
-
-            # Show additional details for HTTP services
-            if "details" in detected and detected["details"]:
-                details = detected["details"]
-                if details.get("title"):
-                    print(f"        └─ Title: {details['title']}")
-                if details.get("server"):
-                    print(f"        └─ Server: {details['server']}")
-                if details.get("redirect"):
-                    print(f"        └─ Redirects to: {details['redirect']}")
+        if detect_services:
+            print("📊 OPEN PORTS WITH SERVICE DETECTION:")
         else:
-            print(f"Port {port:5} | {expected_service:25} | ✅ OPEN")
-
-    print("=" * 90)
-    print(
-        f"📊 Summary: {len(open_ports)} open, {len(closed_ports)} closed out of {len(all_ports)} total"
-    )
-
-    if open_ports:
-        print(f"🔓 Open ports: {', '.join(map(str, sorted(open_ports)))}")
-
-    # Show breakdown by category
-    print("\n📂 Results by category:")
-    for list_name, details in config["port_lists"].items():
-        category_open = []
-        category_total = 0
-
-        for port_str, service in details["ports"].items():
-            port = int(port_str)
-            category_total += 1
-            if port in open_ports:
-                category_open.append(port)
-
-        if category_open:
-            print(
-                f"  {list_name:12}: {len(category_open)}/{category_total} open - {', '.join(map(str, sorted(category_open)))}"
-            )
-        else:
-            print(f"  {list_name:12}: 0/{category_total} open")
+            print("📊 OPEN PORTS:")
+        print("=" * 90)
+        for port in sorted(open_ports):
+            expected_service = all_ports[port]
+            if detect_services and port in service_results:
+                detected = service_results[port]
+                confidence_emoji = {"high": "🎯", "medium": "🔍", "low": "❓"}.get(
+                    detected["confidence"], "❓"
+                )
+                method_emoji = "🚀" if detected["method"] == "enhanced" else "🔧"
+                service_display = detected["service"]
+                if detected["version"]:
+                    service_display += f" ({detected['version'][:30]})"
+                print(
+                    f"Port {port:5} | Expected: {expected_service:20} | "
+                    f"Detected: {confidence_emoji}{method_emoji} {service_display}"
+                )
+                if "details" in detected and detected["details"]:
+                    details = detected["details"]
+                    if details.get("title"):
+                        print(f"        └─ Title: {details['title']}")
+                    if details.get("server"):
+                        print(f"        └─ Server: {details['server']}")
+                    if details.get("redirect"):
+                        print(f"        └─ Redirects to: {details['redirect']}")
+            else:
+                print(f"Port {port:5} | {expected_service:25} | ✅ OPEN")
+        print("=" * 90)
+        print(
+            f"📊 Summary: {len(open_ports)} open, {len(closed_ports)} closed out of {len(all_ports)} total"
+        )
+        if open_ports:
+            print(f"🔓 Open ports: {', '.join(map(str, sorted(open_ports)))}")
+        # Show breakdown by category
+        print("\n📂 Results by category:")
+        for list_name, details in config["port_lists"].items():
+            category_open = []
+            category_total = 0
+            for port_str, service in details["ports"].items():
+                port = int(port_str)
+                category_total += 1
+                if port in open_ports:
+                    category_open.append(port)
+            if category_open:
+                print(
+                    f"  {list_name:12}: {len(category_open)}/{category_total} open - {', '.join(map(str, sorted(category_open)))}"
+                )
+            else:
+                print(f"  {list_name:12}: 0/{category_total} open")
 
     return open_ports
 
@@ -872,29 +938,32 @@ def main():
 
             # Display results
             print("\n" + "=" * 60)
-            for port in sorted(open_ports):
-                expected_service = ports[port]
+            if HAS_RICH and console:
+                print_scan_results_rich(open_ports, closed_ports, ports, service_results, config, detect_services)
+            else:
+                for port in sorted(open_ports):
+                    expected_service = ports[port]
 
-                if detect_services and port in service_results:
-                    detected = service_results[port]
-                    confidence_emoji = {"high": "🎯", "medium": "🔍", "low": "❓"}.get(
-                        detected["confidence"], "❓"
-                    )
+                    if detect_services and port in service_results:
+                        detected = service_results[port]
+                        confidence_emoji = {"high": "🎯", "medium": "🔍", "low": "❓"}.get(
+                            detected["confidence"], "❓"
+                        )
 
-                    method_emoji = "🚀" if detected["method"] == "enhanced" else "🔧"
-                    service_display = detected["service"]
-                    if detected["version"]:
-                        service_display += f" ({detected['version'][:30]})"
+                        method_emoji = "🚀" if detected["method"] == "enhanced" else "🔧"
+                        service_display = detected["service"]
+                        if detected["version"]:
+                            service_display += f" ({detected['version'][:30]})"
 
-                    print(
-                        f"Port {port:5} | Expected: {expected_service:20} | "
-                        f"Detected: {confidence_emoji}{method_emoji} {service_display}"
-                    )
-                else:
-                    print(f"Port {port:5} | {expected_service:25} | ✅ OPEN")
+                        print(
+                            f"Port {port:5} | Expected: {expected_service:20} | "
+                            f"Detected: {confidence_emoji}{method_emoji} {service_display}"
+                        )
+                    else:
+                        print(f"Port {port:5} | {expected_service:25} | ✅ OPEN")
 
-            print("=" * 60)
-            print(f"📊 Summary: {len(open_ports)} open out of {len(ports)} scanned")
+                print("=" * 60)
+                print(f"📊 Summary: {len(open_ports)} open out of {len(ports)} scanned")
 
         else:
             # DEFAULT: Scan ALL configured ports with optional service detection
