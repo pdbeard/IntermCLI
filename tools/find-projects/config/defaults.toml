@@ -4,7 +4,7 @@
 # Directories to scan for git repositories
 development_dirs = [
     "~/development",
-    "~/projects", 
+    "~/projects",
     "~/code",
     "~/workspace",
     "~/src"
@@ -23,7 +23,7 @@ max_scan_depth = 3
 # Directories to skip during scanning
 skip_dirs = [
     ".git",
-    "node_modules", 
+    "node_modules",
     ".vscode",
     "dist",
     "build",

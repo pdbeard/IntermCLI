@@ -1,6 +1,6 @@
 # 🛡️ scan-ports — Suite-Level Command Reference
 
-`scan-ports` is part of the **IntermCLI** suite: a collection of modular, composable terminal tools for developers and sysadmins.  
+`scan-ports` is part of the **IntermCLI** suite: a collection of modular, composable terminal tools for developers and sysadmins.
 This document provides a centralized, suite-level overview of the `scan-ports` command, its options, features, and integration with the broader IntermCLI ecosystem.
 
 ---
@@ -49,8 +49,8 @@ scan-ports --check-deps
 - **Fast multi-threaded scanning** (configurable thread count)
 - **Configurable port lists** via TOML (`~/.config/intermcli/scan-ports.toml` or tool config)
 - **Scan all lists at once** with `--list all`
-- **Service detection**:  
-  - Basic (stdlib only)  
+- **Service detection**:
+  - Basic (stdlib only)
   - Enhanced (with `requests`, `urllib3`, etc.)
 - **HTTP/HTTPS detection**: banner, server, title, framework
 - **Database and SSH detection**: version and banner grabbing
@@ -114,7 +114,7 @@ If you have `requests`, `urllib3`, or other optional dependencies installed, you
 
 ## 🐍 Requirements
 
-- Python 3.8+
+
 - No dependencies required for basic usage
 - Optional: `requests`, `urllib3`, `rich`, `textual`, `tomli` (for Python <3.11)
 

@@ -7,6 +7,7 @@
 
 <!-- CI Badges for main and dev branches -->
 [![CI (main)](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/pdbeard/intermcli/actions?query=branch%3Amain)
+[![CI (dev)](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=dev/testing)](https://github.com/pdbeard/intermcli/actions?query=branch%3Adev%2Ftesting)
 
 Interactive terminal utilities for developers. A collection of independent, self-contained CLI tools for common developer and sysadmin tasks.
 
@@ -96,7 +97,7 @@ pip3 install -r requirements-dev.txt  # Includes requirements.txt
 ```
 
 ### Manual Installation
-Copy individual tools to your PATH and ensure they are executable.  
+Copy individual tools to your PATH and ensure they are executable.
 Optional features require manual installation of Python packages:
 
 ```bash
@@ -109,7 +110,7 @@ pip3 install --user -r requirements.txt  # For enhanced features
 
 ### Optional Dependencies
 
-The install script will detect and offer to install optional Python packages for enhanced features (e.g., `requests`, `rich`, `gitpython`).  
+The install script will detect and offer to install optional Python packages for enhanced features (e.g., `requests`, `rich`, `gitpython`).
 You can also install them manually:
 
 ```bash
@@ -250,7 +251,7 @@ Please read our [Contributing Guidelines](docs/CONTRIBUTING.md) for details on:
 ### Planned Tools
 - `check-services` - Enhanced service detection and analysis
 - `list-processes` - Process monitoring and management
-- `monitor-network` - Network traffic monitoring  
+- `monitor-network` - Network traffic monitoring
 - `manage-configs` - Configuration file management
 - `analyze-logs` - Log file analysis and filtering
 

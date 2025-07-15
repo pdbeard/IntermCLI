@@ -189,7 +189,7 @@ interm config validate
 
 Extract to [`shared/`](shared/) when:
 - **3+ tools** implement the same pattern
-- **Clear abstraction** emerges naturally  
+- **Clear abstraction** emerges naturally
 - **Maintenance burden** of duplication becomes significant
 
 ---

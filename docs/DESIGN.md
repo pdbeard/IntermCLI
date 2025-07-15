@@ -78,7 +78,7 @@
 ## 🛠️ Technical Requirements
 
 ### Core Standards
-- Python 3.8+ compatibility
+ - Python 3.9+ compatibility
 - Cross-platform (Linux, macOS, WSL)
 - No external binary dependencies
 - UTF-8 output with emoji support

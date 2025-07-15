@@ -1,6 +1,6 @@
 # 🗂️ find-projects — Suite-Level Command Reference
 
-`find-projects` is an interactive terminal tool for discovering, searching, and opening your development projects.  
+`find-projects` is an interactive terminal tool for discovering, searching, and opening your development projects.
 It is part of the **IntermCLI** suite and follows the action-target naming and progressive enhancement conventions.
 
 ---
@@ -36,22 +36,22 @@ find-projects --version      # Show version information
 - **Fuzzy search** and instant filtering of projects
 - **Group by project type** (Python, Node.js, Rust, etc.) or show recent
 - **Open projects** in your preferred editor (configurable)
-- **Keyboard navigation:**  
-  - Up/Down arrows: Move selection  
-  - `/`: Search  
-  - `t`: Toggle group by type  
-  - `Enter`: Open selected project  
+- **Keyboard navigation:**
+  - Up/Down arrows: Move selection
+  - `/`: Search
+  - `t`: Toggle group by type
+  - `Enter`: Open selected project
   - `q`: Quit
-- **Security-aware:**  
-  - Validates editor commands  
-  - Skips unsafe symlinks  
+- **Security-aware:**
+  - Validates editor commands
+  - Skips unsafe symlinks
   - Limits scan depth and rate
 
 ---
 
 ## 🛠️ Configuration
 
-- **TOML config:**  
+- **TOML config:**
   - `tools/find-projects/config/defaults.toml` (default)
   - Override with environment variables
 
@@ -95,9 +95,9 @@ find-projects --version      # Show version information
 
 ## 🐍 Requirements
 
-- Python 3.8+
+
 - No dependencies required for basic usage
-- For Python <3.11, install `tomli` for TOML config support:  
+- For Python <3.11, install `tomli` for TOML config support:
   `pip install tomli`
 
 ---
@@ -112,13 +112,13 @@ find-projects --version      # Show version information
 
 ## ❓ Troubleshooting
 
-- **No projects found?**  
+- **No projects found?**
   - Make sure your configured directories exist and contain Git repositories.
   - Use `FIND_PROJECTS_DIRS` to override directories if needed.
-- **Editor not opening?**  
+- **Editor not opening?**
   - Check that your editor is installed and in your PATH.
   - Use `FIND_PROJECTS_EDITOR` to set a different editor.
-- **TOML errors?**  
+- **TOML errors?**
   - Install `tomli` if using Python <3.11.
 
 ---

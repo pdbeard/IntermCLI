@@ -29,7 +29,7 @@ We welcome contributions of all kinds—new tools, features, bug fixes, and docu
 - Test with minimal dependencies (stdlib only)
 - Test with all optional dependencies installed
 - Include both unit and integration tests
-- Test on multiple Python versions (3.8–3.11 recommended)
+ - Test on multiple Python versions (3.9–3.13 recommended)
 - Use `pytest`, `pytest-cov`, and other tools from `requirements-dev.txt`
 
 ---
@@ -94,7 +94,7 @@ Before submitting a PR, please ensure:
 ## 🏷️ Semantic Versioning
 
 - `v1.0.0`    Major: Breaking changes, new tool additions
-- `v1.1.0`    Minor: New features, non-breaking changes  
+- `v1.1.0`    Minor: New features, non-breaking changes
 - `v1.1.1`    Patch: Bug fixes, documentation updates
 
 ---
