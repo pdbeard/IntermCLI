@@ -1,12 +1,15 @@
 # 🖥️ IntermCLI
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos-lightgrey.svg)](https://github.com/pdbeard/intermcli)
 
-<!-- CI Badges for main and dev branches -->
-[![CI main](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/pdbeard/intermcli/actions?query=branch%3Amain)
-[![CI dev](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/pdbeard/intermcli/actions?query=branch%3Adev)
+
+<!-- CI Status -->
+| Branch | Status |
+|--------|--------|
+| **main** | [![CI main](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/pdbeard/intermcli/actions?query=branch%3Amain) |
+| **dev**  | [![CI dev](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/pdbeard/intermcli/actions?query=branch%3Adev) |
 
 
 # 🖥️ IntermCLI
@@ -127,9 +130,10 @@ For development, install all dev dependencies:
 pip3 install -r requirements-dev.txt
 ```
 
+
 ## 🎯 Requirements
 
-- **Python 3.8+** (tested on 3.8-3.11)
+- **Python 3.9+** (tested on 3.9-3.11)
 - **Linux or macOS**
 - Optional: Python packages in `requirements.txt` for enhanced features (installer will prompt)
 
