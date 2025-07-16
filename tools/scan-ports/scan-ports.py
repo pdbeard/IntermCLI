@@ -60,10 +60,10 @@ except ImportError:
 
 # SSL support detection
 try:
-    import ssl
+    import importlib.util
 
-    HAS_SSL = True
-except ImportError:
+    HAS_SSL = importlib.util.find_spec("ssl") is not None
+except Exception:
     HAS_SSL = False
 
 
@@ -544,7 +544,9 @@ def comprehensive_service_detection(host, port, timeout=3, enhanced=None):
     return service_info
 
 
-def print_scan_results_rich(open_ports, closed_ports, all_ports, service_results, config, detect_services):
+def print_scan_results_rich(
+    open_ports, closed_ports, all_ports, service_results, config, detect_services
+):
     """Print scan results using rich tables and panels"""
     # Summary Table
     summary_table = Table(title="Port Scan Results", box=box.SIMPLE)
@@ -676,7 +678,14 @@ def scan_all_configured_ports(host, timeout=3, show_closed=False, detect_service
     # Display results
     print("\n" + "=" * 90)
     if HAS_RICH and console:
-        print_scan_results_rich(open_ports, closed_ports, all_ports, service_results, config, detect_services)
+        print_scan_results_rich(
+            open_ports,
+            closed_ports,
+            all_ports,
+            service_results,
+            config,
+            detect_services,
+        )
     else:
         if detect_services:
             print("📊 OPEN PORTS WITH SERVICE DETECTION:")
@@ -896,6 +905,7 @@ def main():
             print("=" * 60)
 
             open_ports = []
+            closed_ports = [port for port in ports if port not in open_ports]
             service_results = {}
 
             # Check ports
@@ -939,18 +949,29 @@ def main():
             # Display results
             print("\n" + "=" * 60)
             if HAS_RICH and console:
-                print_scan_results_rich(open_ports, closed_ports, ports, service_results, config, detect_services)
+                print_scan_results_rich(
+                    open_ports,
+                    closed_ports,
+                    ports,
+                    service_results,
+                    config,
+                    detect_services,
+                )
             else:
                 for port in sorted(open_ports):
                     expected_service = ports[port]
 
                     if detect_services and port in service_results:
                         detected = service_results[port]
-                        confidence_emoji = {"high": "🎯", "medium": "🔍", "low": "❓"}.get(
-                            detected["confidence"], "❓"
-                        )
+                        confidence_emoji = {
+                            "high": "🎯",
+                            "medium": "🔍",
+                            "low": "❓",
+                        }.get(detected["confidence"], "❓")
 
-                        method_emoji = "🚀" if detected["method"] == "enhanced" else "🔧"
+                        method_emoji = (
+                            "🚀" if detected["method"] == "enhanced" else "🔧"
+                        )
                         service_display = detected["service"]
                         if detected["version"]:
                             service_display += f" ({detected['version'][:30]})"

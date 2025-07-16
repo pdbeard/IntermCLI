@@ -360,7 +360,7 @@ for pkg in missing_deps:
     print(f'  ⚪ {pkg} - optional')
 with open('$TEMP_FILE', 'w') as f:
     f.write('\n'.join(missing_deps))
-"    
+"
     OPTIONAL_MISSING+=($(cat "$TEMP_FILE" 2>/dev/null || true))
     rm -f "$TEMP_FILE"
 else

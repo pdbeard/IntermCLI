@@ -30,7 +30,7 @@
 6. Alignment with project goals
   - Add additional enhancedments into tools with optional dependencies
     - Create stucture for dep management (clear organization of what tool needs what dependecy, or 'global' deps like rich. skip deps for certain tools)
-    - Implement some TUI through rich for interaction 
+    - Implement some TUI through rich for interaction
 
 
 ## Hardcoded Values Refactor Checklist
