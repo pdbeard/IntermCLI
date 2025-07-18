@@ -105,7 +105,10 @@ def print_dependency_status(verbose=False):
 def load_port_config():
     """Load port configuration from TOML file"""
     script_dir = Path(__file__).parent
-    config_file = script_dir / "config" / "ports.toml"
+    source_config_file = script_dir / "config" / "ports.toml"
+    user_config_dir = Path.home() / ".config" / "intermcli"
+    user_config_file = user_config_dir / "scan-ports.toml"
+    legacy_user_config_file = user_config_dir / "config.toml"
 
     # Default fallback config
     default_config = {
@@ -130,13 +133,28 @@ def load_port_config():
         return default_config
 
     try:
-        if config_file.exists():
-            with open(config_file, "rb") as f:
-                return tomllib.load(f)
+        config_loaded = None
+        config_data = None
+        if user_config_file.exists():
+            with open(user_config_file, "rb") as f:
+                config_data = tomllib.load(f)
+            config_loaded = str(user_config_file)
+        elif legacy_user_config_file.exists():
+            with open(legacy_user_config_file, "rb") as f:
+                config_data = tomllib.load(f)
+            config_loaded = str(legacy_user_config_file)
+        elif source_config_file.exists():
+            with open(source_config_file, "rb") as f:
+                config_data = tomllib.load(f)
+            config_loaded = str(source_config_file)
         else:
-            print(f"⚠️  Config file not found: {config_file}")
+            print(f"⚠️  Config file not found in any location.")
             print("💡 Using default port list")
             return default_config
+
+        if config_loaded:
+            print(f"ℹ️  Loaded port config: {config_loaded}")
+        return config_data if config_data else default_config
     except Exception as e:
         print(f"⚠️  Error loading TOML config: {e}")
         print("💡 Using default port list")

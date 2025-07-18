@@ -192,18 +192,47 @@ def print_response_simple(response, verbose=False, show_headers=True):
                 print(body)
 
 
-def load_collection(collection_path):
-    """Load a TOML collection file"""
+def load_collection(collection_path=None):
+    """Load a TOML collection file with robust fallback (user, legacy, source-tree)."""
+    script_dir = Path(__file__).parent
+    source_config_file = script_dir / "config" / "defaults.toml"
+    user_config_dir = Path.home() / ".config" / "intermcli"
+    user_config_file = user_config_dir / "test-endpoints.toml"
+    legacy_user_config_file = user_config_dir / "config.toml"
+
+    config_loaded = None
+    config_paths = []
+    if collection_path:
+        config_paths.append(collection_path)
+    config_paths.extend([
+        str(user_config_file),
+        str(legacy_user_config_file),
+        str(source_config_file),
+    ])
+
     if not tomllib:
         print("❌ TOML support not available. Install tomli: pip install tomli")
         return None
 
-    try:
-        with open(collection_path, "rb") as f:
-            return tomllib.load(f)
-    except Exception as e:
-        print(f"❌ Failed to load collection: {e}")
-        return None
+    for path in config_paths:
+        p = Path(path)
+        if p.exists():
+            try:
+                with open(p, "rb") as f:
+                    file_config = tomllib.load(f)
+                config_loaded = str(p)
+            except Exception as e:
+                print(f"❌ Failed to load collection: {path}: {e}")
+                file_config = None
+            break  # Use the first config found
+        else:
+            file_config = None
+
+    if config_loaded:
+        print(f"ℹ️  Loaded collection config: {config_loaded}")
+    else:
+        print("ℹ️  No collection config found, using defaults if any.")
+    return file_config
 
 
 def substitute_variables(text, variables):

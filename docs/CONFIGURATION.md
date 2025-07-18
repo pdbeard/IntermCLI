@@ -6,14 +6,23 @@ IntermCLI uses a hierarchical configuration system for flexible customization. A
 
 ## 📁 Configuration File Locations
 
-Configuration files are loaded in this order (higher overrides lower):
 
-1. Tool defaults: `tools/{tool-name}/config/defaults.toml`
-2. User global: `~/.config/intermcli/config.toml`
-3. User tool-specific: `~/.config/intermcli/{tool-name}.toml`
-4. Project local: `.intermcli.toml` (project root)
-5. Environment variables: `TOOLNAME_SETTING=value`
-6. Command line arguments
+Configuration files are loaded in this order (Overrides as they go):
+
+1. Command line arguments
+2. Environment variables (e.g. `FIND_PROJECTS_DIRS`, `SCAN_PORTS_TIMEOUT`)
+3. Project config: `.intermcli.toml` (project root)
+4. User tool-specific: `~/.config/intermcli/{tool-name}.toml`
+5. User global: `~/.config/intermcli/config.toml`
+6. Tool defaults: `tools/{tool-name}/config/defaults.toml`
+
+Each tool will attempt to load its configuration from the following locations, in order:
+
+1. User tool-specific config: `~/.config/intermcli/{tool-name}.toml`
+2. Legacy user global config: `~/.config/intermcli/config.toml`
+3. Source-tree default config: `tools/{tool-name}/config/defaults.toml`
+
+If no config file is found, built-in defaults are used. The tool will print which config was loaded for debugging.
 
 Example config directory:
 
@@ -100,9 +109,9 @@ export FIND_PROJECTS_EDITOR="nvim"
 1. Command line arguments
 2. Environment variables
 3. Project config (`.intermcli.toml`)
-4. User tool-specific config
-5. User global config
-6. Tool defaults
+4. User tool-specific config (`~/.config/intermcli/{tool-name}.toml`)
+5. User global config (`~/.config/intermcli/config.toml`)
+6. Tool defaults (`tools/{tool-name}/config/defaults.toml`)
 
 ## 📝 TOML Format Examples
 
@@ -289,14 +298,17 @@ interm config reset scan-ports
    echo $FIND_PROJECTS_DIRS
    ```
 
+
 ### Debug Configuration Loading
 
 ```bash
-# Enable debug output to see config loading process
-scan-ports --debug localhost
-find-projects --config  # Shows configuration details
+# Show which config file was loaded and current settings
+find-projects --config      # Shows configuration details and config source
+scan-ports --config        # Shows configuration details and config source
+sort-files --config        # Shows configuration details and config source
+test-endpoints --config    # Shows configuration details and config source
 ```
 
 ---
 
-This TOML-based configuration system provides better readability, comment support, and maintainability while maintaining the flexible hierarchical approach that allows users to customize IntermCLI tools to their specific needs and workflows.
+This TOML-based configuration system provides better readability, comment support, and maintainability while maintaining a flexible hierarchical approach. IntermCLI tools will work both when installed and when run directly from the source tree, automatically falling back to the appropriate config location.

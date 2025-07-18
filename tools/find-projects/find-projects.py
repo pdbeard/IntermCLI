@@ -163,9 +163,12 @@ class ConfigManager:
         self.validator = SecurityValidator()
 
     def load_config(self) -> Config:
-        """Load configuration with hierarchical precedence"""
+        """Load configuration with hierarchical precedence and fallback"""
         script_dir = Path(__file__).parent
-        config_file = script_dir / "config" / "defaults.toml"
+        source_config_file = script_dir / "config" / "defaults.toml"
+        user_config_dir = Path.home() / ".config" / "intermcli"
+        user_config_file = user_config_dir / "find-projects.toml"
+        legacy_user_config_file = user_config_dir / "config.toml"
 
         # Platform-aware defaults
         home = Path.home()
@@ -194,9 +197,18 @@ class ConfigManager:
             **self.validator.SECURE_DEFAULTS,
         }
 
-        # Load TOML config if available
-        if tomllib and config_file.exists():
-            config_dict.update(self._load_toml_config(config_file))
+        # Try user config first, then legacy, then source-tree config
+        config_loaded = None
+        if tomllib:
+            if user_config_file.exists():
+                config_dict.update(self._load_toml_config(user_config_file))
+                config_loaded = str(user_config_file)
+            elif legacy_user_config_file.exists():
+                config_dict.update(self._load_toml_config(legacy_user_config_file))
+                config_loaded = str(legacy_user_config_file)
+            elif source_config_file.exists():
+                config_dict.update(self._load_toml_config(source_config_file))
+                config_loaded = str(source_config_file)
 
         # Environment variable overrides
         self._apply_env_overrides(config_dict)
@@ -208,6 +220,12 @@ class ConfigManager:
         config_dict["default_editor"] = self._validate_editor(
             config_dict["default_editor"]
         )
+
+        # Optionally print which config was loaded
+        if config_loaded:
+            print(f"ℹ️  Loaded config: {config_loaded}")
+        else:
+            print("ℹ️  Using built-in defaults (no config file found)")
 
         return Config(**config_dict)
 

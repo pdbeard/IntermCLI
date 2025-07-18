@@ -34,7 +34,7 @@ __version__ = "0.1.0"
 
 # --- Config loading ---
 def load_config(config_path=None):
-    """Load TOML config if available, else return defaults."""
+    """Load TOML config with robust fallback (user, legacy, source-tree), else return defaults."""
     config = {
         "rules": {"by_type": True, "by_date": False, "by_size": False, "custom": {}},
         "type_folders": {
@@ -73,14 +73,33 @@ def load_config(config_path=None):
         "skip_hidden": True,
         "skip_dirs": [],
     }
+    script_dir = Path(__file__).parent
+    source_config_file = script_dir / "config" / "defaults.toml"
+    user_config_dir = Path.home() / ".config" / "intermcli"
+    user_config_file = user_config_dir / "sort-files.toml"
+    legacy_user_config_file = user_config_dir / "config.toml"
+
+    config_loaded = None
     config_paths = []
     if config_path:
         config_paths.append(config_path)
-    config_paths.append(str(Path(__file__).parent / "config" / "defaults.toml"))
+    config_paths.extend([
+        str(user_config_file),
+        str(legacy_user_config_file),
+        str(source_config_file),
+    ])
+
+    if not tomllib:
+        print("⚠️  TOML support not available")
+        print("💡 Install tomli for Python < 3.11: pip3 install tomli")
+        print("💡 Using built-in defaults")
+        return config
+
     for path in config_paths:
-        if tomllib and Path(path).exists():
+        p = Path(path)
+        if p.exists():
             try:
-                with open(path, "rb") as f:
+                with open(p, "rb") as f:
                     file_config = tomllib.load(f)
                     # Merge nested sections if present
                     if "rules" in file_config:
@@ -91,9 +110,15 @@ def load_config(config_path=None):
                     for key in ("dry_run", "safe", "skip_hidden", "skip_dirs"):
                         if key in file_config:
                             config[key] = file_config[key]
+                config_loaded = str(p)
             except Exception as e:
                 print(f"⚠️  Could not load config: {path}: {e}")
             break  # Use the first config found
+
+    if config_loaded:
+        print(f"ℹ️  Loaded config: {config_loaded}")
+    else:
+        print("ℹ️  Using built-in defaults (no config file found)")
     return config
 
 

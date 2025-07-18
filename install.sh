@@ -403,6 +403,7 @@ fi
 # VALIDATE ENVIRONMENT AFTER DETERMINING SCOPE
 validate_environment
 
+
 # Config directory setup
 echo ""
 echo -e "${BLUE}⚙️  Configuration Setup:${NC}"
@@ -415,17 +416,39 @@ else
     mkdir -p "$CONFIG_DIR"
 fi
 
-if [ -f "$CONFIG_DIR/config.toml" ]; then
-    echo -e "${YELLOW}  ⚠️  Existing config found${NC}"
-    if ask_yes_no "Backup and update config file?" "y"; then
-        cp "$CONFIG_DIR/config.toml" "$CONFIG_DIR/config.toml.backup"
-        cp "$SCRIPT_ROOT/tools/find-projects/config/defaults.toml" "$CONFIG_DIR/config.toml"
-        echo -e "${GREEN}  ✅ Config updated (backup saved)${NC}"
+# Function to install tool config with prompt
+install_tool_config() {
+    local config_name="$1"
+    local source_config="$2"
+    local dest_config="$CONFIG_DIR/$config_name"
+    # Always default to N for overwrite prompt
+    if [ -f "$dest_config" ]; then
+        echo -e "${YELLOW}  ⚠️  Existing config found: $dest_config${NC}"
+        if ask_yes_no "Overwrite $config_name config file?" "n"; then
+            cp "$dest_config" "$dest_config.backup"
+            cp "$source_config" "$dest_config"
+            echo -e "${GREEN}  ✅ $config_name config updated (backup saved)${NC}"
+        else
+            echo -e "${YELLOW}  Keeping existing $config_name config${NC}"
+        fi
+    else
+        cp "$source_config" "$dest_config"
+        echo -e "${GREEN}  ✅ $config_name config installed${NC}"
     fi
-else
-    cp "$SCRIPT_ROOT/tools/find-projects/config/defaults.toml" "$CONFIG_DIR/config.toml"
-    echo -e "${GREEN}  ✅ Default config created${NC}"
-fi
+}
+
+
+# Install tool configs (add more as needed)
+install_tool_config "find-projects.toml" "$SCRIPT_ROOT/tools/find-projects/config/defaults.toml"
+install_tool_config "scan-ports.toml" "$SCRIPT_ROOT/tools/scan-ports/config/ports.toml"
+install_tool_config "sort-files.toml" "$SCRIPT_ROOT/tools/sort-files/config/defaults.toml"
+install_tool_config "test-endpoints.toml" "$SCRIPT_ROOT/tools/test-endpoints/config/defaults.toml"
+install_tool_config "config.toml" "$SCRIPT_ROOT/config/defaults.conf"
+# Add more tool configs here
+
+# Always overwrite manifest/internal configs
+cp "$SCRIPT_ROOT/tools_manifest.toml" "$CONFIG_DIR/tools_manifest.toml"
+echo -e "${GREEN}  ✅ tools_manifest.toml updated${NC}"
 
 # Installation summary
 echo ""
