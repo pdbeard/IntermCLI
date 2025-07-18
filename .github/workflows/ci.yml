@@ -58,7 +58,15 @@ jobs:
         run: |
           pip install pytest-cov coveralls
           pytest --cov=tools --cov=shared --cov-report=term-missing --cov-report=xml
+        if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'
+
+      - name: Upload coverage to Coveralls
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pip install coveralls
           coveralls --service=github
+        if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'
 
   # docs:
   #   runs-on: ubuntu-latest
