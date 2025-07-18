@@ -1,6 +1,3 @@
-# 🖥️ IntermCLI
-
-
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos-lightgrey.svg)](https://github.com/pdbeard/intermcli)
@@ -8,10 +5,10 @@
 
 
 <!-- CI Status -->
-| Branch | Status |
-|--------|--------|
-| **main** | [![CI main](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/pdbeard/intermcli/actions?query=branch%3Amain) |
-| **dev**  | [![CI dev](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/pdbeard/intermcli/actions?query=branch%3Adev) |
+| Branch | CI Status | Coverage |
+|--------|-----------|----------|
+| **main** | [![CI main](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/pdbeard/intermcli/actions?query=branch%3Amain) | [![Coverage Status](https://coveralls.io/repos/github/pdbeard/intermcli/badge.svg?branch=main)](https://coveralls.io/github/pdbeard/intermcli?branch=main) |
+| **dev**  | [![CI dev](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/pdbeard/intermcli/actions?query=branch%3Adev) | [![Coverage Status](https://coveralls.io/repos/github/pdbeard/intermcli/badge.svg?branch=dev)](https://coveralls.io/github/pdbeard/intermcli?branch=dev) |
 
 
 # 🖥️ IntermCLI

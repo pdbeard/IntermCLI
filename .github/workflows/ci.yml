@@ -53,6 +53,8 @@ jobs:
           black --check tools/
 
       - name: Run tests with coverage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pip install pytest-cov coveralls
           pytest --cov=tools --cov=shared --cov-report=term-missing --cov-report=xml
