@@ -1,8 +1,10 @@
 # 🖥️ IntermCLI
 
+
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos-lightgrey.svg)](https://github.com/pdbeard/intermcli)
+[![Coverage Status](https://coveralls.io/repos/github/pdbeard/intermcli/badge.svg?branch=main)](https://coveralls.io/github/pdbeard/intermcli?branch=main)
 
 
 <!-- CI Status -->
