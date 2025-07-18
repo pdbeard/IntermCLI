@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, dev, dev/*]
+    branches: [main, dev]
   pull_request:
-    branches: [main, dev, dev/*]
+    branches: [main, dev]
 
 jobs:
   test:
@@ -52,9 +52,11 @@ jobs:
         run: |
           black --check tools/
 
-      - name: Run tests
+      - name: Run tests with coverage
         run: |
-          pytest
+          pip install pytest-cov coveralls
+          pytest --cov=tools --cov=shared --cov-report=term-missing --cov-report=xml
+          coveralls --service=github
 
   # docs:
   #   runs-on: ubuntu-latest

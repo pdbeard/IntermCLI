@@ -83,11 +83,13 @@ def load_config(config_path=None):
     config_paths = []
     if config_path:
         config_paths.append(config_path)
-    config_paths.extend([
-        str(user_config_file),
-        str(legacy_user_config_file),
-        str(source_config_file),
-    ])
+    config_paths.extend(
+        [
+            str(user_config_file),
+            str(legacy_user_config_file),
+            str(source_config_file),
+        ]
+    )
 
     if not tomllib:
         print("⚠️  TOML support not available")

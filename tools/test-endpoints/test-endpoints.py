@@ -194,6 +194,8 @@ def print_response_simple(response, verbose=False, show_headers=True):
 
 def load_collection(collection_path=None):
     """Load a TOML collection file with robust fallback (user, legacy, source-tree)."""
+    from pathlib import Path
+
     script_dir = Path(__file__).parent
     source_config_file = script_dir / "config" / "defaults.toml"
     user_config_dir = Path.home() / ".config" / "intermcli"
@@ -204,11 +206,13 @@ def load_collection(collection_path=None):
     config_paths = []
     if collection_path:
         config_paths.append(collection_path)
-    config_paths.extend([
-        str(user_config_file),
-        str(legacy_user_config_file),
-        str(source_config_file),
-    ])
+    config_paths.extend(
+        [
+            str(user_config_file),
+            str(legacy_user_config_file),
+            str(source_config_file),
+        ]
+    )
 
     if not tomllib:
         print("❌ TOML support not available. Install tomli: pip install tomli")

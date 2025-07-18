@@ -11,16 +11,19 @@ toml_loader = None
 toml_loader_name = None
 try:
     import tomllib
+
     toml_loader = tomllib
     toml_loader_name = "tomllib (builtin)"
 except ImportError:
     try:
         import tomli
+
         toml_loader = tomli
         toml_loader_name = "tomli (external)"
     except ImportError:
         try:
             import toml
+
             toml_loader = toml
             toml_loader_name = "toml (external)"
         except ImportError:
@@ -30,7 +33,6 @@ except ImportError:
 SUITE_VERSION = "1.0.0"
 
 
-
 def get_tools_from_manifest():
     manifest_path = Path.home() / ".config" / "intermcli" / "tools_manifest.toml"
     print("Looking for manifest at:", manifest_path)
@@ -38,8 +40,12 @@ def get_tools_from_manifest():
         print("tools_manifest.toml not found.")
         return []
     if not toml_loader:
-        print("No TOML parser found. Supported: Python 3.11+ (tomllib), 'tomli', or 'toml'.")
-        print("Install with: 'pip3 install tomli' (recommended for Python <3.11) or 'pip3 install toml'.")
+        print(
+            "No TOML parser found. Supported: Python 3.11+ (tomllib), 'tomli', or 'toml'."
+        )
+        print(
+            "Install with: 'pip3 install tomli' (recommended for Python <3.11) or 'pip3 install toml'."
+        )
         return []
     try:
         if toml_loader_name in ["tomllib (builtin)", "tomli (external)"]:
@@ -48,16 +54,12 @@ def get_tools_from_manifest():
         else:
             manifest = toml_loader.load(manifest_path)
         return [
-            {
-                "name": tool.get("name", ""),
-                "description": tool.get("description", "")
-            }
+            {"name": tool.get("name", ""), "description": tool.get("description", "")}
             for tool in manifest.get("tool", [])
         ]
     except Exception as e:
         print(f"Error loading tools_manifest.toml: {e}")
         return []
-
 
 
 def show_suite_help():
@@ -100,7 +102,7 @@ def find_tool_executable(tool_name):
     if local_bin.exists():
         return str(local_bin)
     # Fallback to PATH
-    import shutil
+
     return shutil.which(tool_name) or tool_name
 
 
@@ -119,7 +121,6 @@ def delegate_to_tool(tool_name, args):
     else:
         cmd = [tool_path] + args
     subprocess.run(cmd)
-
 
 
 def main():

@@ -148,7 +148,7 @@ def load_port_config():
                 config_data = tomllib.load(f)
             config_loaded = str(source_config_file)
         else:
-            print(f"⚠️  Config file not found in any location.")
+            print("⚠️  Config file not found in any location.")
             print("💡 Using default port list")
             return default_config
 
