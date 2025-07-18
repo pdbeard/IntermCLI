@@ -26,6 +26,34 @@ TOOLS_MANIFEST="$SCRIPT_ROOT/tools_manifest.toml"
 INSTALL_OPTIONAL=false
 
 
+# Add function to parse [logging] section from config.toml
+get_install_log_path() {
+    # Try user config first, then root config
+    local user_config="$HOME/.config/intermcli/config.toml"
+    local root_config="$SCRIPT_ROOT/config/defaults.toml"
+    local default_log_dir="$HOME/.config/intermcli"
+    local log_file_name="install.log"
+    local log_path="$default_log_dir/$log_file_name"
+    local output_dir=""
+    # Check user config for [logging].output_dir
+    if [ -f "$user_config" ]; then
+        output_dir=$(python3 -c "import sys; import os; try:\n import tomllib\n except ImportError:\n import tomli as tomllib\n with open('$user_config','rb') as f:\n t=tomllib.load(f)\n print(t.get('logging', {}).get('output_dir', '')) if 'logging' in t else print('')" 2>/dev/null)
+    fi
+    # If not found, check root config
+    if [ -z "$output_dir" ] && [ -f "$root_config" ]; then
+        output_dir=$(python3 -c "import sys; import os; try:\n import tomllib\n except ImportError:\n import tomli as tomllib\n with open('$root_config','rb') as f:\n t=tomllib.load(f)\n print(t.get('logging', {}).get('output_dir', '')) if 'logging' in t else print('')" 2>/dev/null)
+    fi
+    # Use output_dir if set
+    if [ -n "$output_dir" ]; then
+        output_dir="$(eval echo $output_dir)"
+        mkdir -p "$output_dir"
+        log_path="$output_dir/$log_file_name"
+    else
+        mkdir -p "$default_log_dir"
+    fi
+    echo "$log_path"
+}
+
 # IntermCLI Installation Script
 # Interactive terminal utilities for developers
 
@@ -216,10 +244,9 @@ INSTALLED_DIRS=()
 
 # Add logging capability
 CONFIG_DIR="$HOME/.config/intermcli"
-LOG_FILE="$CONFIG_DIR/install.log"
+LOG_FILE="$(get_install_log_path)"
 
-# Ensure config dir exists before logging
-mkdir -p "$CONFIG_DIR"
+# Ensure log file exists
 : > "$LOG_FILE"
 
 log() {

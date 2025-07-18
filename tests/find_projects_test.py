@@ -14,7 +14,8 @@ spec.loader.exec_module(find_projects)
 
 def test_config_manager_loads_defaults():
     config_manager = find_projects.ConfigManager()
-    config = config_manager.load_config()
+    loaded_config = config_manager.load_config()
+    config = loaded_config.config
     assert isinstance(config.development_dirs, list)
     assert config.max_scan_depth > 0
 
@@ -23,7 +24,8 @@ def test_config_manager_env_override(monkeypatch):
     monkeypatch.setenv("FIND_PROJECTS_DIRS", "/tmp:/var")
     monkeypatch.setenv("FIND_PROJECTS_EDITOR", "vim")
     config_manager = find_projects.ConfigManager()
-    config = config_manager.load_config()
+    loaded_config = config_manager.load_config()
+    config = loaded_config.config
     assert config.development_dirs == [d for d in ["/tmp", "/var"] if os.path.exists(d)]
     assert config.default_editor == "vim"
 

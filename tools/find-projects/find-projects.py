@@ -11,7 +11,9 @@ Example usage:
     find-projects --version
 """
 
+# Standard library imports
 import argparse
+import logging
 import os
 import subprocess
 import sys
@@ -20,9 +22,60 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, NamedTuple, Optional
 
+# Version
 __version__ = "1.0.0"
+
+
+# === Logging Setup ===
+def setup_logging(
+    log_level: str = "INFO",
+    log_to_file: bool = False,
+    log_file_path: str = "",
+    output_dir: str = "",
+    tool_name: str = "find-projects",
+):
+    """Configure global logging for the tool, optionally to file. Uses output_dir and sets filename automatically."""
+    numeric_level = getattr(logging, log_level.upper(), logging.INFO)
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+    handlers = []
+    # Always log to console
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(message)s", "%Y-%m-%d %H:%M:%S"
+        )
+    )
+    handlers.append(console_handler)
+    # Optionally log to file (overwrite each run)
+    log_file = log_file_path
+    if log_to_file:
+        # If output_dir is set, use it for log file location
+        if output_dir:
+            output_dir_expanded = os.path.expanduser(output_dir)
+            os.makedirs(output_dir_expanded, exist_ok=True)
+            log_file = os.path.join(output_dir_expanded, f"{tool_name}.log")
+            print(f"[DIAG] Attempting to save log file to: {log_file}")
+        elif log_file_path:
+            log_file = os.path.expanduser(log_file_path)
+            print(f"[DIAG] Attempting to save log file to: {log_file}")
+        else:
+            log_file = os.path.expanduser(f"~/{tool_name}.log")
+            print(f"[DIAG] Attempting to save log file to: {log_file}")
+        file_handler = logging.FileHandler(log_file, mode="w")
+        file_handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s [%(levelname)s] %(message)s", "%Y-%m-%d %H:%M:%S"
+            )
+        )
+        handlers.append(file_handler)
+    logging.basicConfig(level=numeric_level, handlers=handlers, force=True)
+    logger = logging.getLogger()
+    logger.setLevel(numeric_level)
+    return logger
+
 
 # TOML support with fallback
 try:
@@ -59,6 +112,8 @@ class Config:
     scan_timeout: int
     allowed_editors: List[str]
     max_file_size: int = 1024 * 1024
+    log_to_file: bool = False
+    log_file_path: str = ""
 
 
 class SecurityValidator:
@@ -155,14 +210,22 @@ class RateLimiter:
         return True
 
 
+class LoadedConfig(NamedTuple):
+    config: Config
+    log_level: str
+    log_to_file: bool
+    log_file_path: str
+    output_dir: str
+
+
 class ConfigManager:
     """Configuration management"""
 
     def __init__(self):
         self.validator = SecurityValidator()
 
-    def load_config(self) -> Config:
-        """Load configuration with hierarchical precedence and fallback"""
+    def load_config(self) -> LoadedConfig:
+        """Load configuration with hierarchical precedence and fallback, always checking [logging] section."""
         script_dir = Path(__file__).parent
         source_config_file = script_dir / "config" / "defaults.toml"
         user_config_dir = Path.home() / ".config" / "intermcli"
@@ -198,16 +261,59 @@ class ConfigManager:
 
         # Try user config first, then legacy, then source-tree config
         config_loaded = None
+        loaded_toml = None
+        global_toml = None
+        # Load global/root config if available
+        root_global_config = (
+            Path(__file__).parent.parent.parent / "config" / "defaults.toml"
+        )
+        if tomllib and root_global_config.exists():
+            global_toml = self._load_toml_config(root_global_config)
         if tomllib:
             if user_config_file.exists():
-                config_dict.update(self._load_toml_config(user_config_file))
+                loaded_toml = self._load_toml_config(user_config_file)
+                config_dict.update(loaded_toml)
                 config_loaded = str(user_config_file)
+                print(f"[DIAG] Picked up config file: {user_config_file}")
             elif legacy_user_config_file.exists():
-                config_dict.update(self._load_toml_config(legacy_user_config_file))
+                loaded_toml = self._load_toml_config(legacy_user_config_file)
+                config_dict.update(loaded_toml)
                 config_loaded = str(legacy_user_config_file)
+                print(f"[DIAG] Picked up legacy config file: {legacy_user_config_file}")
             elif source_config_file.exists():
-                config_dict.update(self._load_toml_config(source_config_file))
+                loaded_toml = self._load_toml_config(source_config_file)
+                config_dict.update(loaded_toml)
                 config_loaded = str(source_config_file)
+                print(f"[DIAG] Picked up source config file: {source_config_file}")
+            else:
+                print("[DIAG] No config file found, using built-in defaults.")
+
+        # Always check [logging] section from loaded TOML, fallback to global/root config if missing
+        output_dir = ""
+        log_level = os.environ.get("FIND_PROJECTS_LOGLEVEL", "INFO")
+        log_to_file = config_dict.get("log_to_file", False)
+        log_file_path = config_dict.get("log_file_path", "")
+        if loaded_toml and "logging" in loaded_toml:
+            logging_cfg = loaded_toml["logging"]
+            print(f"[DIAG] Found [logging] section in config: {logging_cfg}")
+            log_to_file = logging_cfg.get("log_to_file", log_to_file)
+            log_level = logging_cfg.get("log_level", log_level)
+            output_dir = logging_cfg.get("output_dir", "")
+            log_file_path = logging_cfg.get("log_file_path", log_file_path)
+        elif global_toml and "logging" in global_toml:
+            logging_cfg = global_toml["logging"]
+            print(f"[DIAG] Found [logging] section in global config: {logging_cfg}")
+            log_to_file = logging_cfg.get("log_to_file", log_to_file)
+            log_level = logging_cfg.get("log_level", log_level)
+            output_dir = logging_cfg.get("output_dir", "")
+            log_file_path = logging_cfg.get("log_file_path", log_file_path)
+        else:
+            print("[DIAG] No [logging] section found in config or global config.")
+
+        # Print out the actual logging config values being used
+        print(
+            f"[DIAG] Logging config values: log_to_file={log_to_file}, log_level={log_level}, output_dir={output_dir}, log_file_path={log_file_path}"
+        )
 
         # Environment variable overrides
         self._apply_env_overrides(config_dict)
@@ -220,13 +326,30 @@ class ConfigManager:
             config_dict["default_editor"]
         )
 
+        # Remove any keys not in Config dataclass before instantiating
+        config_fields = set(Config.__dataclass_fields__.keys())
+        filtered_config_dict = {
+            k: v for k, v in config_dict.items() if k in config_fields
+        }
+
         # Optionally print which config was loaded
         if config_loaded:
-            print(f"ℹ️  Loaded config: {config_loaded}")
+            logging.info(f"Loaded config: {config_loaded}")
         else:
-            print("ℹ️  Using built-in defaults (no config file found)")
+            logging.info("Using built-in defaults (no config file found)")
 
-        return Config(**config_dict)
+        # Return LoadedConfig object
+        return LoadedConfig(
+            config=Config(
+                **filtered_config_dict,
+                log_to_file=log_to_file,
+                log_file_path=log_file_path,
+            ),
+            log_level=log_level,
+            log_to_file=log_to_file,
+            log_file_path=log_file_path,
+            output_dir=output_dir,
+        )
 
     def _load_toml_config(self, config_file: Path) -> Dict[str, Any]:
         """Load TOML configuration file"""
@@ -343,23 +466,23 @@ class ProjectScanner:
         """Find all git repositories in configured directories"""
         projects = []
 
-        print("🔍 Scanning directories:")
+        logging.info("Scanning directories:")
         for dev_dir in self.config.development_dirs:
             projects.extend(self._scan_directory(dev_dir))
 
         # Sort by last modified (newest first)
         projects.sort(key=lambda x: x.last_modified, reverse=True)
-        print(f"\n📊 Total projects found: {len(projects)}")
+        logging.info(f"Total projects found: {len(projects)}")
         return projects
 
     def _scan_directory(self, dev_dir: str) -> List[Project]:
         """Scan a single directory for projects"""
-        print(f"  Checking: {dev_dir}")
+        logging.info(f"Checking: {dev_dir}")
         if not os.path.exists(dev_dir):
-            print("    ❌ Directory doesn't exist")
+            logging.error("Directory doesn't exist")
             return []
 
-        print("    ✅ Directory exists, scanning...")
+        logging.info("Directory exists, scanning...")
         projects = []
         project_count = 0
 
@@ -389,9 +512,9 @@ class ProjectScanner:
                         dirs.clear()  # Don't recurse into git repositories
 
         except Exception as e:
-            print(f"    ❌ Error scanning {dev_dir}: {e}")
+            logging.error(f"Error scanning {dev_dir}: {e}")
 
-        print(f"    Found {project_count} projects in this directory")
+        logging.info(f"Found {project_count} projects in this directory")
         return projects
 
     def _filter_unsafe_symlinks(self, root: str, dirs: List[str]) -> None:
@@ -402,7 +525,7 @@ class ProjectScanner:
                 if not self.validator.is_safe_symlink(
                     dir_path, self.config.development_dirs
                 ):
-                    print(f"⚠️  Skipping unsafe symlink: {dir_path}")
+                    logging.warning(f"Skipping unsafe symlink: {dir_path}")
                     dirs.remove(d)
 
     def _check_depth_limit(self, root: str, dev_dir: str) -> bool:
@@ -415,7 +538,7 @@ class ProjectScanner:
         if not self.validator.validate_project_path(
             project_path, self.config.development_dirs
         ):
-            print(f"⚠️  Skipping project outside allowed dirs: {project_path}")
+            logging.warning(f"Skipping project outside allowed dirs: {project_path}")
             return None
 
         project_name = os.path.basename(project_path)
@@ -428,7 +551,7 @@ class ProjectScanner:
 
         project_type = self.detector.detect_project_type(project_path)
 
-        print(f"    📁 Found: {project_name} at {relative_path}")
+        logging.info(f"Found: {project_name} at {relative_path}")
 
         return Project(
             name=project_name,
@@ -977,7 +1100,20 @@ def main():
     parser = create_argument_parser()
     args = parser.parse_args()
 
+    # Setup logging before running app
+    config_manager = ConfigManager()
+    loaded_config = config_manager.load_config()
+    setup_logging(
+        loaded_config.log_level,
+        loaded_config.log_to_file,
+        loaded_config.log_file_path,
+        loaded_config.output_dir,
+        tool_name="find-projects",
+    )
+
     app = FindProjectsApp()
+    app.config = loaded_config.config
+    app.scanner = ProjectScanner(loaded_config.config)
     app.run(args)
 
 

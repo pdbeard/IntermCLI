@@ -1,30 +1,66 @@
 # Global configuration for IntermCLI (TOML format)
 # This file sets defaults for all tools and can be overridden by tool-specific configs.
+# config_version: Used for migration/compatibility
+config_version = "1.0" # Not currently supported
 
-
+# [common]: General settings used by all tools
 [common]
-log_level = "INFO"                # Logging verbosity for all tools
-default_editor = "code"           # Editor for opening files/projects
-timeout = 30                      # Default network timeout (seconds)
-dry_run = false                   # Default dry-run mode for safe operations
-output_dir = "~/intermcli/output" # Default output directory for reports/logs
+# Editor for opening files/projects
+default_editor = "code"
+# Default network timeout (seconds)
+timeout = 30
+# Default dry-run mode for safe operations
+dry_run = false
+# Platform (auto-detected, can be overridden)
+platform = "auto" # Not currently supported
 
+# [paths]: Directory locations for projects, downloads, documents
 [paths]
 projects = ["~/development", "~/projects", "~/code", "~/workspace", "~/src"]
-downloads = "~/Downloads"
-documents = "~/Documents"
+downloads_dir = "~/Downloads"
+documents_dir = "~/Documents"
 
+# [platform]: OS-specific paths
 [platform]
-linux_specific_dir = "/opt/projects"
-macos_specific_dir = "/Applications/Projects"
+linux_specific_dir = "/opt/projects" # Not currently supported
+macos_specific_dir = "/Applications/Projects" # Not currently supported
 
+# [features]: Feature flags for enhanced output and optional features
 [features]
-enable_rich_output = true         # Enable rich/colorized output if available
-enable_enhanced_mode = true       # Enable enhanced features if optional deps are present
+enable_rich_output = true         # Not currently supported
+enable_enhanced_mode = true       # Not currently supported
 
+# [experimental]: Toggle beta/experimental features
+[experimental]
+use_new_ui = false # Not currently supported
+validate_config = true # Not currently supported
+
+# [network]: Network scanning defaults
 [network]
 default_ports = [80, 443, 22, 8080]
 scan_threads = 10                 # Default number of threads for scanning
 
+# [api]: API defaults for all tools
 [api]
 default_headers = { "User-Agent" = "IntermCLI/1.0" }
+
+# [security]: Global safe defaults for all tools
+[security]
+allowed_editors = ["code", "vim", "nvim", "subl", "atom"] # Not currently supported
+max_file_size = 1048576           # 1MB # Not currently supported
+skip_dirs = [".git", "node_modules", ".vscode", "dist", "build", "__pycache__", ".pytest_cache", ".ssh", ".gnupg"] # Not currently supported
+
+# [tool_defaults]: Per-tool default settings (can be overridden in tool configs)
+[tool_defaults]
+find_projects_timeout = 30 # Not currently supported
+find_projects_max_scan_depth = 3 # Not currently supported
+scan_ports_max_threads = 10 # Not currently supported
+sort_files_max_files = 1000 # Not currently supported
+
+# [logging]: Logging settings for all tools
+[logging]
+log_to_file = true                # If true, overwrite log file each run (do not append)
+log_level = "DEBUG"                 # Default log level for all tools
+output_dir = "~/.config/intermcli/logs/"   # Default output directory for reports/logs
+max_log_size = 1048576              # Optional: max log file size in bytes # Not currently supported
+log_rotation = false                # Optional: enable log rotation # Not currently supported
