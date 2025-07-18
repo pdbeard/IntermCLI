@@ -1,6 +1,7 @@
-import os
-import pytest
 import importlib.util
+import os
+
+import pytest
 
 # Dynamically import the find-projects tool as a module
 TOOL_PATH = os.path.abspath(

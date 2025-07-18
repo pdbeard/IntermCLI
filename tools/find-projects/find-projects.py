@@ -11,17 +11,16 @@ Example usage:
     find-projects --version
 """
 
-import os
-import sys
-import subprocess
 import argparse
-from datetime import datetime
-from pathlib import Path
+import os
+import subprocess
+import sys
 import time
 from collections import defaultdict
-from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
-
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 __version__ = "1.0.0"
 
@@ -88,8 +87,8 @@ class SecurityValidator:
     @staticmethod
     def validate_editor_command(editor: str) -> str:
         """Validate editor command for security"""
-        import shutil
         import re
+        import shutil
 
         if not re.match(r"^[a-zA-Z0-9._-]+$", editor):
             raise ValueError(f"Invalid editor command: {editor}")

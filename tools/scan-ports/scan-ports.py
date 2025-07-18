@@ -14,12 +14,12 @@ Example usage:
     scan-ports --check-deps
 """
 
-import socket
-import sys
 import argparse
 import re
-from pathlib import Path
+import socket
+import sys
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 # TOML support with fallback
 try:
@@ -47,10 +47,10 @@ except ImportError:
 
 # Add rich support
 try:
-    from rich.console import Console
-    from rich.table import Table
-    from rich.panel import Panel
     from rich import box
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.table import Table
 
     HAS_RICH = True
     console = Console()
@@ -268,8 +268,8 @@ def detect_service_banner_basic(host, port, timeout=3):
 def detect_http_service_basic(host, port, timeout=5):
     """Basic HTTP detection using urllib (standard library)"""
     try:
-        import urllib.request
         import urllib.error
+        import urllib.request
 
         protocols = ["http"]
         if port in [443, 8443] and HAS_SSL:

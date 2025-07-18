@@ -13,13 +13,13 @@ Example usage:
     test-endpoints --collection my-api --request "Get Users" --env dev
 """
 
-import sys
-import json
-import time
 import argparse
-import urllib.request
-import urllib.parse
+import json
+import sys
+import time
 import urllib.error
+import urllib.parse
+import urllib.request
 
 # Optional enhancements
 try:
@@ -31,9 +31,9 @@ except ImportError:
 
 try:
     from rich.console import Console
-    from rich.table import Table
-    from rich.syntax import Syntax
     from rich.panel import Panel
+    from rich.syntax import Syntax
+    from rich.table import Table
 
     HAS_RICH = True
     console = Console()

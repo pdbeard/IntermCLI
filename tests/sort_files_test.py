@@ -1,9 +1,10 @@
-import sys
-import os
-import pytest
 import importlib.util
-from pathlib import Path
+import os
+import sys
 from datetime import datetime
+from pathlib import Path
+
+import pytest
 
 # Dynamically import the sort-files tool as a module
 TOOL_PATH = os.path.abspath(

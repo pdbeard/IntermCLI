@@ -1,7 +1,7 @@
-import sys
-import os
-import json
 import importlib.util
+import json
+import os
+import sys
 
 # Dynamically import the test-endpoints tool as a module
 TOOL_PATH = os.path.abspath(

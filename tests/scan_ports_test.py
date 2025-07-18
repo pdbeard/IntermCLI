@@ -1,7 +1,8 @@
-import sys
-import os
-import pytest
 import importlib.util
+import os
+import sys
+
+import pytest
 
 # Dynamically import the scan-ports tool as a module
 TOOL_PATH = os.path.abspath(

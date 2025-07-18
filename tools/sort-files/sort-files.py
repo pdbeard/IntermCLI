@@ -12,13 +12,13 @@ Example usage:
     sort-files --config ~/.config/intermcli/sort-files.toml ~/Downloads
 """
 
-import sys
 import argparse
-from pathlib import Path
-from datetime import datetime
-from collections import Counter
-import shutil
 import fnmatch
+import shutil
+import sys
+from collections import Counter
+from datetime import datetime
+from pathlib import Path
 
 # TOML support with fallback
 try:
