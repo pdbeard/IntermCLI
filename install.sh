@@ -443,7 +443,7 @@ install_tool_config "find-projects.toml" "$SCRIPT_ROOT/tools/find-projects/confi
 install_tool_config "scan-ports.toml" "$SCRIPT_ROOT/tools/scan-ports/config/ports.toml"
 install_tool_config "sort-files.toml" "$SCRIPT_ROOT/tools/sort-files/config/defaults.toml"
 install_tool_config "test-endpoints.toml" "$SCRIPT_ROOT/tools/test-endpoints/config/defaults.toml"
-install_tool_config "config.toml" "$SCRIPT_ROOT/config/defaults.conf"
+install_tool_config "config.toml" "$SCRIPT_ROOT/config/defaults.toml"
 # Add more tool configs here
 
 # Always overwrite manifest/internal configs

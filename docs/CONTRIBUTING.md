@@ -25,14 +25,25 @@ We welcome contributions—new tools, features, bug fixes, and docs!
 - Test on Python 3.9+
 - Use `pytest` and tools from `requirements-dev.txt`
 
-## Code Style
+
+## Code Style & Pre-commit Hooks
 - Use [black](https://github.com/psf/black) for formatting
 - Use [isort](https://github.com/PyCQA/isort) for import sorting
+- Use [ruff](https://github.com/astral-sh/ruff) for linting
+- Pre-commit hooks are configured in `.pre-commit-config.yaml` and run automatically before each commit:
+    - Formatting: black, isort
+    - Linting: ruff
+    - Whitespace, YAML, merge conflict, shebang, docstring, and secret checks
+    - To enable: run `pre-commit install` after cloning
+    - To run manually: `pre-commit run --all-files`
+    - To update hooks: `pre-commit autoupdate`
+
 
 ## PR Workflow
 - All changes should be submitted via pull request
-- PRs must pass CI (lint, tests, audit)
+- PRs must pass CI (lint, tests, audit, pre-commit)
 - Write clear commit messages and PR descriptions
+
 
 ## Branching & Releases
 - Main development happens on `main` branch
@@ -40,9 +51,18 @@ We welcome contributions—new tools, features, bug fixes, and docs!
 - Releases are tagged and changelog is updated automatically
 
 ---
-- Run [flake8](https://flake8.pycqa.org/) for linting
+
 - Type annotations are encouraged (use [mypy](http://mypy-lang.org/))
 - Keep code readable and modular
+## Security & Quality
+- Pre-commit hooks include checks to prevent committing secrets and merge conflicts
+- Use [Dependabot](https://github.com/dependabot) for automated dependency updates
+- Add a `SECURITY.md` for vulnerability reporting (recommended)
+## Automation & Makefile
+- Consider adding a `Makefile` or `tasks.py` for common dev tasks (lint, test, format, docs)
+## Additional Tips
+- Run `pre-commit autoupdate` regularly to keep hooks up to date
+- Use `pre-commit run --all-files` before submitting a PR to catch issues early
 
 ---
 

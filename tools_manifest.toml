@@ -3,23 +3,28 @@ name = "interm"
 script = "bin/interm"
 is_executable = true
 description = "IntermCLI information."
+optional_deps = []
 
 [[tool]]
 name = "scan-ports"
 script = "tools/scan-ports/scan-ports.py"
 description = "Scan local/remote hosts for open ports and detect running services."
+optional_deps = ["rich", "requests", "tomli"]
 
 [[tool]]
 name = "find-projects"
 script = "tools/find-projects/find-projects.py"
 description = "Discover and navigate development projects in configured directories."
+optional_deps = ["tomli"]
 
 [[tool]]
 name = "sort-files"
 script = "tools/sort-files/sort-files.py"
 description = "Organize and declutter directories by sorting files into subfolders."
+optional_deps = ["tomli"]
 
 [[tool]]
 name = "test-endpoints"
 script = "tools/test-endpoints/test-endpoints.py"
 description = "Command-line API testing tool for REST, GraphQL, and webhooks."
+optional_deps = ["requests", "rich", "tomli"]
