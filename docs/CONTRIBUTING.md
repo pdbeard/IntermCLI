@@ -1,8 +1,5 @@
 # Contributing to IntermCLI
 
-
-# Contributing to IntermCLI
-
 We welcome contributions—new tools, features, bug fixes, and docs!
 
 ## Quick Contribution Guide
