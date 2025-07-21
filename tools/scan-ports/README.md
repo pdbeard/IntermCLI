@@ -1,4 +1,3 @@
-
 ## scan-ports
 
 Scan local or remote hosts for open ports and detect running services. Supports configurable port lists, service detection, and both basic and enhanced detection modes.
@@ -20,6 +19,8 @@ scan-ports --check-deps             # Show optional dependency status
 - Fast concurrent scanning
 - Progressive enhancement (works with stdlib, optional dependencies add features)
 - Optional dependencies: requests, urllib3, tomli/tomllib
+- Fully type-annotated with mypy support
+- Comprehensive test coverage
 
 ### Configuration
 - Port lists and categories are configured via TOML: `tools/scan-ports/config/ports.toml`
@@ -28,6 +29,8 @@ scan-ports --check-deps             # Show optional dependency status
 
 **Example TOML snippet:**
 ```toml
+version = "1.0"
+
 [port_lists.web]
 description = "Web service ports"
 [port_lists.web.ports]
@@ -45,5 +48,6 @@ description = "Web service ports"
 ### Troubleshooting
 - If you see "TOML support not available", install `tomli` for Python < 3.11: `pip install tomli`
 - If the config file is missing, the tool will fall back to built-in defaults.
+- For type checking during development, ensure you have `types-requests` and `types-urllib3` installed.
 
 ---

@@ -1,6 +1,8 @@
 # Port scanning configuration
 # Organized by service category for easy reference and scanning
 
+version = "1.0"
+
 [port_lists.common]
 description = "Most commonly used development and service ports"
 
