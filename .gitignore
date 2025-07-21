@@ -128,7 +128,7 @@ test_data/generated/
 docs/_build/
 docs/build/
 site/
-TODO.local
+*.local
 
 # Package manager files
 poetry.lock
