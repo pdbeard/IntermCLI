@@ -12,13 +12,37 @@ Example usage:
     sort-files --config ~/.config/intermcli/sort-files.toml ~/Downloads
 """
 
+
 import argparse
 import fnmatch
+import logging
 import shutil
 import sys
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
+
+# Optional rich support
+try:
+    from rich.console import Console
+    from rich.table import Table
+    from rich.theme import Theme
+
+    HAS_RICH = True
+    console = Console(
+        theme=Theme(
+            {
+                "info": "cyan",
+                "success": "green",
+                "warning": "yellow",
+                "error": "bold red",
+            }
+        )
+    )
+except ImportError:
+    HAS_RICH = False
+    console = None
+
 
 # TOML support with fallback
 try:
@@ -34,7 +58,13 @@ __version__ = "0.1.0"
 
 # --- Config loading ---
 def load_config(config_path=None):
-    """Load TOML config with robust fallback (user, legacy, source-tree), else return defaults."""
+    """
+    Load TOML config with robust fallback (user, legacy, source-tree), else return defaults.
+    Args:
+        config_path (str or Path, optional): Path to a config file. If not provided, tries user and source-tree defaults.
+    Returns:
+        dict: Configuration dictionary for sorting rules and options.
+    """
     config = {
         "rules": {"by_type": True, "by_date": False, "by_size": False, "custom": {}},
         "type_folders": {
@@ -92,9 +122,9 @@ def load_config(config_path=None):
     )
 
     if not tomllib:
-        print("⚠️  TOML support not available")
-        print("💡 Install tomli for Python < 3.11: pip3 install tomli")
-        print("💡 Using built-in defaults")
+        logging.warning("TOML support not available")
+        logging.info("Install tomli for Python < 3.11: pip3 install tomli")
+        logging.info("Using built-in defaults")
         return config
 
     for path in config_paths:
@@ -114,18 +144,26 @@ def load_config(config_path=None):
                             config[key] = file_config[key]
                 config_loaded = str(p)
             except Exception as e:
-                print(f"⚠️  Could not load config: {path}: {e}")
+                logging.warning(f"Could not load config: {path}: {e}")
             break  # Use the first config found
 
     if config_loaded:
-        print(f"ℹ️  Loaded config: {config_loaded}")
+        logging.info(f"Loaded config: {config_loaded}")
     else:
-        print("ℹ️  Using built-in defaults (no config file found)")
+        logging.info("Using built-in defaults (no config file found)")
     return config
 
 
 # --- Core logic ---
-def get_file_type(file: Path, type_folders: dict):
+def get_file_type(file: Path, type_folders: dict) -> str:
+    """
+    Determine the file type category for a given file based on its extension.
+    Args:
+        file (Path): The file to categorize.
+        type_folders (dict): Mapping of folder names to lists of extensions.
+    Returns:
+        str: The folder/category name, or 'other' if no match.
+    """
     ext = file.suffix.lower()
     for folder, exts in type_folders.items():
         if not isinstance(exts, list):
@@ -135,8 +173,15 @@ def get_file_type(file: Path, type_folders: dict):
     return "other"
 
 
-def match_custom_rule(filename, custom_rules):
-    """Return the folder name if filename matches a custom rule pattern."""
+def match_custom_rule(filename: str, custom_rules: dict) -> str | None:
+    """
+    Return the folder name if filename matches a custom rule pattern.
+    Args:
+        filename (str): The filename to check.
+        custom_rules (dict): Mapping of glob patterns to folder names.
+    Returns:
+        str or None: The folder name if matched, else None.
+    """
     for pattern, folder in custom_rules.items():
         if fnmatch.fnmatch(filename, pattern):
             return folder
@@ -151,7 +196,21 @@ def sort_files(
     safe: bool = True,
     skip_hidden: bool = True,
     skip_dirs: list = [],
-):
+    console=None,
+) -> tuple[list, list]:
+    """
+    Sort files in a directory according to rules and type folders.
+    Args:
+        target_dir (Path): Directory to organize.
+        rules (dict): Sorting rules (by_type, by_date, by_size, custom).
+        type_folders (dict): Mapping of folder names to extensions.
+        dry_run (bool): If True, only log actions without moving files.
+        safe (bool): If True, skip files that would overwrite existing ones.
+        skip_hidden (bool): If True, skip hidden files and folders.
+        skip_dirs (list): List of directory names to skip.
+    Returns:
+        tuple: (moved, skipped) lists of (entry, dest_dir) and (entry, reason).
+    """
     moved = []
     skipped = []
     entries = list(target_dir.iterdir())
@@ -160,7 +219,10 @@ def sort_files(
         for entry in entries
         if entry.is_file() and not (skip_hidden and entry.name.startswith("."))
     )
-    print(f"Processing {total_files} files...")
+    if console:
+        console.print(f"[info]Processing {total_files} files in {target_dir}...")
+    else:
+        logging.info(f"Processing {total_files} files in {target_dir}...")
 
     for entry in entries:
         if entry.is_dir():
@@ -206,35 +268,51 @@ def sort_files(
             continue
 
         if dry_run:
-            print(f"[DRY RUN] Would move: {entry.name} → {dest_dir}/")
+            msg = f"[DRY RUN] Would move: {entry.name} → {dest_dir}/"
+            if console:
+                console.print(msg)
+            else:
+                logging.info(msg)
         else:
             dest_dir.mkdir(parents=True, exist_ok=True)
             try:
                 shutil.move(str(entry), str(dest))
-                print(f"Moved: {entry.name} → {dest_dir}/")
+                msg = f"Moved: {entry.name} → {dest_dir}/"
+                if console:
+                    console.print(msg)
+                else:
+                    logging.info(msg)
                 moved.append((entry, dest_dir))
             except PermissionError:
-                print(
-                    "❌ Failed to move {}: Permission denied. Try running with elevated permissions.".format(
-                        entry.name
-                    )
-                )
+                msg = f"Failed to move {entry.name}: Permission denied. Try running with elevated permissions."
+                if console:
+                    console.print(f"[error]{msg}[/error]")
+                else:
+                    logging.error(msg)
                 skipped.append((entry, "permission denied"))
             except FileNotFoundError:
-                print(
-                    "❌ Failed to move {}: File not found. It may have been moved or deleted.".format(
-                        entry.name
-                    )
-                )
+                msg = f"Failed to move {entry.name}: File not found. It may have been moved or deleted."
+                if console:
+                    console.print(f"[error]{msg}[/error]")
+                else:
+                    logging.error(msg)
                 skipped.append((entry, "file not found"))
             except Exception as e:
-                print(f"❌ Failed to move {entry.name}: {e}")
+                msg = f"Failed to move {entry.name}: {e}"
+                if console:
+                    console.print(f"[error]{msg}[/error]")
+                else:
+                    logging.error(msg)
                 skipped.append((entry, f"error: {e}"))
     return moved, skipped
 
 
 # --- CLI ---
 def main():
+    """
+    CLI entry point for sort-files. Parses arguments, loads config, and runs sorting logic.
+    Uses rich for output if available, otherwise falls back to logging.
+    """
     parser = argparse.ArgumentParser(
         description="Organize files in a directory by type, date, size, or custom rules.",
         epilog="Example: sort-files --by type ~/Downloads",
@@ -269,6 +347,13 @@ def main():
 
     args = parser.parse_args()
 
+    # Set up logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(message)s",
+        handlers=[logging.StreamHandler(sys.stdout)],
+    )
+
     config = load_config(args.config)
     config["rules"] = {
         "by_type": args.by == "type",
@@ -281,22 +366,39 @@ def main():
 
     target_dir = Path(args.directory).expanduser().resolve()
     if not target_dir.exists() or not target_dir.is_dir():
-        print(f"❌ Directory does not exist: {target_dir}")
+        if HAS_RICH:
+            console.print(f"[error]Directory does not exist: {target_dir}[/error]")
+        else:
+            logging.error(f"Directory does not exist: {target_dir}")
         sys.exit(1)
 
-    print(f"🗃️  sort-files {__version__}")
-    print(f"Target: {target_dir}")
-    if config["rules"]["by_type"]:
-        rule = "type"
-    elif config["rules"]["by_date"]:
-        rule = "date"
-    elif config["rules"]["by_size"]:
-        rule = "size"
+    # Header
+    if HAS_RICH:
+        console.print(f"[info]🗃️  sort-files {__version__}")
+        console.print(f"[info]Target:[/] {target_dir}")
+        if config["rules"]["by_type"]:
+            rule = "type"
+        elif config["rules"]["by_date"]:
+            rule = "date"
+        elif config["rules"]["by_size"]:
+            rule = "size"
+        else:
+            rule = "custom/other"
+        console.print(f"[info]Rule:[/] {rule}")
+        console.print(f"[info]Dry run:[/] {'ON' if config['dry_run'] else 'OFF'}\n")
     else:
-        rule = "custom/other"
-    print(f"Rule: {rule}")
-    print(f"Dry run: {'ON' if config['dry_run'] else 'OFF'}")
-    print("")
+        logging.info(f"🗃️  sort-files {__version__}")
+        logging.info(f"Target: {target_dir}")
+        if config["rules"]["by_type"]:
+            rule = "type"
+        elif config["rules"]["by_date"]:
+            rule = "date"
+        elif config["rules"]["by_size"]:
+            rule = "size"
+        else:
+            rule = "custom/other"
+        logging.info(f"Rule: {rule}")
+        logging.info(f"Dry run: {'ON' if config['dry_run'] else 'OFF'}\n")
 
     moved, skipped = sort_files(
         target_dir,
@@ -306,24 +408,39 @@ def main():
         safe=config["safe"],
         skip_hidden=config.get("skip_hidden", True),
         skip_dirs=config.get("skip_dirs", []),
+        console=console if HAS_RICH else None,
     )
 
     # --- Summary Table ---
-
     folder_counts = Counter()
     for entry, dest_dir in moved:
         folder_counts[str(dest_dir.name)] += 1
 
-    print(f"\n✅ Done. {len(moved)} files moved.")
-    if folder_counts:
-        print("\nSummary:")
-        for folder, count in sorted(folder_counts.items()):
-            print(f"  {folder:<15}: {count} file{'s' if count != 1 else ''}")
-
-    if (args.show_skipped or config["dry_run"]) and skipped:
-        print("\nSkipped files:")
-        for entry, reason in skipped:
-            print(f"  {entry.name}: {reason}")
+    if HAS_RICH:
+        console.print(f"\n[success]✅ Done. {len(moved)} files moved.")
+        if folder_counts:
+            table = Table(
+                title="Summary", show_header=True, header_style="bold magenta"
+            )
+            table.add_column("Folder", style="cyan")
+            table.add_column("Files", style="green")
+            for folder, count in sorted(folder_counts.items()):
+                table.add_row(folder, str(count))
+            console.print(table)
+        if (args.show_skipped or config["dry_run"]) and skipped:
+            console.print("\n[warning]Skipped files:")
+            for entry, reason in skipped:
+                console.print(f"  [yellow]{entry.name}[/yellow]: {reason}")
+    else:
+        logging.info(f"\n✅ Done. {len(moved)} files moved.")
+        if folder_counts:
+            logging.info("\nSummary:")
+            for folder, count in sorted(folder_counts.items()):
+                logging.info(f"  {folder:<15}: {count} file{'s' if count != 1 else ''}")
+        if (args.show_skipped or config["dry_run"]) and skipped:
+            logging.info("\nSkipped files:")
+            for entry, reason in skipped:
+                logging.info(f"  {entry.name}: {reason}")
 
 
 if __name__ == "__main__":

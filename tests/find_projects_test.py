@@ -140,3 +140,243 @@ def test_project_opener_handles_missing_editor(tmp_path):
         str(project_dir), "proj", editor="nonexistent_editor"
     )
     assert result is False
+
+
+def import_find_projects():
+    TOOL_PATH = os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__), "../tools/find-projects/find-projects.py"
+        )
+    )
+    spec = importlib.util.spec_from_file_location("find_projects", TOOL_PATH)
+    find_projects = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(find_projects)
+    return find_projects
+
+
+def test_setup_logging_console(tmp_path, capsys):
+    find_projects = import_find_projects()
+    logger = find_projects.setup_logging("DEBUG", False)
+    logger.debug("test debug")
+    for handler in logger.handlers:
+        if hasattr(handler, "flush"):
+            handler.flush()
+    out = capsys.readouterr()
+    assert (
+        "test debug" in out.out
+        or "test debug" in out.err
+        or "DEBUG" in out.out
+        or "DEBUG" in out.err
+    )
+
+
+def test_setup_logging_file(tmp_path):
+    find_projects = import_find_projects()
+    log_file = tmp_path / "test.log"
+    logger = find_projects.setup_logging("INFO", True, str(log_file))
+    logger.info("file log")
+    logger.handlers[0].flush()
+    with open(log_file) as f:
+        assert "file log" in f.read()
+
+
+def test_setup_logging_output_dir(tmp_path):
+    find_projects = import_find_projects()
+    logger = find_projects.setup_logging("INFO", True, "", str(tmp_path), "testtool")
+    log_file = tmp_path / "testtool.log"
+    logger.info("dir log")
+    logger.handlers[0].flush()
+    assert log_file.exists()
+    with open(log_file) as f:
+        assert "dir log" in f.read()
+
+
+def test_configmanager_env_overrides(monkeypatch, tmp_path):
+    find_projects = import_find_projects()
+    monkeypatch.setenv("FIND_PROJECTS_DIRS", str(tmp_path))
+    monkeypatch.setenv("FIND_PROJECTS_EDITOR", "vim")
+    cm = find_projects.ConfigManager()
+    loaded = cm.load_config()
+    assert loaded.config.development_dirs == [str(tmp_path)]
+    assert loaded.config.default_editor == "vim"
+
+
+def test_configmanager_missing_toml(monkeypatch):
+    find_projects = import_find_projects()
+    monkeypatch.setattr(find_projects, "tomllib", None)
+    cm = find_projects.ConfigManager()
+    loaded = cm.load_config()
+    assert isinstance(loaded.config, find_projects.Config)
+
+
+def test_securityvalidator_validate_editor(monkeypatch):
+    find_projects = import_find_projects()
+    sv = find_projects.SecurityValidator()
+    # Valid editor
+    monkeypatch.setattr("shutil.which", lambda e: True)
+    assert sv.validate_editor_command("vim") == "vim"
+    # Invalid editor
+    with pytest.raises(ValueError):
+        sv.validate_editor_command("bad;rm -rf ~")
+    # Not in PATH
+    monkeypatch.setattr("shutil.which", lambda e: False)
+    with pytest.raises(ValueError):
+        sv.validate_editor_command("notfound")
+
+
+def test_securityvalidator_is_safe_symlink(tmp_path):
+    find_projects = import_find_projects()
+    sv = find_projects.SecurityValidator()
+    base = tmp_path / "base"
+    base.mkdir()
+    target = base / "target"
+    target.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(target, target_is_directory=True)
+    assert sv.is_safe_symlink(str(link), [str(base)])
+    # Unsafe symlink
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    link2 = tmp_path / "link2"
+    link2.symlink_to(outside, target_is_directory=True)
+    assert not sv.is_safe_symlink(str(link2), [str(base)])
+
+
+def test_securityvalidator_validate_project_path(tmp_path):
+    find_projects = import_find_projects()
+    sv = find_projects.SecurityValidator()
+    base = tmp_path / "base"
+    base.mkdir()
+    proj = base / "proj"
+    proj.mkdir()
+    assert sv.validate_project_path(str(proj), [str(base)])
+    # Outside
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    assert not sv.validate_project_path(str(outside), [str(base)])
+
+
+def test_projectscanner_scan(tmp_path):
+    find_projects = import_find_projects()
+    base = tmp_path / "dev"
+    base.mkdir()
+    proj = base / "proj1"
+    proj.mkdir()
+    (proj / ".git").mkdir()
+    config = find_projects.Config(
+        development_dirs=[str(base)],
+        default_editor="vim",
+        max_scan_depth=3,
+        skip_dirs=[".git"],
+        max_projects=10,
+        max_query_length=100,
+        scan_timeout=10,
+        allowed_editors=["vim"],
+    )
+    scanner = find_projects.ProjectScanner(config)
+    projects = scanner.find_git_projects()
+    assert projects and projects[0].name == "proj1"
+
+
+def test_projectdetector_detect_type(tmp_path):
+    find_projects = import_find_projects()
+    proj = tmp_path / "pyproj"
+    proj.mkdir()
+    (proj / "requirements.txt").write_text("")
+    detector = find_projects.ProjectDetector()
+    assert detector.detect_project_type(str(proj)) == "Python"
+
+
+def test_inputhandler_is_safe_printable():
+    find_projects = import_find_projects()
+    ih = find_projects.InputHandler()
+    assert ih.is_safe_printable("A")
+    assert not ih.is_safe_printable("\x00")
+    assert not ih.is_safe_printable("")
+    assert not ih.is_safe_printable("AA")
+
+
+def test_searchengine_fuzzy_search():
+    find_projects = import_find_projects()
+    Project = find_projects.Project
+    items = [Project("foo", "", "", "Python", 0), Project("bar", "", "", "Node.js", 0)]
+    results = find_projects.SearchEngine.fuzzy_search(
+        "foo", items, key_func=lambda p: p.name
+    )
+    assert results and results[0].name == "foo"
+
+
+def test_projectgrouper_group_projects_by_type():
+    find_projects = import_find_projects()
+    Project = find_projects.Project
+    items = [Project("foo", "", "", "Python", 0), Project("bar", "", "", "Node.js", 0)]
+    grouped = find_projects.ProjectGrouper.group_projects_by_type(items)
+    assert any(p.is_header for p in grouped)
+
+
+def test_projectopener_open_project(monkeypatch, tmp_path):
+    find_projects = import_find_projects()
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    monkeypatch.setattr(os, "chdir", lambda d: None)
+
+    class DummyResult:
+        def __init__(self, code):
+            self.returncode = code
+
+    monkeypatch.setattr(
+        find_projects.subprocess, "run", lambda *a, **kw: DummyResult(0)
+    )
+    assert find_projects.ProjectOpener.open_project(str(proj), "proj", "vim")
+    monkeypatch.setattr(
+        find_projects.subprocess, "run", lambda *a, **kw: DummyResult(1)
+    )
+    assert not find_projects.ProjectOpener.open_project(str(proj), "proj", "vim")
+
+
+def test_uirenderer_display_projects(tmp_path, capsys):
+    find_projects = import_find_projects()
+    Project = find_projects.Project
+    detector = find_projects.ProjectDetector()
+    renderer = find_projects.UIRenderer(detector)
+    items = [
+        Project("foo", "", "foo", "Python", 0),
+        Project("bar", "", "bar", "Node.js", 0),
+    ]
+    renderer.display_projects(items, 0, False)
+    out = capsys.readouterr().out
+    assert "foo" in out and "bar" in out
+
+
+def test_findprojectsapp_run_config(monkeypatch, capsys):
+    find_projects = import_find_projects()
+    app = find_projects.FindProjectsApp()
+    # Ensure app.config is a Config, not LoadedConfig
+    if hasattr(app.config, "config"):
+        app.config = app.config.config
+
+    class Args:
+        config = True
+
+    app.run(Args())
+    out = capsys.readouterr().out
+    assert "Platform" in out
+
+
+def test_findprojectsapp_run_no_projects(monkeypatch, capsys):
+    find_projects = import_find_projects()
+    app = find_projects.FindProjectsApp()
+    # Ensure app.config is a Config, not LoadedConfig
+    if hasattr(app.config, "config"):
+        app.config = app.config.config
+    app.scanner.find_git_projects = lambda: []
+
+    class Args:
+        config = False
+
+    app.run(Args())
+    out = capsys.readouterr().out
+    assert "No git repositories found" in out
+
+
+# CLI entry point tests can be added similarly if needed.

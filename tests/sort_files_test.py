@@ -2,9 +2,19 @@ import importlib.util
 import os
 import sys
 from datetime import datetime
+
+# Rich/Console import and availability check for test output capture
+from io import StringIO
 from pathlib import Path
 
 import pytest
+
+try:
+    from rich.console import Console
+
+    HAS_RICH = True
+except ImportError:
+    HAS_RICH = False
 
 # Dynamically import the sort-files tool as a module
 TOOL_PATH = os.path.abspath(
@@ -56,11 +66,20 @@ def test_sort_files_dry_run(tmp_path, capsys):
     img.write_bytes(b"img")
     rules = {"by_type": True, "by_date": False, "by_size": False, "custom": {}}
     type_folders = sort_files.load_config()["type_folders"]
-    moved, skipped = sort_files.sort_files(
-        tmp_path, rules, type_folders, dry_run=True, safe=True
-    )
-    out = capsys.readouterr().out
-    assert "[DRY RUN] Would move: test.jpg" in out
+    if HAS_RICH:
+        buf = StringIO()
+        console = Console(file=buf, force_terminal=True, color_system=None)
+        moved, skipped = sort_files.sort_files(
+            tmp_path, rules, type_folders, dry_run=True, safe=True, console=console
+        )
+        output = buf.getvalue()
+    else:
+        # fallback: capture logging output via capsys
+        moved, skipped = sort_files.sort_files(
+            tmp_path, rules, type_folders, dry_run=True, safe=True, console=None
+        )
+        output = capsys.readouterr().out
+    assert "[DRY RUN] Would move: test.jpg" in output
     assert not (tmp_path / "images" / "test.jpg").exists()
 
 
@@ -153,3 +172,168 @@ def test_main_help(monkeypatch, capsys):
         sort_files.main()
     out = capsys.readouterr().out
     assert "usage" in out.lower()
+
+
+def test_no_rich(monkeypatch):
+    """Test fallback when Rich is not installed."""
+    import importlib
+    import sys
+
+    # Remove rich from sys.modules and reload
+    sys_modules_backup = sys.modules.copy()
+    sys.modules["rich"] = None
+    sys.modules["rich.console"] = None
+    sys.modules["rich.table"] = None
+    sys.modules["rich.theme"] = None
+    import importlib.util
+
+    TOOL_PATH = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../tools/sort-files/sort-files.py")
+    )
+    spec = importlib.util.spec_from_file_location("sort_files_no_rich", TOOL_PATH)
+    sort_files_no_rich = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sort_files_no_rich)
+    assert not sort_files_no_rich.HAS_RICH
+    assert sort_files_no_rich.console is None
+    sys.modules.clear()
+    sys.modules.update(sys_modules_backup)
+
+
+def test_no_toml(monkeypatch, caplog):
+    """Test fallback when neither tomllib nor tomli is available."""
+    import importlib
+    import sys
+
+    sys_modules_backup = sys.modules.copy()
+    sys.modules["tomllib"] = None
+    sys.modules["tomli"] = None
+    import importlib.util
+
+    TOOL_PATH = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../tools/sort-files/sort-files.py")
+    )
+    spec = importlib.util.spec_from_file_location("sort_files_no_toml", TOOL_PATH)
+    sort_files_no_toml = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sort_files_no_toml)
+    with caplog.at_level("WARNING"):
+        config = sort_files_no_toml.load_config()
+        assert "TOML support not available" in caplog.text
+        assert isinstance(config, dict)
+    sys.modules.clear()
+    sys.modules.update(sys_modules_backup)
+
+
+def test_config_path_logic(tmp_path):
+    """Test that a custom config path is used if provided."""
+    config_file = tmp_path / "custom.toml"
+    config_file.write_text(
+        """
+[rules]
+by_type = false
+by_date = true
+by_size = false
+"""
+    )
+    import importlib.util
+
+    TOOL_PATH = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../tools/sort-files/sort-files.py")
+    )
+    spec = importlib.util.spec_from_file_location("sort_files_config_path", TOOL_PATH)
+    sort_files_config_path = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sort_files_config_path)
+    config = sort_files_config_path.load_config(str(config_file))
+    assert config["rules"]["by_date"] is True
+    assert config["rules"]["by_type"] is False
+
+
+def test_permission_and_file_not_found(monkeypatch, tmp_path):
+    """Test PermissionError and FileNotFoundError branches in sort_files."""
+    file = tmp_path / "file.txt"
+    file.write_bytes(b"data")
+    dest_dir = tmp_path / "docs"
+    dest_dir.mkdir()
+    # Patch shutil.move to raise PermissionError, then FileNotFoundError
+    import importlib.util
+
+    TOOL_PATH = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../tools/sort-files/sort-files.py")
+    )
+    spec = importlib.util.spec_from_file_location("sort_files_perm", TOOL_PATH)
+    sort_files_perm = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sort_files_perm)
+
+    def raise_perm(*a, **kw):
+        raise PermissionError()
+
+    def raise_notfound(*a, **kw):
+        raise FileNotFoundError()
+
+    # PermissionError
+    monkeypatch.setattr(sort_files_perm.shutil, "move", raise_perm)
+    moved, skipped = sort_files_perm.sort_files(
+        tmp_path,
+        {"by_type": True, "custom": {}},
+        sort_files_perm.load_config()["type_folders"],
+        dry_run=False,
+        safe=False,
+    )
+    assert skipped and "permission denied" in skipped[0][1]
+    # FileNotFoundError
+    monkeypatch.setattr(sort_files_perm.shutil, "move", raise_notfound)
+    moved, skipped = sort_files_perm.sort_files(
+        tmp_path,
+        {"by_type": True, "custom": {}},
+        sort_files_perm.load_config()["type_folders"],
+        dry_run=False,
+        safe=False,
+    )
+    assert skipped and "file not found" in skipped[0][1]
+
+
+def test_cli_directory_not_exist(monkeypatch, capsys):
+    """Test CLI error for non-existent directory."""
+    import importlib.util
+
+    TOOL_PATH = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../tools/sort-files/sort-files.py")
+    )
+    spec = importlib.util.spec_from_file_location("sort_files_cli", TOOL_PATH)
+    sort_files_cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sort_files_cli)
+    monkeypatch.setattr(sys, "argv", ["sort-files.py", "/no/such/dir"])
+    with pytest.raises(SystemExit):
+        sort_files_cli.main()
+    out = capsys.readouterr().out
+    assert (
+        "Directory does not exist" in out
+        or "Directory does not exist" in capsys.readouterr().err
+    )
+
+
+def test_cli_summary_and_show_skipped(tmp_path, capsys):
+    """Test CLI summary output and --show-skipped option."""
+    import importlib.util
+
+    TOOL_PATH = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../tools/sort-files/sort-files.py")
+    )
+    spec = importlib.util.spec_from_file_location("sort_files_cli2", TOOL_PATH)
+    sort_files_cli2 = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sort_files_cli2)
+    # Create a file and a conflicting file to trigger skipped
+    file = tmp_path / "foo.txt"
+    file.write_bytes(b"foo")
+    dest_dir = tmp_path / "documents"
+    dest_dir.mkdir()
+    dest_file = dest_dir / "foo.txt"
+    dest_file.write_bytes(b"bar")
+    # Run CLI with --show-skipped
+    import sys
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(sys, "argv", ["sort-files.py", str(tmp_path), "--show-skipped"])
+    sort_files_cli2.main()
+    out = capsys.readouterr().out
+    assert "Skipped files" in out
+    monkeypatch.undo()
