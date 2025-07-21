@@ -5,14 +5,6 @@ from unittest import mock
 
 import pytest
 
-# Dynamically import the scan-ports tool as a module
-TOOL_PATH = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "../tools/scan-ports/scan-ports.py")
-)
-spec = importlib.util.spec_from_file_location("scan_ports", TOOL_PATH)
-scan_ports = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(scan_ports)
-
 
 def import_scan_ports():
     TOOL_PATH = os.path.abspath(

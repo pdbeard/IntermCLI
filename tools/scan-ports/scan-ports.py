@@ -796,6 +796,123 @@ def scan_port_range(host, start_port, end_port, timeout=3, threads=50):
 __version__ = "0.1.0"
 
 
+def handle_check_deps():
+    print_dependency_status(verbose=True)
+
+
+def handle_show_lists():
+    list_available_port_lists()
+
+
+def handle_port_scan(args, detect_services):
+    print(f"🔍 Checking port {args.port} on {args.host}...")
+    is_open = check_port(args.host, args.port, args.timeout)
+    status = "✅ OPEN" if is_open else "❌ CLOSED"
+    print(f"Port {args.port}: {status}")
+    if is_open and detect_services:
+        print("🔬 Detecting service...")
+        service_info = comprehensive_service_detection(
+            args.host, args.port, args.timeout
+        )
+        print(f"Service: {service_info['service']} ({service_info['method']} mode)")
+        if service_info["version"]:
+            print(f"Version: {service_info['version']}")
+
+
+def handle_range_scan(args):
+    start_port, end_port = args.range
+    if start_port > end_port or start_port < 1 or end_port > 65535:
+        print("❌ Invalid port range. Ports must be 1-65535 and start <= end")
+        sys.exit(1)
+    scan_port_range(args.host, start_port, end_port, args.timeout, args.threads)
+
+
+def handle_list_scan(args, detect_services):
+    config = load_port_config()
+    list_names = [name.strip() for name in args.list.split(",")]
+    ports = get_ports_from_lists(list_names, config)
+    if not ports:
+        print("❌ No valid ports found in specified lists")
+        sys.exit(1)
+    print(f"🔍 Scanning {len(ports)} ports from lists: {', '.join(list_names)}")
+    print("=" * 60)
+    open_ports = []
+    closed_ports = [port for port in ports if port not in open_ports]
+    service_results = {}
+    # Check ports
+    with ThreadPoolExecutor(max_workers=args.threads) as executor:
+        futures = {
+            executor.submit(check_port, args.host, port, args.timeout): (
+                port,
+                service,
+            )
+            for port, service in ports.items()
+        }
+        for future in futures:
+            port, expected_service = futures[future]
+            is_open = future.result()
+            if is_open:
+                open_ports.append(port)
+            elif args.show_closed:
+                print(f"Port {port:5} ({expected_service:25}): ❌ CLOSED")
+    # Service detection on open ports
+    if detect_services and open_ports:
+        print(f"\n🔬 Detecting services on {len(open_ports)} open ports...")
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = {
+                executor.submit(
+                    comprehensive_service_detection,
+                    args.host,
+                    port,
+                    args.timeout,
+                ): port
+                for port in open_ports
+            }
+            for future in futures:
+                port = futures[future]
+                service_info = future.result()
+                service_results[port] = service_info
+    # Display results
+    print("\n" + "=" * 60)
+    if HAS_RICH and console:
+        print_scan_results_rich(
+            open_ports,
+            closed_ports,
+            ports,
+            service_results,
+            config,
+            detect_services,
+        )
+    else:
+        for port in sorted(open_ports):
+            expected_service = ports[port]
+            if detect_services and port in service_results:
+                detected = service_results[port]
+                confidence_emoji = {
+                    "high": "🎯",
+                    "medium": "🔍",
+                    "low": "❓",
+                }.get(detected["confidence"], "❓")
+                method_emoji = "🚀" if detected["method"] == "enhanced" else "🔧"
+                service_display = detected["service"]
+                if detected["version"]:
+                    service_display += f" ({detected['version'][:30]})"
+                print(
+                    f"Port {port:5} | Expected: {expected_service:20} | "
+                    f"Detected: {confidence_emoji}{method_emoji} {service_display}"
+                )
+            else:
+                print(f"Port {port:5} | {expected_service:25} | ✅ OPEN")
+        print("=" * 60)
+        print(f"📊 Summary: {len(open_ports)} open out of {len(ports)} scanned")
+
+
+def handle_default_scan(args, detect_services):
+    scan_all_configured_ports(
+        args.host, args.timeout, args.show_closed, detect_services
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Port scanner and service checker with TOML configuration",
@@ -861,11 +978,11 @@ def main():
     args = parser.parse_args()
 
     if args.check_deps:
-        print_dependency_status(verbose=True)
+        handle_check_deps()
         return
 
     if args.show_lists:
-        list_available_port_lists()
+        handle_show_lists()
         return
 
     if args.fast:
@@ -883,133 +1000,13 @@ def main():
 
     try:
         if args.port:
-            # Check single port with service detection
-            print(f"🔍 Checking port {args.port} on {args.host}...")
-            is_open = check_port(args.host, args.port, args.timeout)
-            status = "✅ OPEN" if is_open else "❌ CLOSED"
-            print(f"Port {args.port}: {status}")
-
-            if is_open and detect_services:
-                print("🔬 Detecting service...")
-                service_info = comprehensive_service_detection(
-                    args.host, args.port, args.timeout
-                )
-                print(
-                    f"Service: {service_info['service']} ({service_info['method']} mode)"
-                )
-                if service_info["version"]:
-                    print(f"Version: {service_info['version']}")
-
+            handle_port_scan(args, detect_services)
         elif args.range:
-            # Scan port range (no service detection for ranges)
-            start_port, end_port = args.range
-            if start_port > end_port or start_port < 1 or end_port > 65535:
-                print("❌ Invalid port range. Ports must be 1-65535 and start <= end")
-                sys.exit(1)
-
-            scan_port_range(args.host, start_port, end_port, args.timeout, args.threads)
-
+            handle_range_scan(args)
         elif args.list:
-            # Scan specific port lists
-            config = load_port_config()
-            list_names = [name.strip() for name in args.list.split(",")]
-            ports = get_ports_from_lists(list_names, config)
-
-            if not ports:
-                print("❌ No valid ports found in specified lists")
-                sys.exit(1)
-
-            print(f"🔍 Scanning {len(ports)} ports from lists: {', '.join(list_names)}")
-            print("=" * 60)
-
-            open_ports = []
-            closed_ports = [port for port in ports if port not in open_ports]
-            service_results = {}
-
-            # Check ports
-            with ThreadPoolExecutor(max_workers=args.threads) as executor:
-                futures = {
-                    executor.submit(check_port, args.host, port, args.timeout): (
-                        port,
-                        service,
-                    )
-                    for port, service in ports.items()
-                }
-
-                for future in futures:
-                    port, expected_service = futures[future]
-                    is_open = future.result()
-                    if is_open:
-                        open_ports.append(port)
-                    elif args.show_closed:
-                        print(f"Port {port:5} ({expected_service:25}): ❌ CLOSED")
-
-            # Service detection on open ports
-            if detect_services and open_ports:
-                print(f"\n🔬 Detecting services on {len(open_ports)} open ports...")
-
-                with ThreadPoolExecutor(max_workers=10) as executor:
-                    futures = {
-                        executor.submit(
-                            comprehensive_service_detection,
-                            args.host,
-                            port,
-                            args.timeout,
-                        ): port
-                        for port in open_ports
-                    }
-
-                    for future in futures:
-                        port = futures[future]
-                        service_info = future.result()
-                        service_results[port] = service_info
-
-            # Display results
-            print("\n" + "=" * 60)
-            if HAS_RICH and console:
-                print_scan_results_rich(
-                    open_ports,
-                    closed_ports,
-                    ports,
-                    service_results,
-                    config,
-                    detect_services,
-                )
-            else:
-                for port in sorted(open_ports):
-                    expected_service = ports[port]
-
-                    if detect_services and port in service_results:
-                        detected = service_results[port]
-                        confidence_emoji = {
-                            "high": "🎯",
-                            "medium": "🔍",
-                            "low": "❓",
-                        }.get(detected["confidence"], "❓")
-
-                        method_emoji = (
-                            "🚀" if detected["method"] == "enhanced" else "🔧"
-                        )
-                        service_display = detected["service"]
-                        if detected["version"]:
-                            service_display += f" ({detected['version'][:30]})"
-
-                        print(
-                            f"Port {port:5} | Expected: {expected_service:20} | "
-                            f"Detected: {confidence_emoji}{method_emoji} {service_display}"
-                        )
-                    else:
-                        print(f"Port {port:5} | {expected_service:25} | ✅ OPEN")
-
-                print("=" * 60)
-                print(f"📊 Summary: {len(open_ports)} open out of {len(ports)} scanned")
-
+            handle_list_scan(args, detect_services)
         else:
-            # DEFAULT: Scan ALL configured ports with optional service detection
-            scan_all_configured_ports(
-                args.host, args.timeout, args.show_closed, detect_services
-            )
-
+            handle_default_scan(args, detect_services)
     except KeyboardInterrupt:
         print("\n⏹️  Scan interrupted by user")
         sys.exit(0)
