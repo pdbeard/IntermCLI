@@ -39,14 +39,14 @@ def test_missing_requests(monkeypatch):
     sys.modules.update(sys_modules_backup)
 
 
-def test_missing_toml(monkeypatch, capsys):
+def test_missing_toml(monkeypatch, caplog):
     sys_modules_backup = sys.modules.copy()
     sys.modules["tomllib"] = None
     sys.modules["tomli"] = None
     scan_ports = import_scan_ports()
     config = scan_ports.load_port_config()
-    out = capsys.readouterr().out
-    assert "TOML support not available" in out or "Using default port list" in out
+    log = caplog.text
+    assert "TOML support not available" in log or "Using default port list" in log
     assert "port_lists" in config
     sys.modules.clear()
     sys.modules.update(sys_modules_backup)
@@ -175,13 +175,14 @@ def test_main_show_lists(monkeypatch, capsys):
     assert "Available Port Lists" in out
 
 
-def test_main_invalid_range(monkeypatch, capsys):
+def test_main_invalid_range(monkeypatch, caplog):
     scan_ports = import_scan_ports()
     monkeypatch.setattr(sys, "argv", ["scan-ports.py", "--range", "1000", "999"])
-    with pytest.raises(SystemExit):
-        scan_ports.main()
-    out = capsys.readouterr().out
-    assert "Invalid port range" in out
+    with caplog.at_level("ERROR"):
+        with pytest.raises(SystemExit):
+            scan_ports.main()
+    log = caplog.text
+    assert "Invalid port range" in log
 
 
 def test_main_no_valid_ports(monkeypatch, capsys):

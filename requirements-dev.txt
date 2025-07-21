@@ -18,6 +18,8 @@ pre-commit>=3.0.0
 
 # Type checking
 mypy>=1.0.0
+types-requests>=2.32.0
+types-urllib3>=1.26.0
 
 # Documentation
 mkdocs>=1.4.0

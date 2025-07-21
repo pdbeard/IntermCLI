@@ -15,20 +15,29 @@ Example usage:
 """
 
 import argparse
+import logging
 import re
 import socket
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, TypeVar
+
+T = TypeVar("T")  # Define a generic type variable for futures
+
+__version__ = "0.1.0"
+
 
 # TOML support with fallback
 try:
     import tomllib  # Python 3.11+
 except ImportError:
     try:
-        import tomli as tomllib  # fallback for older Python
+        import tomli  # fallback for older Python
+
+        tomllib = tomli  # Use tomli with the tomllib name for consistency
     except ImportError:
-        tomllib = None
+        tomllib = None  # type: ignore
 
 # Optional dependencies with fallbacks
 try:
@@ -53,7 +62,7 @@ try:
     from rich.table import Table
 
     HAS_RICH = True
-    console = Console()
+    console: Optional[Console] = Console()
 except ImportError:
     HAS_RICH = False
     console = None
@@ -67,42 +76,88 @@ except Exception:
     HAS_SSL = False
 
 
-def check_optional_dependencies():
+# Setup logging
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
+logger = logging.getLogger("scan-ports")
+
+
+# Unified output abstraction
+
+
+class Output:
+    def __init__(self, use_rich: bool = False) -> None:
+        self.use_rich: bool = use_rich and HAS_RICH and console is not None
+
+    def info(self, msg: str) -> None:
+        if self.use_rich and console is not None:
+            console.print(msg)
+        else:
+            logger.info(msg)
+
+    def warning(self, msg: str) -> None:
+        if self.use_rich and console is not None:
+            console.print(f"[yellow]{msg}[/yellow]")
+        else:
+            logger.warning(msg)
+
+    def error(self, msg: str) -> None:
+        if self.use_rich and console is not None:
+            console.print(f"[red]{msg}[/red]")
+        else:
+            logger.error(msg)
+
+    def separator(self, length: int = 60) -> None:
+        self.info("=" * length)
+
+    def blank(self) -> None:
+        self.info("")
+
+    def print_rich(self, obj: Any) -> None:
+        if self.use_rich and console is not None:
+            console.print(obj)
+        else:
+            logger.info(str(obj))
+
+
+output = Output(use_rich=HAS_RICH)
+
+
+def check_optional_dependencies() -> Tuple[Dict[str, bool], List[str]]:
     """Check which optional dependencies are available"""
-    deps = {
+    deps: Dict[str, bool] = {
         "requests": HAS_REQUESTS,
         "urllib3": HAS_URLLIB3,
         "ssl": HAS_SSL,
         "tomllib": tomllib is not None,
     }
 
-    missing = [name for name, available in deps.items() if not available]
+    missing: List[str] = [name for name, available in deps.items() if not available]
 
     return deps, missing
 
 
-def print_dependency_status(verbose=False):
+def print_dependency_status(verbose: bool = False) -> None:
     """Print status of optional dependencies"""
     deps, missing = check_optional_dependencies()
 
     if verbose:
-        print("📦 Optional Dependencies Status:")
+        output.info("Optional Dependencies Status:")
         for name, available in deps.items():
             status = "✅ Available" if available else "❌ Missing"
-            print(f"  {name:10}: {status}")
+            output.info(f"  {name:10}: {status}")
 
         if missing:
             if "tomllib" in missing:
-                print("\n💡 For TOML support on Python < 3.11: pip3 install tomli")
+                output.info("For TOML support on Python < 3.11: pip3 install tomli")
             other_missing = [m for m in missing if m != "tomllib"]
             if other_missing:
-                print(
-                    f"💡 To enable enhanced service detection: pip3 install {' '.join(other_missing)}"
+                output.info(
+                    f"To enable enhanced service detection: pip3 install {' '.join(other_missing)}"
                 )
-        print()
+        output.blank()
 
 
-def load_port_config():
+def load_port_config() -> Dict[str, Any]:
     """Load port configuration from TOML file"""
     script_dir = Path(__file__).parent
     source_config_file = script_dir / "config" / "ports.toml"
@@ -127,9 +182,9 @@ def load_port_config():
     }
 
     if not tomllib:
-        print("⚠️  TOML support not available")
-        print("💡 Install tomli for Python < 3.11: pip3 install tomli")
-        print("💡 Using default port list")
+        logger.warning("TOML support not available")
+        logger.info("Install tomli for Python < 3.11: pip3 install tomli")
+        logger.info("Using default port list")
         return default_config
 
     try:
@@ -148,51 +203,62 @@ def load_port_config():
                 config_data = tomllib.load(f)
             config_loaded = str(source_config_file)
         else:
-            print("⚠️  Config file not found in any location.")
-            print("💡 Using default port list")
+            logger.warning("Config file not found in any location.")
+            logger.info("Using default port list")
             return default_config
 
         if config_loaded:
-            print(f"ℹ️  Loaded port config: {config_loaded}")
+            logger.info(f"Loaded port config: {config_loaded}")
         return config_data if config_data else default_config
     except Exception as e:
-        print(f"⚠️  Error loading TOML config: {e}")
-        print("💡 Using default port list")
+        logger.error(f"Error loading TOML config: {e}")
+        logger.info("Using default port list")
         return default_config
 
 
-def list_available_port_lists():
+def log_separator(length: int = 60) -> None:
+    output.separator(length)
+
+
+def log_blank() -> None:
+    output.blank()
+
+
+def list_available_port_lists() -> None:
     """Display all available port lists from configuration"""
     config = load_port_config()
 
-    print("📋 Available Port Lists:")
-    print("=" * 60)
+    output.info("Available Port Lists:")
+    output.separator()
 
     for list_name, details in config["port_lists"].items():
         description = details.get("description", "No description")
         ports = details.get("ports", {})
 
-        print(f"\n🏷️  {list_name.upper()}")
-        print(f"   Description: {description}")
-        print(f"   Ports: {len(ports)} defined")
+        output.info(f"\n🏷️  {list_name.upper()}")
+        output.info(f"   Description: {description}")
+        output.info(f"   Ports: {len(ports)} defined")
 
         # Show first few ports as preview
         port_preview = list(ports.items())[:5]
         for port, service in port_preview:
-            print(f"   • {port}: {service}")
+            output.info(f"   • {port}: {service}")
 
         if len(ports) > 5:
-            print(f"   ... and {len(ports) - 5} more")
+            output.info(f"   ... and {len(ports) - 5} more")
 
-    print("\n" + "=" * 60)
-    print("💡 Usage: scan-ports -l <list_name> or scan-ports -l <list1>,<list2>")
-    print("💡 Example: scan-ports -l web,database")
+    output.blank()
+    output.separator()
+    output.info("Usage: scan-ports -l <list_name> or scan-ports -l <list1>,<list2>")
+    output.info("Example: scan-ports -l web,database")
 
 
-def get_ports_from_lists(list_names, config):
+def get_ports_from_lists(
+    list_names: List[str], config: Dict[str, Any]
+) -> Dict[int, str]:
     """Get ports from specified lists, or all if 'all' is specified"""
-    ports = {}
-    available_lists = list(config["port_lists"].keys())
+    ports: Dict[int, str] = {}
+    available_lists: List[str] = list(config["port_lists"].keys())
 
     # If 'all' is in the list, combine all ports from all lists
     if any(name.strip().lower() == "all" for name in list_names):
@@ -213,13 +279,92 @@ def get_ports_from_lists(list_names, config):
                 if port not in ports:
                     ports[port] = service
         else:
-            print(f"⚠️  Port list '{list_name}' not found")
-            print(f"Available lists: {', '.join(available_lists)}")
+            output.warning(f"Port list '{list_name}' not found")
+            output.info(f"Available lists: {', '.join(available_lists)}")
 
     return ports
 
 
-def check_port(host, port, timeout=3):
+def handle_list_scan(args: argparse.Namespace, detect_services: bool) -> None:
+    config = load_port_config()
+    list_names = [name.strip() for name in args.list.split(",")]
+    ports = get_ports_from_lists(list_names, config)
+
+    if not ports:
+        output.error("No valid ports found in specified lists")
+        sys.exit(1)
+
+    output.info(f"Scanning {len(ports)} ports from lists: {', '.join(list_names)}")
+    output.separator()
+
+    open_ports: List[int] = []
+    closed_ports = [port for port in ports if port not in open_ports]
+    service_results: Dict[int, Dict[str, Any]] = {}
+
+    # Check ports
+    with ThreadPoolExecutor(max_workers=args.threads) as executor:
+        # Using explicit typing to avoid mypy errors
+        port_service_futures: Dict[Any, Tuple[int, str]] = {}
+        for port, service in ports.items():
+            future = executor.submit(check_port, args.host, port, args.timeout)
+            port_service_futures[future] = (port, service)
+
+        for future in port_service_futures:
+            port, expected_service = port_service_futures[future]
+            is_open = future.result()
+            if is_open:
+                open_ports.append(port)
+            elif args.show_closed:
+                output.info(f"Port {port:5} ({expected_service:25}): CLOSED")
+
+    # Service detection on open ports
+    if detect_services and open_ports:
+        output.info(f"Detecting services on {len(open_ports)} open ports...")
+
+        # Using a simpler approach without dictionary comprehension to avoid type errors
+        for port in open_ports:
+            service_info = comprehensive_service_detection(
+                args.host, port, args.timeout
+            )
+            service_results[port] = service_info
+
+    # Display results
+    output.blank()
+    output.separator()
+    if HAS_RICH and console:
+        print_scan_results_rich(
+            open_ports,
+            closed_ports,
+            ports,
+            service_results,
+            config,
+            detect_services,
+        )
+    else:
+        for port in sorted(open_ports):
+            expected_service = ports[port]
+            if detect_services and port in service_results:
+                detected = service_results[port]
+                confidence_emoji = {
+                    "high": "🎯",
+                    "medium": "🔍",
+                    "low": "❓",
+                }.get(detected["confidence"], "❓")
+                method_emoji = "🚀" if detected["method"] == "enhanced" else "🔧"
+                service_display = detected["service"]
+                if detected["version"]:
+                    service_display += f" ({detected['version'][:30]})"
+                output.info(
+                    f"Port {port:5} | Expected: {expected_service:20} | "
+                    f"Detected: {confidence_emoji}{method_emoji} {service_display}"
+                )
+            else:
+                output.info(f"Port {port:5} | {expected_service:25} | OPEN")
+        output.separator()
+        output.info(f"Summary: {len(open_ports)} open out of {len(ports)} scanned")
+
+
+def check_port(host: str, port: int, timeout: float = 3) -> bool:
     """Check if a specific port is open"""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -230,7 +375,9 @@ def check_port(host, port, timeout=3):
         return False
 
 
-def detect_service_banner_basic(host, port, timeout=3):
+def detect_service_banner_basic(
+    host: str, port: int, timeout: float = 3
+) -> Optional[str]:
     """Basic service banner detection using only standard library"""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -265,13 +412,15 @@ def detect_service_banner_basic(host, port, timeout=3):
         return None
 
 
-def detect_http_service_basic(host, port, timeout=5):
+def detect_http_service_basic(
+    host: str, port: int, timeout: float = 5
+) -> Optional[Dict[str, Any]]:
     """Basic HTTP detection using urllib (standard library)"""
     try:
         import urllib.error
         import urllib.request
 
-        protocols = ["http"]
+        protocols: List[str] = ["http"]
         if port in [443, 8443] and HAS_SSL:
             protocols = ["https", "http"]
 
@@ -298,7 +447,7 @@ def detect_http_service_basic(host, port, timeout=5):
                 content = response.read().decode("utf-8", errors="ignore")
                 headers = dict(response.headers)
 
-                service_info = {
+                service_info: Dict[str, Any] = {
                     "protocol": protocol,
                     "status_code": response.status,
                     "server": headers.get("Server", "Unknown"),
@@ -344,7 +493,9 @@ def detect_http_service_basic(host, port, timeout=5):
     return None
 
 
-def detect_http_service_enhanced(host, port, timeout=5):
+def detect_http_service_enhanced(
+    host: str, port: int, timeout: float = 5
+) -> Optional[Dict[str, Any]]:
     """Enhanced HTTP detection using requests library"""
     if not HAS_REQUESTS:
         return detect_http_service_basic(host, port, timeout)
@@ -367,7 +518,7 @@ def detect_http_service_enhanced(host, port, timeout=5):
                 headers={"User-Agent": "port-check/1.0"},
             )
 
-            service_info = {
+            service_info: Dict[str, Any] = {
                 "protocol": protocol,
                 "status_code": response.status_code,
                 "server": response.headers.get("Server", "Unknown"),
@@ -416,7 +567,9 @@ def detect_http_service_enhanced(host, port, timeout=5):
     return None
 
 
-def detect_database_service_enhanced(host, port, timeout=3):
+def detect_database_service_enhanced(
+    host: str, port: int, timeout: float = 3
+) -> Optional[str]:
     """Enhanced database detection with version probing"""
     database_signatures = {
         3306: "MySQL/MariaDB",
@@ -450,9 +603,11 @@ def detect_database_service_enhanced(host, port, timeout=3):
             es_info = None
             if HAS_REQUESTS:
                 try:
-                    response = requests.get(f"http://{host}:{port}", timeout=timeout)
-                    if response.status_code == 200:
-                        data = response.json()
+                    http_response = requests.get(
+                        f"http://{host}:{port}", timeout=timeout
+                    )
+                    if http_response.status_code == 200:
+                        data = http_response.json()
                         if "version" in data:
                             return f"Elasticsearch {data['version']['number']}"
                         return "Elasticsearch"
@@ -476,7 +631,7 @@ def detect_database_service_enhanced(host, port, timeout=3):
     return database_signatures.get(port)
 
 
-def detect_ssh_service(host, port, timeout=3):
+def detect_ssh_service(host: str, port: int, timeout: float = 3) -> str:
     """Detect SSH service version"""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -494,12 +649,14 @@ def detect_ssh_service(host, port, timeout=3):
     return "SSH"
 
 
-def comprehensive_service_detection(host, port, timeout=3, enhanced=None):
+def comprehensive_service_detection(
+    host: str, port: int, timeout: float = 3, enhanced: Optional[bool] = None
+) -> Dict[str, Any]:
     """Comprehensive service detection with fallback options"""
     if enhanced is None:
         enhanced = HAS_REQUESTS  # Use enhanced features if available
 
-    service_info = {
+    service_info: Dict[str, Any] = {
         "service": "Unknown",
         "version": None,
         "details": {},
@@ -563,9 +720,17 @@ def comprehensive_service_detection(host, port, timeout=3, enhanced=None):
 
 
 def print_scan_results_rich(
-    open_ports, closed_ports, all_ports, service_results, config, detect_services
-):
+    open_ports: List[int],
+    closed_ports: List[int],
+    all_ports: Dict[int, str],
+    service_results: Dict[int, Dict[str, Any]],
+    config: Dict[str, Any],
+    detect_services: bool,
+) -> None:
     """Print scan results using rich tables and panels"""
+    if console is None:
+        return
+
     # Summary Table
     summary_table = Table(title="Port Scan Results", box=box.SIMPLE)
     summary_table.add_column("Port", style="bold cyan", justify="right")
@@ -625,10 +790,15 @@ def print_scan_results_rich(
     console.print(Panel(summary_text, title="Scan Summary", style="bold magenta"))
 
 
-def scan_all_configured_ports(host, timeout=3, show_closed=False, detect_services=True):
+def scan_all_configured_ports(
+    host: str,
+    timeout: float = 3,
+    show_closed: bool = False,
+    detect_services: bool = True,
+) -> List[int]:
     """Scan all ports from all configured port lists with optional service detection"""
     config = load_port_config()
-    all_ports = {}
+    all_ports: Dict[int, str] = {}
 
     # Combine all ports from all lists
     for list_name, details in config["port_lists"].items():
@@ -639,62 +809,54 @@ def scan_all_configured_ports(host, timeout=3, show_closed=False, detect_service
                 all_ports[port] = service
 
     if not all_ports:
-        print("❌ No ports configured")
+        logger.error("No ports configured")
         return []
 
-    print(f"🔍 Scanning ALL configured ports ({len(all_ports)} total) on {host}")
+    output.info(f"Scanning ALL configured ports ({len(all_ports)} total) on {host}")
     if detect_services:
         deps, missing = check_optional_dependencies()
         enhanced = HAS_REQUESTS
         method = "enhanced" if enhanced else "basic"
-        print(f"🔬 Service detection enabled ({method} mode)")
+        output.info(f"Service detection enabled ({method} mode)")
         if missing and not enhanced:
-            print(f"💡 Install {', '.join(missing)} for enhanced detection")
-    print("📋 Port lists included:", ", ".join(config["port_lists"].keys()))
-    print("=" * 90)
+            output.info(f"Install {', '.join(missing)} for enhanced detection")
+    output.info(f"Port lists included: {', '.join(config['port_lists'].keys())}")
+    output.separator(90)
 
-    open_ports = []
-    closed_ports = []
-    service_results = {}
+    open_ports: List[int] = []
+    closed_ports: List[int] = []
+    service_results: Dict[int, Dict[str, Any]] = {}
 
     # First pass: Check which ports are open
     with ThreadPoolExecutor(max_workers=50) as executor:
-        futures = {
-            executor.submit(check_port, host, port, timeout): (port, service)
-            for port, service in all_ports.items()
-        }
+        # Using explicit typing to avoid mypy errors
+        port_service_futures: Dict[Any, Tuple[int, str]] = {}
+        for port, service in all_ports.items():
+            future = executor.submit(check_port, host, port, timeout)
+            port_service_futures[future] = (port, service)
 
-        for future in futures:
-            port, expected_service = futures[future]
+        for future in port_service_futures:
+            port, expected_service = port_service_futures[future]
             is_open = future.result()
             if is_open:
                 open_ports.append(port)
             else:
                 closed_ports.append(port)
                 if show_closed:
-                    print(f"Port {port:5} ({expected_service:25}): ❌ CLOSED")
+                    output.info(f"Port {port:5} ({expected_service:25}): CLOSED")
 
     # Second pass: Service detection on open ports
     if detect_services and open_ports:
-        print(f"\n🔬 Detecting services on {len(open_ports)} open ports...")
+        output.info(f"Detecting services on {len(open_ports)} open ports...")
 
-        with ThreadPoolExecutor(
-            max_workers=10
-        ) as executor:  # Fewer threads for service detection
-            futures = {
-                executor.submit(
-                    comprehensive_service_detection, host, port, timeout
-                ): port
-                for port in open_ports
-            }
-
-            for future in futures:
-                port = futures[future]
-                service_info = future.result()
-                service_results[port] = service_info
+        # Using a simpler approach without dictionary comprehension to avoid type errors
+        for port in open_ports:
+            service_info = comprehensive_service_detection(host, port, timeout)
+            service_results[port] = service_info
 
     # Display results
-    print("\n" + "=" * 90)
+    output.blank()
+    output.separator(90)
     if HAS_RICH and console:
         print_scan_results_rich(
             open_ports,
@@ -706,10 +868,10 @@ def scan_all_configured_ports(host, timeout=3, show_closed=False, detect_service
         )
     else:
         if detect_services:
-            print("📊 OPEN PORTS WITH SERVICE DETECTION:")
+            output.info("OPEN PORTS WITH SERVICE DETECTION:")
         else:
-            print("📊 OPEN PORTS:")
-        print("=" * 90)
+            output.info("OPEN PORTS:")
+        output.separator(90)
         for port in sorted(open_ports):
             expected_service = all_ports[port]
             if detect_services and port in service_results:
@@ -721,28 +883,28 @@ def scan_all_configured_ports(host, timeout=3, show_closed=False, detect_service
                 service_display = detected["service"]
                 if detected["version"]:
                     service_display += f" ({detected['version'][:30]})"
-                print(
+                output.info(
                     f"Port {port:5} | Expected: {expected_service:20} | "
                     f"Detected: {confidence_emoji}{method_emoji} {service_display}"
                 )
                 if "details" in detected and detected["details"]:
                     details = detected["details"]
                     if details.get("title"):
-                        print(f"        └─ Title: {details['title']}")
+                        output.info(f"        └─ Title: {details['title']}")
                     if details.get("server"):
-                        print(f"        └─ Server: {details['server']}")
+                        output.info(f"        └─ Server: {details['server']}")
                     if details.get("redirect"):
-                        print(f"        └─ Redirects to: {details['redirect']}")
+                        output.info(f"        └─ Redirects to: {details['redirect']}")
             else:
-                print(f"Port {port:5} | {expected_service:25} | ✅ OPEN")
-        print("=" * 90)
-        print(
-            f"📊 Summary: {len(open_ports)} open, {len(closed_ports)} closed out of {len(all_ports)} total"
+                output.info(f"Port {port:5} | {expected_service:25} | OPEN")
+        output.separator(90)
+        output.info(
+            f"Summary: {len(open_ports)} open, {len(closed_ports)} closed out of {len(all_ports)} total"
         )
         if open_ports:
-            print(f"🔓 Open ports: {', '.join(map(str, sorted(open_ports)))}")
+            output.info(f"Open ports: {', '.join(map(str, sorted(open_ports)))}")
         # Show breakdown by category
-        print("\n📂 Results by category:")
+        output.info("Results by category:")
         for list_name, details in config["port_lists"].items():
             category_open = []
             category_total = 0
@@ -752,168 +914,82 @@ def scan_all_configured_ports(host, timeout=3, show_closed=False, detect_service
                 if port in open_ports:
                     category_open.append(port)
             if category_open:
-                print(
+                output.info(
                     f"  {list_name:12}: {len(category_open)}/{category_total} open - {', '.join(map(str, sorted(category_open)))}"
                 )
             else:
-                print(f"  {list_name:12}: 0/{category_total} open")
+                output.info(f"  {list_name:12}: 0/{category_total} open")
 
     return open_ports
 
 
-def scan_port_range(host, start_port, end_port, timeout=3, threads=50):
+def scan_port_range(
+    host: str, start_port: int, end_port: int, timeout: float = 3, threads: int = 50
+) -> List[int]:
     """Scan a range of ports"""
     ports_to_scan = list(range(start_port, end_port + 1))
 
-    print(
-        f"🔍 Scanning ports {start_port}-{end_port} on {host} ({len(ports_to_scan)} ports)"
+    output.info(
+        f"Scanning ports {start_port}-{end_port} on {host} ({len(ports_to_scan)} ports)"
     )
-    print("=" * 60)
+    output.separator()
 
     open_ports = []
 
     with ThreadPoolExecutor(max_workers=threads) as executor:
-        futures = {
-            executor.submit(check_port, host, port, timeout): port
-            for port in ports_to_scan
-        }
+        # Using explicit typing to avoid mypy errors
+        port_futures: Dict[Any, int] = {}
+        for port in ports_to_scan:
+            future = executor.submit(check_port, host, port, timeout)
+            port_futures[future] = port
 
-        for future in futures:
-            port = futures[future]
+        for future in port_futures:
+            port = port_futures[future]
             is_open = future.result()
             if is_open:
                 open_ports.append(port)
-                print(f"Port {port:5}: ✅ OPEN")
+                output.info(f"Port {port:5}: OPEN")
 
-    print("=" * 60)
-    print(f"📊 Summary: {len(open_ports)} open out of {len(ports_to_scan)} scanned")
+    output.separator()
+    output.info(f"Summary: {len(open_ports)} open out of {len(ports_to_scan)} scanned")
     if open_ports:
-        print(f"🔓 Open ports: {', '.join(map(str, sorted(open_ports)))}")
+        output.info(f"Open ports: {', '.join(map(str, sorted(open_ports)))}")
 
     return open_ports
 
 
-__version__ = "0.1.0"
-
-
-def handle_check_deps():
-    print_dependency_status(verbose=True)
-
-
-def handle_show_lists():
-    list_available_port_lists()
-
-
-def handle_port_scan(args, detect_services):
-    print(f"🔍 Checking port {args.port} on {args.host}...")
-    is_open = check_port(args.host, args.port, args.timeout)
-    status = "✅ OPEN" if is_open else "❌ CLOSED"
-    print(f"Port {args.port}: {status}")
-    if is_open and detect_services:
-        print("🔬 Detecting service...")
-        service_info = comprehensive_service_detection(
-            args.host, args.port, args.timeout
-        )
-        print(f"Service: {service_info['service']} ({service_info['method']} mode)")
-        if service_info["version"]:
-            print(f"Version: {service_info['version']}")
-
-
-def handle_range_scan(args):
-    start_port, end_port = args.range
-    if start_port > end_port or start_port < 1 or end_port > 65535:
-        print("❌ Invalid port range. Ports must be 1-65535 and start <= end")
-        sys.exit(1)
-    scan_port_range(args.host, start_port, end_port, args.timeout, args.threads)
-
-
-def handle_list_scan(args, detect_services):
-    config = load_port_config()
-    list_names = [name.strip() for name in args.list.split(",")]
-    ports = get_ports_from_lists(list_names, config)
-    if not ports:
-        print("❌ No valid ports found in specified lists")
-        sys.exit(1)
-    print(f"🔍 Scanning {len(ports)} ports from lists: {', '.join(list_names)}")
-    print("=" * 60)
-    open_ports = []
-    closed_ports = [port for port in ports if port not in open_ports]
-    service_results = {}
-    # Check ports
-    with ThreadPoolExecutor(max_workers=args.threads) as executor:
-        futures = {
-            executor.submit(check_port, args.host, port, args.timeout): (
-                port,
-                service,
-            )
-            for port, service in ports.items()
-        }
-        for future in futures:
-            port, expected_service = futures[future]
-            is_open = future.result()
-            if is_open:
-                open_ports.append(port)
-            elif args.show_closed:
-                print(f"Port {port:5} ({expected_service:25}): ❌ CLOSED")
-    # Service detection on open ports
-    if detect_services and open_ports:
-        print(f"\n🔬 Detecting services on {len(open_ports)} open ports...")
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = {
-                executor.submit(
-                    comprehensive_service_detection,
-                    args.host,
-                    port,
-                    args.timeout,
-                ): port
-                for port in open_ports
-            }
-            for future in futures:
-                port = futures[future]
-                service_info = future.result()
-                service_results[port] = service_info
-    # Display results
-    print("\n" + "=" * 60)
-    if HAS_RICH and console:
-        print_scan_results_rich(
-            open_ports,
-            closed_ports,
-            ports,
-            service_results,
-            config,
-            detect_services,
-        )
-    else:
-        for port in sorted(open_ports):
-            expected_service = ports[port]
-            if detect_services and port in service_results:
-                detected = service_results[port]
-                confidence_emoji = {
-                    "high": "🎯",
-                    "medium": "🔍",
-                    "low": "❓",
-                }.get(detected["confidence"], "❓")
-                method_emoji = "🚀" if detected["method"] == "enhanced" else "🔧"
-                service_display = detected["service"]
-                if detected["version"]:
-                    service_display += f" ({detected['version'][:30]})"
-                print(
-                    f"Port {port:5} | Expected: {expected_service:20} | "
-                    f"Detected: {confidence_emoji}{method_emoji} {service_display}"
-                )
-            else:
-                print(f"Port {port:5} | {expected_service:25} | ✅ OPEN")
-        print("=" * 60)
-        print(f"📊 Summary: {len(open_ports)} open out of {len(ports)} scanned")
-
-
-def handle_default_scan(args, detect_services):
+def handle_default_scan(args: argparse.Namespace, detect_services: bool) -> None:
     scan_all_configured_ports(
         args.host, args.timeout, args.show_closed, detect_services
     )
 
 
-def main():
+def handle_range_scan(args: argparse.Namespace) -> None:
+    start_port, end_port = args.range
+    if start_port > end_port or start_port < 1 or end_port > 65535:
+        logger.error("Invalid port range. Ports must be 1-65535 and start <= end")
+        sys.exit(1)
+    scan_port_range(args.host, start_port, end_port, args.timeout, args.threads)
+
+
+def handle_port_scan(args: argparse.Namespace, detect_services: bool) -> None:
+    output.info(f"Checking port {args.port} on {args.host}...")
+    is_open = check_port(args.host, args.port, args.timeout)
+    status = "OPEN" if is_open else "CLOSED"
+    output.info(f"Port {args.port}: {status}")
+    if is_open and detect_services:
+        output.info("Detecting service...")
+        service_info = comprehensive_service_detection(
+            args.host, args.port, args.timeout
+        )
+        output.info(
+            f"Service: {service_info['service']} ({service_info['method']} mode)"
+        )
+        if service_info["version"]:
+            output.info(f"Version: {service_info['version']}")
+
+
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Port scanner and service checker with TOML configuration",
         epilog="By default, scans ALL ports defined in the TOML configuration file with service detection.",
@@ -978,11 +1054,11 @@ def main():
     args = parser.parse_args()
 
     if args.check_deps:
-        handle_check_deps()
+        print_dependency_status(verbose=True)
         return
 
     if args.show_lists:
-        handle_show_lists()
+        list_available_port_lists()
         return
 
     if args.fast:
@@ -990,13 +1066,13 @@ def main():
 
     detect_services = not args.no_service_detection
 
-    print(f"🎯 Target: {args.host}")
-    print(f"⏱️  Timeout: {args.timeout}s")
-    print(f"🧵 Threads: {args.threads}")
-    print(f"🔬 Service Detection: {'Enabled' if detect_services else 'Disabled'}")
+    output.info(f"Target: {args.host}")
+    output.info(f"Timeout: {args.timeout}s")
+    output.info(f"Threads: {args.threads}")
+    output.info(f"Service Detection: {'Enabled' if detect_services else 'Disabled'}")
     if detect_services:
         print_dependency_status(verbose=False)
-    print()
+    output.blank()
 
     try:
         if args.port:
@@ -1008,10 +1084,10 @@ def main():
         else:
             handle_default_scan(args, detect_services)
     except KeyboardInterrupt:
-        print("\n⏹️  Scan interrupted by user")
+        output.warning("Scan interrupted by user")
         sys.exit(0)
     except Exception as e:
-        print(f"❌ Error: {e}")
+        output.error(f"Error: {e}")
         sys.exit(1)
 
 
