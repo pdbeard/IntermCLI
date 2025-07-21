@@ -419,6 +419,7 @@ def detect_http_service_basic(
     try:
         import urllib.error
         import urllib.request
+        from typing import Any, cast
 
         protocols: List[str] = ["http"]
         if port in [443, 8443] and HAS_SSL:
@@ -444,7 +445,8 @@ def detect_http_service_basic(
                 else:
                     response = urllib.request.urlopen(req, timeout=timeout)
 
-                content = response.read().decode("utf-8", errors="ignore")
+                # Cast response to Any to avoid mypy complaining about read() method
+                content = cast(Any, response).read().decode("utf-8", errors="ignore")
                 headers = dict(response.headers)
 
                 service_info: Dict[str, Any] = {
@@ -618,11 +620,13 @@ def detect_database_service_enhanced(
             if not es_info:
                 try:
                     import urllib.request
+                    from typing import Any, cast
 
                     response = urllib.request.urlopen(
                         f"http://{host}:{port}", timeout=timeout
                     )
-                    content = response.read().decode("utf-8")
+                    # Cast response to Any to avoid mypy complaining about read() method
+                    content = cast(Any, response).read().decode("utf-8")
                     if "elasticsearch" in content.lower():
                         return "Elasticsearch"
                 except Exception:
