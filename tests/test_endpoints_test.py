@@ -660,3 +660,63 @@ def test_main_check_deps(monkeypatch, capsys):
     test_endpoints.main()
     out = capsys.readouterr().out
     assert "Dependency Status" in out
+
+
+def test_print_response_yaml_format(monkeypatch, capsys):
+    """Test the YAML output format in print_response"""
+    # First, check if PyYAML is available
+    import importlib.util
+
+    has_yaml = importlib.util.find_spec("yaml") is not None
+
+    # Mock yaml module if not available for testing
+    if not has_yaml:
+
+        class MockYAML:
+            @staticmethod
+            def dump(data, **kwargs):
+                return "key: value"
+
+            @staticmethod
+            def safe_load(text):
+                return {"key": "value"}
+
+        monkeypatch.setattr(sys.modules, "yaml", MockYAML())
+
+    # Test data
+    class DummyResponse:
+        status_code = 200
+        elapsed = 0.1
+        headers = {"Content-Type": "application/json"}
+        text = '{"foo": "bar"}'
+
+    # Test with YAML format
+    test_endpoints.print_response(DummyResponse(), output_format="yaml")
+
+    # Get output
+    out = capsys.readouterr().out
+
+    # Check output contains YAML-formatted content
+    assert "foo:" in out or "key: value" in out
+
+
+def test_print_response_json_format(monkeypatch, capsys):
+    """Test the JSON output format in print_response"""
+
+    # Test data
+    class DummyResponse:
+        status_code = 200
+        elapsed = 0.1
+        headers = {"Content-Type": "application/json"}
+        text = '{"foo": "bar", "nested": {"key": "value"}}'
+
+    # Test with JSON format
+    test_endpoints.print_response(DummyResponse(), output_format="json")
+
+    # Get output
+    out = capsys.readouterr().out
+
+    # Check output contains properly formatted JSON
+    assert '"foo": "bar"' in out
+    assert '"nested": {' in out
+    assert '"key": "value"' in out
