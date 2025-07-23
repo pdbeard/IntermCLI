@@ -21,20 +21,22 @@ try:
     import tomllib  # Python 3.11+
 except ImportError:
     try:
-        import tomli as tomllib  # Fallback for older Python
+        import tomli as tomli_lib  # type: ignore # Fallback for older Python
+
+        tomllib = tomli_lib  # type: ignore
     except ImportError:
-        tomllib = None  # Will raise appropriate error during usage
+        tomllib = None  # type: ignore # Will raise appropriate error during usage
 
 
 class ConfigLoader:
-    def __init__(self, tool_name: str, logger=None):
+    def __init__(self, tool_name: str, logger: Optional[logging.Logger] = None) -> None:
         """Initialize config loader for a specific tool."""
         self.tool_name = tool_name
         self.logger = logger or self._get_default_logger()
         self.config: Dict[str, Any] = {}
         self.config_source: str = "built-in defaults"
 
-    def _get_default_logger(self):
+    def _get_default_logger(self) -> logging.Logger:
         """Create a basic logger if none provided."""
         logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
         return logging.getLogger(self.tool_name)

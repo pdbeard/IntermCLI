@@ -1,6 +1,4 @@
 import importlib.util
-
-# ...existing code...
 import os
 import sys
 from unittest import mock
@@ -15,41 +13,6 @@ def import_scan_ports():
     spec = importlib.util.spec_from_file_location("scan_ports", TOOL_PATH)
     scan_ports = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(scan_ports)
-
-    # Redirect output.info/warning/error to print to make tests work
-    original_info = scan_ports.output.info
-    original_warning = scan_ports.output.warning
-    original_error = scan_ports.output.error
-    original_separator = scan_ports.output.separator
-    original_blank = scan_ports.output.blank
-
-    def patched_info(msg, **kwargs):
-        print(msg)
-        return original_info(msg, **kwargs)
-
-    def patched_warning(msg, **kwargs):
-        print(msg)
-        return original_warning(msg, **kwargs)
-
-    def patched_error(msg, **kwargs):
-        print(msg)
-        return original_error(msg, **kwargs)
-
-    def patched_separator(char="=", length=60, **kwargs):
-        separator = char * length
-        print(separator)
-        return original_separator(char=char, length=length, **kwargs)
-
-    def patched_blank(**kwargs):
-        print("")
-        return original_blank(**kwargs)
-
-    scan_ports.output.info = patched_info
-    scan_ports.output.warning = patched_warning
-    scan_ports.output.error = patched_error
-    scan_ports.output.separator = patched_separator
-    scan_ports.output.blank = patched_blank
-
     return scan_ports
 
 
@@ -177,27 +140,37 @@ def test_check_port_open_closed(monkeypatch):
 def test_detect_service_banner_basic(monkeypatch):
     scan_ports = import_scan_ports()
 
-    # Mock detect_service_banner to return a test banner
-    def mock_detect_banner(host, port, timeout):
-        return "HTTP/1.1 200 OK\r\nServer: Dummy\r\n\r\n"
+    # Mock socket to simulate banner
+    class DummySock:
+        def __enter__(self):
+            return self
 
-    monkeypatch.setattr(scan_ports, "detect_service_banner", mock_detect_banner)
+        def __exit__(self, *a):
+            pass
 
-    banner = scan_ports.detect_service_banner("localhost", 80, 1)
+        def settimeout(self, t):
+            pass
+
+        def connect(self, addr):
+            pass
+
+        def send(self, data):
+            pass
+
+        def recv(self, n):
+            return b"HTTP/1.1 200 OK\r\nServer: Dummy\r\n\r\n"
+
+    monkeypatch.setattr("socket.socket", lambda *a, **kw: DummySock())
+    banner = scan_ports.detect_service_banner_basic("localhost", 80, 1)
     assert "HTTP/1.1" in banner
 
 
 def test_scan_all_configured_ports(monkeypatch, capsys):
     scan_ports = import_scan_ports()
-
-    # Mock scan_ports method to always return all ports as closed
-    def mock_scan_ports(host, ports, max_workers):
-        return {port: False for port in ports}
-
-    monkeypatch.setattr(scan_ports.network_utils, "scan_ports", mock_scan_ports)
-
+    # Patch check_port to always return False (all closed)
+    monkeypatch.setattr(scan_ports, "check_port", lambda *a, **kw: False)
     open_ports = scan_ports.scan_all_configured_ports(
-        "localhost", timeout=0.1, show_closed=True, detect_services=False, threads=10
+        "localhost", timeout=0.1, show_closed=True, detect_services=False
     )
     out = capsys.readouterr().out
     assert "CLOSED" in out or "closed" in out
@@ -206,13 +179,10 @@ def test_scan_all_configured_ports(monkeypatch, capsys):
 
 def test_scan_port_range(monkeypatch, capsys):
     scan_ports = import_scan_ports()
-
-    # Mock scan_ports method to return port 22 as open and others as closed
-    def mock_scan_ports(host, ports, max_workers):
-        return {port: port == 22 for port in ports}
-
-    monkeypatch.setattr(scan_ports.network_utils, "scan_ports", mock_scan_ports)
-
+    # Patch check_port to return True for port 22 only
+    monkeypatch.setattr(
+        scan_ports, "check_port", lambda host, port, timeout: port == 22
+    )
     open_ports = scan_ports.scan_port_range("localhost", 22, 23, timeout=0.1, threads=2)
     out = capsys.readouterr().out
     assert 22 in open_ports
@@ -291,40 +261,47 @@ def test_output_class_methods(monkeypatch, caplog):
 
     # Set log level to INFO to capture info messages
     with caplog.at_level(logging.INFO):
-        # Test different output methods directly from the scan_ports output instance
-        scan_ports.output.info("Info message")
-        scan_ports.output.warning("Warning message")
-        scan_ports.output.error("Error message")
-        scan_ports.output.separator(10)
-        scan_ports.output.blank()
+        # Test with rich disabled
+        output = scan_ports.Output(use_rich=False)
+
+        # Test different output methods
+        output.info("Info message")
+        output.warning("Warning message")
+        output.error("Error message")
+        output.separator(10)
+        output.blank()
+        output.print_rich("Rich object")
 
         # Check log output
         log = caplog.text
         assert "Info message" in log
         assert "Warning message" in log
         assert "Error message" in log
+        assert "Rich object" in log
 
 
-def test_detect_http_service(monkeypatch):
+def test_detect_http_service_basic(monkeypatch):
     scan_ports = import_scan_ports()
 
-    # Mock network_utils.detect_http_service to return a test result
-    def mock_detect_http(*args, **kwargs):
-        return {
-            "protocol": "http",
-            "status_code": 200,
-            "server": "Apache/2.4.41",
-            "title": "Test Page",
-            "framework": None,
-            "redirect": None,
-        }
+    # Mock urllib.request
+    class MockResponse:
+        def __init__(self):
+            self.status = 200
+            self.headers = {"Server": "Apache/2.4.41"}
 
-    monkeypatch.setattr(
-        scan_ports.network_utils, "detect_http_service", mock_detect_http
-    )
+        def read(self):
+            return (
+                b"<html><head><title>Test Page</title></head><body>Hello</body></html>"
+            )
+
+    # Mock urllib.request.urlopen to return our mock response
+    def mock_urlopen(*args, **kwargs):
+        return MockResponse()
+
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
 
     # Test the method
-    result = scan_ports.detect_http_service("localhost", 80, timeout=0.1)
+    result = scan_ports.detect_http_service_basic("localhost", 80, timeout=0.1)
 
     assert result is not None
     assert result["status_code"] == 200
@@ -332,75 +309,38 @@ def test_detect_http_service(monkeypatch):
     assert result["title"] == "Test Page"
 
 
-def test_detect_database_service(monkeypatch):
+def test_detect_http_service_enhanced(monkeypatch):
     scan_ports = import_scan_ports()
 
-    # Mock detect_service_banner to return Redis banner
-    def mock_detect_banner(host, port, timeout):
-        if port == 6379:
-            return "redis_version:6.0.9\r\nredis_mode:standalone\r\n"
-        return None
+    # Skip if requests is not available
+    if not scan_ports.HAS_REQUESTS:
+        pytest.skip("requests library not available")
 
-    monkeypatch.setattr(scan_ports, "detect_service_banner", mock_detect_banner)
+    # Mock requests.get
+    class MockRequestsResponse:
+        def __init__(self):
+            self.status_code = 200
+            self.headers = {"Server": "nginx/1.18.0", "Content-Type": "text/html"}
+            self.text = "<html><head><title>Enhanced Test</title></head><body>Enhanced response with vue.js</body></html>"
 
-    # Test Redis detection (port 6379)
-    redis_result = scan_ports.detect_database_service("localhost", 6379, timeout=0.1)
-    assert "Redis" in redis_result
+    monkeypatch.setattr("requests.get", lambda *a, **kw: MockRequestsResponse())
 
-    # Test default signature-based detection (other DB port)
-    pg_result = scan_ports.detect_database_service("localhost", 5432, timeout=0.1)
-    assert "PostgreSQL" in pg_result
+    # Test the method
+    result = scan_ports.detect_http_service_enhanced("localhost", 80, timeout=0.1)
+
+    assert result is not None
+    assert result["status_code"] == 200
+    assert result["server"] == "nginx/1.18.0"
+    assert result["title"] == "Enhanced Test"
+    # The framework detection depends on the implementation, don't assert exact value
+    assert result["framework"] is not None
 
 
-def test_comprehensive_service_detection(monkeypatch):
+def test_detect_database_service_enhanced(monkeypatch):
     scan_ports = import_scan_ports()
 
-    # Test SSH detection
-    def mock_detect_ssh(*args, **kwargs):
-        return "SSH-2.0-OpenSSH_8.2p1"
-
-    # Test HTTP detection
-    def mock_detect_http(*args, **kwargs):
-        return {
-            "protocol": "https",
-            "status_code": 200,
-            "server": "nginx",
-            "title": "Test Page",
-            "framework": "Django",
-            "redirect": None,
-        }
-
-    # Test database detection
-    def mock_detect_db(*args, **kwargs):
-        return "PostgreSQL 13.4"
-
-    # Test different cases
-    monkeypatch.setattr(scan_ports, "detect_ssh_service", mock_detect_ssh)
-    monkeypatch.setattr(scan_ports, "detect_http_service", mock_detect_http)
-    monkeypatch.setattr(scan_ports, "detect_database_service", mock_detect_db)
-
-    # Test SSH detection (port 22)
-    ssh_result = scan_ports.comprehensive_service_detection("localhost", 22)
-    assert ssh_result["service"] == "SSH"
-    assert "SSH-2.0" in ssh_result["version"]
-    assert ssh_result["confidence"] == "high"
-
-    # Test HTTP detection (port 80)
-    http_result = scan_ports.comprehensive_service_detection("localhost", 80)
-    assert http_result["service"] == "Django"
-    assert http_result["confidence"] == "high"
-
-    # Test database detection (port 5432)
-    db_result = scan_ports.comprehensive_service_detection("localhost", 5432)
-    assert "PostgreSQL" in db_result["service"]
-    assert db_result["confidence"] == "medium"
-
-
-def test_detect_service_banner(monkeypatch):
-    scan_ports = import_scan_ports()
-
-    # Mock socket to simulate banner
-    class DummySock:
+    # Test Redis detection
+    class MockRedisSocket:
         def __enter__(self):
             return self
 
@@ -417,18 +357,66 @@ def test_detect_service_banner(monkeypatch):
             pass
 
         def recv(self, n):
-            return b"HTTP/1.1 200 OK\r\nServer: Dummy\r\n\r\n"
+            return b"redis_version:6.0.9\r\nredis_mode:standalone\r\n"
 
-    # Mock network_utils.detect_service_banner
-    def mock_detect_banner(host, port):
-        return "HTTP/1.1 200 OK\r\nServer: Dummy\r\n\r\n"
+    monkeypatch.setattr("socket.socket", lambda *a, **kw: MockRedisSocket())
 
-    monkeypatch.setattr(
-        scan_ports.network_utils, "detect_service_banner", mock_detect_banner
+    # Test Redis detection (port 6379)
+    redis_result = scan_ports.detect_database_service_enhanced(
+        "localhost", 6379, timeout=0.1
     )
+    assert "Redis" in redis_result
 
-    banner = scan_ports.detect_service_banner("localhost", 80, 1)
-    assert "HTTP/1.1" in banner
+    # Test default signature-based detection (other DB port)
+    pg_result = scan_ports.detect_database_service_enhanced(
+        "localhost", 5432, timeout=0.1
+    )
+    assert "PostgreSQL" in pg_result
+
+
+def test_comprehensive_service_detection(monkeypatch):
+    scan_ports = import_scan_ports()
+
+    # Test SSH detection
+    def mock_detect_ssh(*args, **kwargs):
+        return "SSH-2.0-OpenSSH_8.2p1"
+
+    # Test HTTP detection
+    def mock_detect_http_enhanced(*args, **kwargs):
+        return {
+            "protocol": "https",
+            "status_code": 200,
+            "server": "nginx",
+            "title": "Test Page",
+            "framework": "Django",
+        }
+
+    # Test database detection
+    def mock_detect_db(*args, **kwargs):
+        return "PostgreSQL 13.4"
+
+    # Test different cases
+    monkeypatch.setattr(scan_ports, "detect_ssh_service", mock_detect_ssh)
+    monkeypatch.setattr(
+        scan_ports, "detect_http_service_enhanced", mock_detect_http_enhanced
+    )
+    monkeypatch.setattr(scan_ports, "detect_database_service_enhanced", mock_detect_db)
+
+    # Test SSH detection (port 22)
+    ssh_result = scan_ports.comprehensive_service_detection("localhost", 22)
+    assert ssh_result["service"] == "SSH"
+    assert "SSH-2.0" in ssh_result["version"]
+    assert ssh_result["confidence"] == "high"
+
+    # Test HTTP detection (port 80)
+    http_result = scan_ports.comprehensive_service_detection("localhost", 80)
+    assert http_result["service"] == "Django"
+    assert http_result["confidence"] == "high"
+
+    # Test database detection (port 5432)
+    db_result = scan_ports.comprehensive_service_detection("localhost", 5432)
+    assert db_result["service"] == "PostgreSQL 13.4"
+    assert db_result["confidence"] == "medium"
 
 
 def test_print_scan_results_rich(monkeypatch):
@@ -502,9 +490,6 @@ def test_handle_list_scan(monkeypatch, capsys):
 
     args = Args()
 
-    # Track whether the function was called
-    called = [False]
-
     # Mock dependencies
     config = {
         "port_lists": {
@@ -517,16 +502,9 @@ def test_handle_list_scan(monkeypatch, capsys):
     }
 
     monkeypatch.setattr(scan_ports, "load_port_config", lambda: config)
-
-    # Just verify that scan_ports is called with the right ports
-    def mock_scan_ports(host, ports, max_workers):
-        called[0] = True
-        assert 80 in ports  # HTTP port
-        assert 443 in ports  # HTTPS port
-        assert 22 in ports  # SSH port
-        return {port: port == 80 for port in ports}
-
-    monkeypatch.setattr(scan_ports.network_utils, "scan_ports", mock_scan_ports)
+    monkeypatch.setattr(
+        scan_ports, "check_port", lambda host, port, timeout: port == 80
+    )
 
     # Mock comprehensive_service_detection
     def mock_detect(host, port, timeout):
@@ -542,11 +520,10 @@ def test_handle_list_scan(monkeypatch, capsys):
     # Call the function
     scan_ports.handle_list_scan(args, True)
 
-    # Verify the scan_ports function was called
-    assert called[0] is True
-
-    # Check the output
+    # Check output
     out = capsys.readouterr().out
+    assert "Scanning" in out
+    assert "80" in out
     assert "OPEN" in out
 
 
@@ -599,10 +576,9 @@ def test_handle_range_scan(monkeypatch, capsys):
     args = Args()
 
     # Mock dependencies to make ports 80 and 82 open
-    def mock_scan_ports(host, ports, max_workers):
-        return {port: port in [80, 82] for port in ports}
-
-    monkeypatch.setattr(scan_ports.network_utils, "scan_ports", mock_scan_ports)
+    monkeypatch.setattr(
+        scan_ports, "check_port", lambda host, port, timeout: port in [80, 82]
+    )
 
     # Call the function
     scan_ports.handle_range_scan(args)
@@ -624,15 +600,14 @@ def test_handle_default_scan(monkeypatch):
         host = "localhost"
         timeout = 0.1
         show_closed = False
-        threads = 5
 
     args = Args()
 
     # Mock scan_all_configured_ports to track calls
     calls = []
 
-    def mock_scan_all(host, timeout, show_closed, detect_services, threads):
-        calls.append((host, timeout, show_closed, detect_services, threads))
+    def mock_scan_all(host, timeout, show_closed, detect_services):
+        calls.append((host, timeout, show_closed, detect_services))
         return [80, 443]
 
     monkeypatch.setattr(scan_ports, "scan_all_configured_ports", mock_scan_all)
@@ -640,11 +615,11 @@ def test_handle_default_scan(monkeypatch):
     # Call the function with and without service detection
     scan_ports.handle_default_scan(args, True)
     assert len(calls) == 1
-    assert calls[0] == ("localhost", 0.1, False, True, 5)
+    assert calls[0] == ("localhost", 0.1, False, True)
 
     scan_ports.handle_default_scan(args, False)
     assert len(calls) == 2
-    assert calls[1] == ("localhost", 0.1, False, False, 5)
+    assert calls[1] == ("localhost", 0.1, False, False)
 
 
 def test_log_separator_and_blank(capsys):

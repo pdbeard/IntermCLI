@@ -13,38 +13,42 @@ from typing import Any, Dict, List, Optional
 class RichProgressAdapter:
     """Adapter for rich progress bars"""
 
-    def __init__(self, progress, task_id):
+    def __init__(self, progress: Any, task_id: Any) -> None:
         self.progress = progress
         self.task_id = task_id
 
-    def __enter__(self):
+    def __enter__(self) -> "RichProgressAdapter":
         self.progress.start()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self, exc_type: Optional[type], exc_val: Optional[Exception], exc_tb: Any
+    ) -> None:
         self.progress.stop()
 
-    def update(self, advance=1):
+    def update(self, advance: int = 1) -> None:
         self.progress.update(self.task_id, advance=advance)
 
 
 class SimpleProgressBar:
     """Simple text-based progress bar for non-rich environments"""
 
-    def __init__(self, total, description="Processing"):
+    def __init__(self, total: int, description: str = "Processing") -> None:
         self.total = total
         self.current = 0
         self.description = description
         self.width = 30
 
-    def __enter__(self):
+    def __enter__(self) -> "SimpleProgressBar":
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self, exc_type: Optional[type], exc_val: Optional[Exception], exc_tb: Any
+    ) -> None:
         sys.stdout.write("\n")
         sys.stdout.flush()
 
-    def update(self, advance=1):
+    def update(self, advance: int = 1) -> None:
         self.current += advance
         pct = min(100, int(100 * self.current / self.total))
         bar_length = int(self.width * self.current / self.total)
@@ -435,7 +439,7 @@ class Output:
             self.logger.info(f"{key}: {value}")
 
     def banner(
-        self, tool_name: str, version: str, details: Dict[str, str] = None
+        self, tool_name: str, version: str, details: Optional[Dict[str, str]] = None
     ) -> None:
         """
         Print a standard tool banner with optional rich formatting.

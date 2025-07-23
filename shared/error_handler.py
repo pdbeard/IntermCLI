@@ -16,7 +16,7 @@ that can be used for programmatic handling of errors.
 
 import sys
 from pathlib import Path
-from typing import Callable, Tuple, Union
+from typing import Any, Callable, Tuple, Union
 
 from .output import Output
 
@@ -297,7 +297,7 @@ class ErrorHandler:
             Wrapped function with error handling
         """
 
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
                 return func(*args, **kwargs)
             except Exception as e:
