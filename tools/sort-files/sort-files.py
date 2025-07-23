@@ -12,150 +12,59 @@ Example usage:
     sort-files --config ~/.config/intermcli/sort-files.toml ~/Downloads
 """
 
-
-import argparse
 import fnmatch
-import logging
 import shutil
 import sys
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
-# Optional rich support
+# Ensure shared utilities are available
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 try:
-    from rich.console import Console
-    from rich.table import Table
-    from rich.theme import Theme
+    from shared.path_utils import require_shared_utilities
 
-    HAS_RICH = True
-    console = Console(
-        theme=Theme(
-            {
-                "info": "cyan",
-                "success": "green",
-                "warning": "yellow",
-                "error": "bold red",
-            }
-        )
-    )
+    require_shared_utilities()
 except ImportError:
-    HAS_RICH = False
-    console = None
+    # If even path_utils can't be imported, provide a fallback error
+    print("Error: IntermCLI shared utilities not found.")
+    print("Please make sure the IntermCLI suite is properly installed.")
+    sys.exit(1)
 
+from shared.arg_parser import ArgumentParser
 
-# TOML support with fallback
-try:
-    import tomllib  # Python 3.11+
-except ImportError:
-    try:
-        import tomli as tomllib  # fallback for older Python
-    except ImportError:
-        tomllib = None
+# Import shared utilities
+from shared.config_loader import ConfigLoader
+from shared.enhancement_loader import EnhancementLoader
+from shared.output import Output
 
+# Version
 __version__ = "0.1.0"
+TOOL_NAME = "sort-files"
 
 
 # --- Config loading ---
-def load_config(config_path=None):
+def load_config(config_path=None) -> Dict[str, Any]:
     """
-    Load TOML config with robust fallback (user, legacy, source-tree), else return defaults.
+    Load TOML config using the shared ConfigLoader utility.
     Args:
         config_path (str or Path, optional): Path to a config file. If not provided, tries user and source-tree defaults.
     Returns:
         dict: Configuration dictionary for sorting rules and options.
     """
-    config = {
-        "rules": {"by_type": True, "by_date": False, "by_size": False, "custom": {}},
-        "type_folders": {
-            "images": [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".webp"],
-            "documents": [
-                ".pdf",
-                ".docx",
-                ".doc",
-                ".txt",
-                ".md",
-                ".odt",
-                ".rtf",
-                ".xls",
-                ".xlsx",
-                ".csv",
-            ],
-            "archives": [".zip", ".tar", ".gz", ".bz2", ".xz", ".rar", ".7z"],
-            "audio": [".mp3", ".wav", ".ogg", ".flac", ".aac", ".m4a"],
-            "video": [".mp4", ".mkv", ".mov", ".avi", ".wmv", ".webm"],
-            "code": [
-                ".py",
-                ".js",
-                ".ts",
-                ".java",
-                ".c",
-                ".cpp",
-                ".go",
-                ".rb",
-                ".php",
-                ".sh",
-                ".rs",
-            ],
-        },
-        "dry_run": False,
-        "safe": True,
-        "skip_hidden": True,
-        "skip_dirs": [],
-    }
-    script_dir = Path(__file__).parent
-    source_config_file = script_dir / "config" / "defaults.toml"
-    user_config_dir = Path.home() / ".config" / "intermcli"
-    user_config_file = user_config_dir / "sort-files.toml"
-    legacy_user_config_file = user_config_dir / "config.toml"
-
-    config_loaded = None
-    config_paths = []
+    # Use the shared ConfigLoader
+    config_loader = ConfigLoader(TOOL_NAME)
+    # Add the specific config file if provided
     if config_path:
-        config_paths.append(config_path)
-    config_paths.extend(
-        [
-            str(user_config_file),
-            str(legacy_user_config_file),
-            str(source_config_file),
-        ]
-    )
-
-    if not tomllib:
-        logging.warning("TOML support not available")
-        logging.info("Install tomli for Python < 3.11: pip3 install tomli")
-        logging.info("Using built-in defaults")
-        return config
-
-    for path in config_paths:
-        p = Path(path)
-        if p.exists():
-            try:
-                with open(p, "rb") as f:
-                    file_config = tomllib.load(f)
-                    # Merge nested sections if present
-                    if "rules" in file_config:
-                        config["rules"].update(file_config["rules"])
-                    if "type_folders" in file_config:
-                        config["type_folders"].update(file_config["type_folders"])
-                    # Top-level options
-                    for key in ("dry_run", "safe", "skip_hidden", "skip_dirs"):
-                        if key in file_config:
-                            config[key] = file_config[key]
-                config_loaded = str(p)
-            except Exception as e:
-                logging.warning(f"Could not load config: {path}: {e}")
-            break  # Use the first config found
-
-    if config_loaded:
-        logging.info(f"Loaded config: {config_loaded}")
-    else:
-        logging.info("Using built-in defaults (no config file found)")
+        config_loader.add_config_file(config_path)
+    # Load the configuration with proper precedence
+    config = config_loader.load_config()
     return config
 
 
 # --- Core logic ---
-def get_file_type(file: Path, type_folders: dict) -> str:
+def get_file_type(file: Path, type_folders: Dict[str, List[str]]) -> str:
     """
     Determine the file type category for a given file based on its extension.
     Args:
@@ -173,7 +82,7 @@ def get_file_type(file: Path, type_folders: dict) -> str:
     return "other"
 
 
-def match_custom_rule(filename: str, custom_rules: dict) -> str | None:
+def match_custom_rule(filename: str, custom_rules: Dict[str, str]) -> Optional[str]:
     """
     Return the folder name if filename matches a custom rule pattern.
     Args:
@@ -188,16 +97,44 @@ def match_custom_rule(filename: str, custom_rules: dict) -> str | None:
     return None
 
 
+def handle_file_operation_error(
+    entry: Path, exception: Exception, output: Output
+) -> Tuple[str, str]:
+    """
+    Handle errors when moving files and return appropriate messages and skip reason.
+
+    Args:
+        entry: The file that was being moved
+        exception: The exception that was raised
+        output: Output utility for displaying messages
+
+    Returns:
+        Tuple containing (error_message, skip_reason)
+    """
+    if isinstance(exception, PermissionError):
+        msg = f"Failed to move {entry.name}: Permission denied. Try running with elevated permissions."
+        reason = "permission denied"
+    elif isinstance(exception, FileNotFoundError):
+        msg = f"Failed to move {entry.name}: File not found. It may have been moved or deleted."
+        reason = "file not found"
+    else:
+        msg = f"Failed to move {entry.name}: {exception}"
+        reason = f"error: {exception}"
+
+    output.error(msg)
+    return msg, reason
+
+
 def sort_files(
     target_dir: Path,
-    rules: dict,
-    type_folders: dict,
+    rules: Dict[str, Any],
+    type_folders: Dict[str, List[str]],
     dry_run: bool = False,
     safe: bool = True,
     skip_hidden: bool = True,
-    skip_dirs: list = [],
-    console=None,
-) -> tuple[list, list]:
+    skip_dirs: List[str] = None,
+    output: Output = None,
+) -> Tuple[List[Tuple[Path, Path]], List[Tuple[Path, str]]]:
     """
     Sort files in a directory according to rules and type folders.
     Args:
@@ -208,22 +145,20 @@ def sort_files(
         safe (bool): If True, skip files that would overwrite existing ones.
         skip_hidden (bool): If True, skip hidden files and folders.
         skip_dirs (list): List of directory names to skip.
+        output: Output utility for display
     Returns:
         tuple: (moved, skipped) lists of (entry, dest_dir) and (entry, reason).
     """
     moved = []
     skipped = []
+    skip_dirs = skip_dirs or []
     entries = list(target_dir.iterdir())
     total_files = sum(
         1
         for entry in entries
         if entry.is_file() and not (skip_hidden and entry.name.startswith("."))
     )
-    if console:
-        console.print(f"[info]Processing {total_files} files in {target_dir}...")
-    else:
-        logging.info(f"Processing {total_files} files in {target_dir}...")
-
+    output.info(f"Processing {total_files} files in {target_dir}...")
     for entry in entries:
         if entry.is_dir():
             if entry.name in skip_dirs or (skip_hidden and entry.name.startswith(".")):
@@ -268,93 +203,86 @@ def sort_files(
             continue
 
         if dry_run:
-            msg = f"[DRY RUN] Would move: {entry.name} → {dest_dir}/"
-            if console:
-                console.print(msg)
-            else:
-                logging.info(msg)
+            msg = f"Would move: {entry.name} → {dest_dir.name}/"
+            output.info(msg)
         else:
             dest_dir.mkdir(parents=True, exist_ok=True)
             try:
                 shutil.move(str(entry), str(dest))
-                msg = f"Moved: {entry.name} → {dest_dir}/"
-                if console:
-                    console.print(msg)
-                else:
-                    logging.info(msg)
                 moved.append((entry, dest_dir))
-            except PermissionError:
-                msg = f"Failed to move {entry.name}: Permission denied. Try running with elevated permissions."
-                if console:
-                    console.print(f"[error]{msg}[/error]")
-                else:
-                    logging.error(msg)
-                skipped.append((entry, "permission denied"))
-            except FileNotFoundError:
-                msg = f"Failed to move {entry.name}: File not found. It may have been moved or deleted."
-                if console:
-                    console.print(f"[error]{msg}[/error]")
-                else:
-                    logging.error(msg)
-                skipped.append((entry, "file not found"))
             except Exception as e:
-                msg = f"Failed to move {entry.name}: {e}"
-                if console:
-                    console.print(f"[error]{msg}[/error]")
-                else:
-                    logging.error(msg)
-                skipped.append((entry, f"error: {e}"))
+                _, reason = handle_file_operation_error(entry, e, output)
+                skipped.append((entry, reason))
     return moved, skipped
+
+
+# --- Dependency checking ---
+def check_dependencies():
+    """Check status of optional dependencies"""
+    enhancer = EnhancementLoader(TOOL_NAME)
+    enhancer.check_dependency("rich", "Rich output formatting")
+    enhancer.check_dependency("tomllib", "TOML configuration support")
+    enhancer.check_dependency("tomli", "TOML support for Python < 3.11")
+    enhancer.print_status()
 
 
 # --- CLI ---
 def main():
     """
     CLI entry point for sort-files. Parses arguments, loads config, and runs sorting logic.
-    Uses rich for output if available, otherwise falls back to logging.
+    Uses shared utilities for configuration, output, and enhancement detection.
     """
-    parser = argparse.ArgumentParser(
+    # Use the shared ArgumentParser
+    arg_parser = ArgumentParser(
+        tool_name=TOOL_NAME,
         description="Organize files in a directory by type, date, size, or custom rules.",
         epilog="Example: sort-files --by type ~/Downloads",
+        version=__version__,
     )
-    parser.add_argument(
+
+    # Add tool-specific arguments
+    arg_parser.parser.add_argument(
         "directory",
         nargs="?",
         default=".",
         help="Directory to organize (default: current)",
     )
-    parser.add_argument(
+    arg_parser.parser.add_argument(
         "--by",
         choices=["type", "date", "size"],
         default="type",
-        help="Sort files by this rule",
+        help="How to organize files (default: type)",
     )
-    parser.add_argument(
+    arg_parser.parser.add_argument("--config", help="Path to configuration file")
+    arg_parser.parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Show what would be moved, but don't move files",
+        help="Show what would be done, without moving files",
     )
-    parser.add_argument("--config", help="Path to TOML config file")
-    parser.add_argument(
+    arg_parser.parser.add_argument(
         "--unsafe", action="store_true", help="Allow overwriting files in destination"
     )
-    parser.add_argument(
+    arg_parser.parser.add_argument(
         "--show-skipped", action="store_true", help="Show skipped files"
     )
-    parser.add_argument(
-        "--version", action="version", version=f"sort-files {__version__}"
+    arg_parser.parser.add_argument(
+        "--check-deps", action="store_true", help="Check optional dependency status"
     )
 
-    args = parser.parse_args()
+    args = arg_parser.parser.parse_args()
 
-    # Set up logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)],
-    )
+    # Check dependencies if requested
+    if args.check_deps:
+        check_dependencies()
+        return
 
+    # Initialize output handling using shared Output
+    output = Output(TOOL_NAME, verbose=False)
+
+    # Load configuration
     config = load_config(args.config)
+
+    # Override with command line arguments
     config["rules"] = {
         "by_type": args.by == "type",
         "by_date": args.by == "date",
@@ -366,39 +294,41 @@ def main():
 
     target_dir = Path(args.directory).expanduser().resolve()
     if not target_dir.exists() or not target_dir.is_dir():
-        if HAS_RICH:
-            console.print(f"[error]Directory does not exist: {target_dir}[/error]")
-        else:
-            logging.error(f"Directory does not exist: {target_dir}")
+        output.error(f"Directory does not exist: {target_dir}")
         sys.exit(1)
 
-    # Header
-    if HAS_RICH:
-        console.print(f"[info]🗃️  sort-files {__version__}")
-        console.print(f"[info]Target:[/] {target_dir}")
-        if config["rules"]["by_type"]:
-            rule = "type"
-        elif config["rules"]["by_date"]:
-            rule = "date"
-        elif config["rules"]["by_size"]:
-            rule = "size"
-        else:
-            rule = "custom/other"
-        console.print(f"[info]Rule:[/] {rule}")
-        console.print(f"[info]Dry run:[/] {'ON' if config['dry_run'] else 'OFF'}\n")
+    # Determine rule type
+    if config["rules"]["by_type"]:
+        rule = "type"
+    elif config["rules"]["by_date"]:
+        rule = "date"
+    elif config["rules"]["by_size"]:
+        rule = "size"
     else:
-        logging.info(f"🗃️  sort-files {__version__}")
-        logging.info(f"Target: {target_dir}")
-        if config["rules"]["by_type"]:
-            rule = "type"
-        elif config["rules"]["by_date"]:
-            rule = "date"
-        elif config["rules"]["by_size"]:
-            rule = "size"
-        else:
-            rule = "custom/other"
-        logging.info(f"Rule: {rule}")
-        logging.info(f"Dry run: {'ON' if config['dry_run'] else 'OFF'}\n")
+        rule = "custom/other"
+
+    # Header display
+    output.banner(
+        TOOL_NAME,
+        __version__,
+        {
+            "Target": str(target_dir),
+            "Rule": rule,
+            "Dry run": "ON" if config["dry_run"] else "OFF",
+        },
+    )
+
+    # Count the files that will be processed
+    entries = list(target_dir.iterdir())
+    total_files = sum(
+        1
+        for entry in entries
+        if entry.is_file()
+        and not (config.get("skip_hidden", True) and entry.name.startswith("."))
+    )
+
+    # Start sorting task
+    output.task_start("Sorting files", f"{total_files} files in {target_dir}")
 
     moved, skipped = sort_files(
         target_dir,
@@ -408,7 +338,7 @@ def main():
         safe=config["safe"],
         skip_hidden=config.get("skip_hidden", True),
         skip_dirs=config.get("skip_dirs", []),
-        console=console if HAS_RICH else None,
+        output=output,
     )
 
     # --- Summary Table ---
@@ -416,31 +346,26 @@ def main():
     for entry, dest_dir in moved:
         folder_counts[str(dest_dir.name)] += 1
 
-    if HAS_RICH:
-        console.print(f"\n[success]✅ Done. {len(moved)} files moved.")
-        if folder_counts:
-            table = Table(
-                title="Summary", show_header=True, header_style="bold magenta"
+    # Complete sorting task
+    output.task_complete("Sorting files", f"{len(moved)} files moved")
+
+    if folder_counts:
+        output.header("Summary")
+        if output.rich_console:
+            table = output.create_table(
+                title="Files by Category", headers=["Folder", "Files"]
             )
-            table.add_column("Folder", style="cyan")
-            table.add_column("Files", style="green")
             for folder, count in sorted(folder_counts.items()):
                 table.add_row(folder, str(count))
-            console.print(table)
-        if (args.show_skipped or config["dry_run"]) and skipped:
-            console.print("\n[warning]Skipped files:")
-            for entry, reason in skipped:
-                console.print(f"  [yellow]{entry.name}[/yellow]: {reason}")
-    else:
-        logging.info(f"\n✅ Done. {len(moved)} files moved.")
-        if folder_counts:
-            logging.info("\nSummary:")
+            output.print_table(table)
+        else:
             for folder, count in sorted(folder_counts.items()):
-                logging.info(f"  {folder:<15}: {count} file{'s' if count != 1 else ''}")
-        if (args.show_skipped or config["dry_run"]) and skipped:
-            logging.info("\nSkipped files:")
-            for entry, reason in skipped:
-                logging.info(f"  {entry.name}: {reason}")
+                output.item(folder, f"{count} file{'s' if count != 1 else ''}")
+
+    if (args.show_skipped or config["dry_run"]) and skipped:
+        output.subheader("Skipped Files")
+        for entry, reason in skipped:
+            output.warning(f"{entry.name}: {reason}")
 
 
 if __name__ == "__main__":

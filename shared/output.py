@@ -8,6 +8,51 @@ import os
 import sys
 from typing import Any, Dict, List, Optional
 
+
+# Define progress bar adapter classes
+class RichProgressAdapter:
+    """Adapter for rich progress bars"""
+
+    def __init__(self, progress, task_id):
+        self.progress = progress
+        self.task_id = task_id
+
+    def __enter__(self):
+        self.progress.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.progress.stop()
+
+    def update(self, advance=1):
+        self.progress.update(self.task_id, advance=advance)
+
+
+class SimpleProgressBar:
+    """Simple text-based progress bar for non-rich environments"""
+
+    def __init__(self, total, description="Processing"):
+        self.total = total
+        self.current = 0
+        self.description = description
+        self.width = 30
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+
+    def update(self, advance=1):
+        self.current += advance
+        pct = min(100, int(100 * self.current / self.total))
+        bar_length = int(self.width * self.current / self.total)
+        bar = "[" + "#" * bar_length + " " * (self.width - bar_length) + "]"
+        sys.stdout.write(f"\r{self.description} {bar} {pct}%")
+        sys.stdout.flush()
+
+
 # Setup default logging
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
@@ -306,97 +351,110 @@ class Output:
                 self.info(f"\n{title}:")
             self.info(json.dumps(data, indent=2))
 
-
-class SimpleProgressBar:
-    """A simple progress bar fallback when rich is not available."""
-
-    def __init__(self, total: int, description: str = "Processing"):
+    def header(self, message: str) -> None:
         """
-        Initialize simple progress bar.
+        Print a header/banner with optional rich formatting.
 
         Args:
-            total: Total number of items
-            description: Progress bar description
+            message: Header message to print
         """
-        self.total = total
-        self.description = description
-        self.current = 0
-        self.bar_length = 40
+        if self.rich_console:
+            self.rich_console.print(f"\n[bold cyan]== {message} ==[/bold cyan]")
+        else:
+            self.logger.info(f"\n== {message} ==")
 
-    def update(self, n: int = 1) -> None:
+    def subheader(self, message: str) -> None:
         """
-        Update the progress bar.
+        Print a subheader with optional rich formatting.
 
         Args:
-            n: Number of steps to advance
+            message: Subheader message to print
         """
-        self.current += n
-        filled_length = int(self.bar_length * self.current / self.total)
-        bar = "█" * filled_length + "-" * (self.bar_length - filled_length)
-        percent = int(100 * self.current / self.total)
-        sys.stdout.write(
-            f"\r{self.description}: |{bar}| {percent}% ({self.current}/{self.total})"
-        )
-        sys.stdout.flush()
-        if self.current >= self.total:
-            sys.stdout.write("\n")
+        if self.rich_console:
+            self.rich_console.print(f"[bold]-- {message} --[/bold]")
+        else:
+            self.logger.info(f"-- {message} --")
 
-    def __enter__(self):
-        """Enter context manager."""
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Exit context manager."""
-        if self.current < self.total:
-            self.current = self.total
-            self.update(0)
-
-
-class RichProgressAdapter:
-    """Adapter for rich progress to match the simple progress bar interface."""
-
-    def __init__(self, progress: Any, task_id: Any):
+    def task_start(self, task_name: str, details: str = "") -> None:
         """
-        Initialize rich progress adapter.
+        Print a task start message with optional rich formatting.
 
         Args:
-            progress: Rich progress object
-            task_id: Task ID from rich progress
+            task_name: Name of the task
+            details: Optional additional details
         """
-        self.progress = progress
-        self.task_id = task_id
+        message = f"🔄 Starting {task_name}..."
+        if details:
+            message = f"{message} {details}"
 
-    def update(self, n: int = 1) -> None:
+        if self.rich_console:
+            self.rich_console.print(f"[info]{message}[/info]")
+        else:
+            self.logger.info(message)
+
+    def task_complete(self, task_name: str, details: str = "") -> None:
         """
-        Update the progress bar.
+        Print a task completion message with optional rich formatting.
 
         Args:
-            n: Number of steps to advance
+            task_name: Name of the task
+            details: Optional additional details
         """
-        self.progress.update(self.task_id, advance=n)
+        message = f"✅ Completed {task_name}"
+        if details:
+            message = f"{message}: {details}"
 
-    def __enter__(self):
-        """Enter context manager."""
-        self.progress.start()
-        return self
+        if self.rich_console:
+            self.rich_console.print(f"[success]{message}[/success]")
+        else:
+            self.logger.info(message)
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Exit context manager."""
-        self.progress.stop()
+    def section(self, name: str) -> None:
+        """
+        Print a section header with optional rich formatting.
 
+        Args:
+            name: Section name
+        """
+        if self.rich_console:
+            self.rich_console.print(f"\n[bold cyan]== {name} ==[/bold cyan]")
+        else:
+            self.logger.info(f"\n== {name} ==")
 
-def create_output(
-    tool_name: str, use_rich: bool = True, verbose: bool = False
-) -> Output:
-    """
-    Helper function to create an output handler.
+    def item(self, key: str, value: str) -> None:
+        """
+        Print a key-value item with optional rich formatting.
 
-    Args:
-        tool_name: Name of the tool
-        use_rich: Whether to use rich formatting if available
-        verbose: Whether to output verbose messages
+        Args:
+            key: Item key
+            value: Item value
+        """
+        if self.rich_console:
+            self.rich_console.print(f"[bold]{key}:[/bold] {value}")
+        else:
+            self.logger.info(f"{key}: {value}")
 
-    Returns:
-        Output handler
-    """
-    return Output(tool_name, use_rich, verbose)
+    def banner(
+        self, tool_name: str, version: str, details: Dict[str, str] = None
+    ) -> None:
+        """
+        Print a standard tool banner with optional rich formatting.
+
+        Args:
+            tool_name: Name of the tool
+            version: Tool version
+            details: Optional dictionary of details to include
+        """
+        if self.rich_console:
+            self.rich_console.print(f"[bold cyan]🔧 {tool_name} v{version}[/bold cyan]")
+            if details:
+                for key, value in details.items():
+                    self.rich_console.print(f"[bold]{key}:[/bold] {value}")
+        else:
+            self.logger.info(f"🔧 {tool_name} v{version}")
+            if details:
+                for key, value in details.items():
+                    self.logger.info(f"{key}: {value}")
+
+        # Add a blank line after the banner
+        self.blank()

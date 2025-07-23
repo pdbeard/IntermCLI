@@ -42,7 +42,8 @@ cd intermcli
 - [Contributing](docs/CONTRIBUTING.md): How to contribute, code style, PR workflow
 - [Configuration](docs/CONFIGURATION.md): Config file locations and examples
 - [Design Philosophy](docs/DESIGN.md): Naming conventions and project vision
-- [Shared Utilities](docs/shared-utilities.md): Common utilities for all tools
+- [Shared Utilities](docs/shared-utilities/index.md): Common utilities for all tools
+- [Output Style Guide](docs/output-style-guide.md): Guidelines for consistent output formatting
 
 ## Branching Strategy  (not yet used)
 Planned branching strategy for development and releases:

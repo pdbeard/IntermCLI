@@ -14,6 +14,8 @@ We welcome contributions—new tools, features, bug fixes, and docs!
 - Use `action-target` naming (e.g., `scan-ports`, `find-projects`)
 - Each tool should be self-contained, with its own config and README
 - Use TOML for all config files
+- Follow the [Output Style Guide](/docs/output-style-guide.md) for consistent user experience
+- Use the shared [utilities](/docs/shared-utilities/index.md) for configuration, output, argument parsing, etc.
 - Progressive enhancement: stdlib core, optional enhancements
 
 ## Testing
