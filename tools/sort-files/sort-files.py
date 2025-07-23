@@ -37,6 +37,7 @@ from shared.arg_parser import ArgumentParser
 # Import shared utilities
 from shared.config_loader import ConfigLoader
 from shared.enhancement_loader import EnhancementLoader
+from shared.error_handler import ErrorHandler
 from shared.output import Output
 
 # Version
@@ -45,11 +46,12 @@ TOOL_NAME = "sort-files"
 
 
 # --- Config loading ---
-def load_config(config_path=None) -> Dict[str, Any]:
+def load_config(config_path=None, output=None) -> Dict[str, Any]:
     """
     Load TOML config using the shared ConfigLoader utility.
     Args:
         config_path (str or Path, optional): Path to a config file. If not provided, tries user and source-tree defaults.
+        output (Output, optional): Output utility for error handling
     Returns:
         dict: Configuration dictionary for sorting rules and options.
     """
@@ -58,9 +60,21 @@ def load_config(config_path=None) -> Dict[str, Any]:
     # Add the specific config file if provided
     if config_path:
         config_loader.add_config_file(config_path)
+
     # Load the configuration with proper precedence
-    config = config_loader.load_config()
-    return config
+    try:
+        config = config_loader.load_config()
+        return config
+    except Exception as e:
+        if output:
+            error_handler = ErrorHandler(output, exit_on_critical=True)
+            msg, code = error_handler.handle_config_error(
+                config_path or "default config", e
+            )
+            # This will exit if exit_on_critical is True and the error is critical
+            error_handler.exit_if_critical(code)
+            # Otherwise return an empty config
+            return {}
 
 
 # --- Core logic ---
@@ -111,17 +125,16 @@ def handle_file_operation_error(
     Returns:
         Tuple containing (error_message, skip_reason)
     """
-    if isinstance(exception, PermissionError):
-        msg = f"Failed to move {entry.name}: Permission denied. Try running with elevated permissions."
-        reason = "permission denied"
-    elif isinstance(exception, FileNotFoundError):
-        msg = f"Failed to move {entry.name}: File not found. It may have been moved or deleted."
-        reason = "file not found"
-    else:
-        msg = f"Failed to move {entry.name}: {exception}"
-        reason = f"error: {exception}"
+    # Use the shared error handler
+    error_handler = ErrorHandler(output)
+    msg, code = error_handler.handle_file_operation(entry, exception, operation="move")
 
-    output.error(msg)
+    # Extract a simple reason code from the full error code
+    if code.startswith("file:"):
+        reason = code.split(":", 1)[1]
+    else:
+        reason = code
+
     return msg, reason
 
 
@@ -206,7 +219,20 @@ def sort_files(
             msg = f"Would move: {entry.name} → {dest_dir.name}/"
             output.info(msg)
         else:
-            dest_dir.mkdir(parents=True, exist_ok=True)
+            # Create destination directory with error handling
+            try:
+                dest_dir.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                error_handler = ErrorHandler(output)
+                msg, reason = error_handler.handle_file_operation(
+                    dest_dir, e, operation="create directory"
+                )
+                skipped.append(
+                    (entry, reason.split(":", 1)[1] if ":" in reason else reason)
+                )
+                continue
+
+            # Move the file with error handling
             try:
                 shutil.move(str(entry), str(dest))
                 moved.append((entry, dest_dir))
@@ -280,7 +306,7 @@ def main():
     output = Output(TOOL_NAME, verbose=False)
 
     # Load configuration
-    config = load_config(args.config)
+    config = load_config(args.config, output)
 
     # Override with command line arguments
     config["rules"] = {

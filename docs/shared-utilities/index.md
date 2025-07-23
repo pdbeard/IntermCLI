@@ -9,6 +9,7 @@ IntermCLI provides a set of shared utilities that can be used across all tools i
 | [Config Loader](config-loader.md) | Handles TOML configuration loading with proper precedence | `shared/config_loader.py` |
 | [Enhancement Loader](enhancement-loader.md) | Handles detection of optional dependencies | `shared/enhancement_loader.py` |
 | [Output Handler](output-handler.md) | Provides consistent output formatting | `shared/output.py` |
+| [Error Handler](error-handler.md) | Provides standardized error handling | `shared/error_handler.py` |
 | [Network Utilities](network-utils.md) | Provides common network operations | `shared/network_utils.py` |
 | [Argument Parser](argument-parser.md) | Provides consistent argument parsing | `shared/arg_parser.py` |
 | [Path Utilities](path-utils.md) | Ensures shared modules can be imported properly | `shared/path_utils.py` |

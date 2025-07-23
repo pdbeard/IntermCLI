@@ -1,0 +1,21 @@
+# Error Handler Configuration for IntermCLI tools
+# This file defines behavior settings for the shared error handler
+
+[behavior]
+exit_on_critical = false          # Whether to exit automatically on critical errors
+log_errors = true                 # Whether to log errors in addition to displaying them
+extended_messages = true          # Show extended error messages with suggestions
+
+[error_codes]
+# Define custom error messages for specific error codes
+# Format: "category:code" = "Custom message"
+"file:not_found" = "The file could not be found. Please check the path and try again."
+"network:connection_error" = "Connection failed. Please check your network connection and try again."
+
+[error_handling]
+# Define which errors are considered critical
+critical_errors = [
+    "config:not_found",
+    "dependency:not_installed",
+    "resource:memory"
+]
