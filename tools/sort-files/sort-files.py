@@ -8,6 +8,8 @@ Part of the IntermCLI suite – interactive terminal utilities for developers an
 Example usage:
     sort-files ~/Downloads
     sort-files --by date ~/Documents
+    sort-files --copy ~/Pictures
+    sort-files --recursive ~/Projects
     sort-files --dry-run --show-skipped ~/Desktop
     sort-files --config ~/.config/intermcli/sort-files.toml ~/Downloads
 """
@@ -146,6 +148,8 @@ def sort_files(
     safe: bool = True,
     skip_hidden: bool = True,
     skip_dirs: List[str] = None,
+    copy_mode: bool = False,
+    recursive: bool = False,
     output: Output = None,
 ) -> Tuple[List[Tuple[Path, Path]], List[Tuple[Path, str]]]:
     """
@@ -158,6 +162,8 @@ def sort_files(
         safe (bool): If True, skip files that would overwrite existing ones.
         skip_hidden (bool): If True, skip hidden files and folders.
         skip_dirs (list): List of directory names to skip.
+        copy_mode (bool): If True, copy files instead of moving them.
+        recursive (bool): If True, process subdirectories recursively.
         output: Output utility for display
     Returns:
         tuple: (moved, skipped) lists of (entry, dest_dir) and (entry, reason).
@@ -176,7 +182,33 @@ def sort_files(
         if entry.is_dir():
             if entry.name in skip_dirs or (skip_hidden and entry.name.startswith(".")):
                 continue
-            # Don't recurse for now (could add --recursive)
+            # Process subdirectories if recursive mode is enabled
+            if recursive:
+                # Skip folders that might be destination folders to avoid infinite recursion
+                is_destination_folder = False
+                for _, dest_dir in moved:
+                    if entry.name == dest_dir.name:
+                        is_destination_folder = True
+                        break
+
+                if is_destination_folder:
+                    continue
+
+                # Recursively process subdirectory
+                sub_moved, sub_skipped = sort_files(
+                    entry,
+                    rules,
+                    type_folders,
+                    dry_run,
+                    safe,
+                    skip_hidden,
+                    skip_dirs,
+                    copy_mode,
+                    recursive,
+                    output,
+                )
+                moved.extend(sub_moved)
+                skipped.extend(sub_skipped)
             continue
         if skip_hidden and entry.name.startswith("."):
             continue
@@ -216,7 +248,8 @@ def sort_files(
             continue
 
         if dry_run:
-            msg = f"Would move: {entry.name} → {dest_dir.name}/"
+            operation = "copy" if copy_mode else "move"
+            msg = f"Would {operation}: {entry.name} → {dest_dir.name}/"
             output.info(msg)
         else:
             # Create destination directory with error handling
@@ -232,9 +265,12 @@ def sort_files(
                 )
                 continue
 
-            # Move the file with error handling
+            # Move or copy the file based on the option
             try:
-                shutil.move(str(entry), str(dest))
+                if copy_mode:
+                    shutil.copy2(str(entry), str(dest))
+                else:
+                    shutil.move(str(entry), str(dest))
                 moved.append((entry, dest_dir))
             except Exception as e:
                 _, reason = handle_file_operation_error(entry, e, output)
@@ -286,6 +322,17 @@ def main():
         help="Show what would be done, without moving files",
     )
     arg_parser.parser.add_argument(
+        "--copy",
+        action="store_true",
+        help="Copy files instead of moving them",
+    )
+    arg_parser.parser.add_argument(
+        "--recursive",
+        "-r",
+        action="store_true",
+        help="Process subdirectories recursively",
+    )
+    arg_parser.parser.add_argument(
         "--unsafe", action="store_true", help="Allow overwriting files in destination"
     )
     arg_parser.parser.add_argument(
@@ -316,6 +363,8 @@ def main():
         "custom": config.get("rules", {}).get("custom", {}),
     }
     config["dry_run"] = args.dry_run
+    config["copy"] = args.copy
+    config["recursive"] = args.recursive
     config["safe"] = not args.unsafe
 
     target_dir = Path(args.directory).expanduser().resolve()
@@ -340,6 +389,8 @@ def main():
         {
             "Target": str(target_dir),
             "Rule": rule,
+            "Mode": "Copy" if config.get("copy", False) else "Move",
+            "Recursive": "ON" if config.get("recursive", False) else "OFF",
             "Dry run": "ON" if config["dry_run"] else "OFF",
         },
     )
@@ -365,6 +416,8 @@ def main():
         skip_hidden=config.get("skip_hidden", True),
         skip_dirs=config.get("skip_dirs", []),
         output=output,
+        copy_mode=args.copy,
+        recursive=args.recursive,
     )
 
     # --- Summary Table ---
@@ -373,7 +426,8 @@ def main():
         folder_counts[str(dest_dir.name)] += 1
 
     # Complete sorting task
-    output.task_complete("Sorting files", f"{len(moved)} files moved")
+    operation = "copied" if config.get("copy", False) else "moved"
+    output.task_complete("Sorting files", f"{len(moved)} files {operation}")
 
     if folder_counts:
         output.header("Summary")

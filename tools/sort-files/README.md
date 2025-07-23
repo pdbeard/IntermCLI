@@ -1,4 +1,3 @@
-
 ## sort-files
 
 Organize and declutter directories by automatically sorting files into subfolders based on file type, date, size, or user-defined custom rules.
@@ -8,12 +7,16 @@ Organize and declutter directories by automatically sorting files into subfolder
 ```bash
 sort-files ~/Downloads                # Sort files by type in Downloads
 sort-files --by date ~/Documents      # Sort files by date
+sort-files --copy ~/Desktop           # Copy files instead of moving them
+sort-files --recursive ~/Projects     # Process subdirectories recursively
 sort-files --dry-run --show-skipped ~/Desktop   # Preview actions, show skipped files
 sort-files --config ~/.config/intermcli/sort-files.toml ~/Downloads  # Use custom config
 ```
 
 ### Features
 - Sort by type, date, or size
+- Copy or move files (--copy flag)
+- Recursively process subdirectories (--recursive or -r)
 - Custom rules via TOML config
 - Dry run mode for preview
 - Safe by default (never overwrites files)
@@ -46,4 +49,15 @@ archives = [".zip", ".tar", ".gz"]
 - If you see "TOML support not available", install `tomli` for Python < 3.11: `pip install tomli`
 - If the config file is missing, the tool will fall back to built-in defaults.
 
----
+### Options
+
+```
+--by {type,date,size}    How to organize files (default: type)
+--config CONFIG          Path to configuration file
+--dry-run                Show what would be done without moving files
+--copy                   Copy files instead of moving them
+--recursive, -r          Process subdirectories recursively
+--unsafe                 Allow overwriting files in destination
+--show-skipped           Show skipped files
+--check-deps             Check optional dependency status
+```

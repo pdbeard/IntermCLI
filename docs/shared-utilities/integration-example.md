@@ -288,5 +288,5 @@ def check_dependencies():
 
 ## See Also
 
-- [Tool Template](../tools/tool-template.md) - Template for creating new tools
+- [CONTRIBUTING Guide](../CONTRIBUTING.md) - Guide for project contributors
 - All individual utility documentation in this directory

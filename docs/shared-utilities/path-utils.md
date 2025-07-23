@@ -118,5 +118,5 @@ from shared.arg_parser import ArgumentParser
 
 ## See Also
 
-- [Tool Template](../tools/tool-template.md) - Template for creating new tools
+- [CONTRIBUTING Guide](../CONTRIBUTING.md) - Guide for project contributors
 - [CONTRIBUTING.md](../CONTRIBUTING.md) - Guidelines for contributing to IntermCLI

@@ -7,6 +7,9 @@ Part of the IntermCLI suite – interactive terminal utilities for developers an
 Example usage:
     template-tool [args]
     template-tool --option value
+    template-tool --copy source destination
+    template-tool --recursive directory
+    template-tool --dry-run --verbose
 """
 
 import sys
@@ -91,6 +94,22 @@ def main():
         help="Input to process",
     )
     arg_parser.parser.add_argument("--config", help="Path to configuration file")
+    arg_parser.parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be done without making changes",
+    )
+    arg_parser.parser.add_argument(
+        "--copy",
+        action="store_true",
+        help="Copy files instead of moving them",
+    )
+    arg_parser.parser.add_argument(
+        "--recursive",
+        "-r",
+        action="store_true",
+        help="Process subdirectories recursively",
+    )
     arg_parser.parser.add_argument(
         "--check-deps", action="store_true", help="Check optional dependency status"
     )
