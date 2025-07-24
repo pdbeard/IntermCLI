@@ -241,7 +241,7 @@ class TestSetupToolOutput(unittest.TestCase):
         """Test setup with custom output directory."""
         mock_expanduser.return_value = "/mock/output/dir"
 
-        # output = setup_tool_output("test_tool", log_to_file=True, output_dir="~/logs")
+        _ = setup_tool_output("test_tool", log_to_file=True, output_dir="~/logs")
 
         # Check that the directory was created
         mock_makedirs.assert_called_once_with("/mock/output/dir", exist_ok=True)
