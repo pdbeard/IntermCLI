@@ -170,7 +170,13 @@ def test_setup_logging_console(tmp_path, capsys):
 def test_setup_logging_file(tmp_path):
     find_projects = import_find_projects()
     log_file = tmp_path / "test.log"
-    output = find_projects.setup_tool_output("INFO", True, str(log_file))
+    output = find_projects.setup_tool_output(
+        tool_name="find-projects",
+        log_level="INFO",
+        use_rich=True,
+        log_to_file=True,
+        log_file_path=str(log_file),
+    )
     output.info("file log")
     # Since we're using shared Output, it manages its own logger
     assert os.path.exists(log_file)
@@ -179,7 +185,11 @@ def test_setup_logging_file(tmp_path):
 def test_setup_logging_output_dir(tmp_path):
     find_projects = import_find_projects()
     output = find_projects.setup_tool_output(
-        "INFO", True, "", str(tmp_path), "testtool"
+        tool_name="testtool",
+        log_level="INFO",
+        use_rich=True,
+        log_to_file=True,
+        output_dir=str(tmp_path),
     )
     log_file = tmp_path / "testtool.log"
     output.info("dir log")
