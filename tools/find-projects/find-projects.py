@@ -12,8 +12,6 @@ Example usage:
 """
 
 # Standard library imports
-import argparse
-import logging
 import os
 import subprocess
 import sys
@@ -27,64 +25,25 @@ from typing import Any, Dict, List, NamedTuple, Optional
 # Version
 __version__ = "1.0.0"
 
-
-# === Logging Setup ===
-def setup_logging(
-    log_level: str = "INFO",
-    log_to_file: bool = False,
-    log_file_path: str = "",
-    output_dir: str = "",
-    tool_name: str = "find-projects",
-):
-    """Configure global logging for the tool, optionally to file. Uses output_dir and sets filename automatically."""
-    numeric_level = getattr(logging, log_level.upper(), logging.INFO)
-    for handler in logging.root.handlers[:]:
-        logging.root.removeHandler(handler)
-    handlers = []
-    # Always log to console
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(
-        logging.Formatter(
-            "%(asctime)s [%(levelname)s] %(message)s", "%Y-%m-%d %H:%M:%S"
-        )
-    )
-    handlers.append(console_handler)
-    # Optionally log to file (overwrite each run)
-    log_file = log_file_path
-    if log_to_file:
-        # If output_dir is set, use it for log file location
-        if output_dir:
-            output_dir_expanded = os.path.expanduser(output_dir)
-            os.makedirs(output_dir_expanded, exist_ok=True)
-            log_file = os.path.join(output_dir_expanded, f"{tool_name}.log")
-            print(f"[DIAG] Attempting to save log file to: {log_file}")
-        elif log_file_path:
-            log_file = os.path.expanduser(log_file_path)
-            print(f"[DIAG] Attempting to save log file to: {log_file}")
-        else:
-            log_file = os.path.expanduser(f"~/{tool_name}.log")
-            print(f"[DIAG] Attempting to save log file to: {log_file}")
-        file_handler = logging.FileHandler(log_file, mode="w")
-        file_handler.setFormatter(
-            logging.Formatter(
-                "%(asctime)s [%(levelname)s] %(message)s", "%Y-%m-%d %H:%M:%S"
-            )
-        )
-        handlers.append(file_handler)
-    logging.basicConfig(level=numeric_level, handlers=handlers, force=True)
-    logger = logging.getLogger()
-    logger.setLevel(numeric_level)
-    return logger
-
-
-# TOML support with fallback
+# Ensure shared utilities are available
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 try:
-    import tomllib  # Python 3.11+
+    from shared.path_utils import require_shared_utilities
+
+    require_shared_utilities()
 except ImportError:
-    try:
-        import tomli as tomllib  # fallback for older Python
-    except ImportError:
-        tomllib = None
+    # If even path_utils can't be imported, provide a fallback error
+    print("Error: IntermCLI shared utilities not found.")
+    print("Please make sure the IntermCLI suite is properly installed.")
+    sys.exit(1)
+
+# Import shared utilities
+from shared.arg_parser import ArgumentParser
+from shared.config_loader import ConfigLoader
+from shared.error_handler import ErrorHandler
+from shared.output import Output, setup_tool_output
+
+# We'll use the shared ConfigLoader which already handles TOML dependencies
 
 
 @dataclass
@@ -219,19 +178,15 @@ class LoadedConfig(NamedTuple):
 
 
 class ConfigManager:
-    """Configuration management"""
+    """Configuration management using shared ConfigLoader"""
 
-    def __init__(self):
+    def __init__(self, output: Output):
         self.validator = SecurityValidator()
+        self.output = output
+        self.config_loader = ConfigLoader("find-projects", output.logger)
 
     def load_config(self) -> LoadedConfig:
-        """Load configuration with hierarchical precedence and fallback, always checking [logging] section."""
-        script_dir = Path(__file__).parent
-        source_config_file = script_dir / "config" / "defaults.toml"
-        user_config_dir = Path.home() / ".config" / "intermcli"
-        user_config_file = user_config_dir / "find-projects.toml"
-        legacy_user_config_file = user_config_dir / "config.toml"
-
+        """Load configuration with hierarchical precedence using shared ConfigLoader"""
         # Platform-aware defaults
         home = Path.home()
         default_dirs = [
@@ -243,7 +198,8 @@ class ConfigManager:
             str(home / "git"),
         ]
 
-        config_dict = {
+        # Set default configuration
+        default_config = {
             "development_dirs": default_dirs,
             "default_editor": "vim",
             "max_scan_depth": 3,
@@ -256,66 +212,27 @@ class ConfigManager:
                 "__pycache__",
                 ".pytest_cache",
             ],
+            "max_projects": 1000,
+            "max_query_length": 1000,
+            "scan_timeout": 30,
+            "allowed_editors": ["code", "vim", "nvim", "subl", "atom"],
+            # Ensure all required fields from Config dataclass are included in defaults
             **self.validator.SECURE_DEFAULTS,
         }
 
-        # Try user config first, then legacy, then source-tree config
-        config_loaded = None
-        loaded_toml = None
-        global_toml = None
-        # Load global/root config if available
-        root_global_config = (
-            Path(__file__).parent.parent.parent / "config" / "defaults.toml"
-        )
-        if tomllib and root_global_config.exists():
-            global_toml = self._load_toml_config(root_global_config)
-        if tomllib:
-            if user_config_file.exists():
-                loaded_toml = self._load_toml_config(user_config_file)
-                config_dict.update(loaded_toml)
-                config_loaded = str(user_config_file)
-                print(f"[DIAG] Picked up config file: {user_config_file}")
-            elif legacy_user_config_file.exists():
-                loaded_toml = self._load_toml_config(legacy_user_config_file)
-                config_dict.update(loaded_toml)
-                config_loaded = str(legacy_user_config_file)
-                print(f"[DIAG] Picked up legacy config file: {legacy_user_config_file}")
-            elif source_config_file.exists():
-                loaded_toml = self._load_toml_config(source_config_file)
-                config_dict.update(loaded_toml)
-                config_loaded = str(source_config_file)
-                print(f"[DIAG] Picked up source config file: {source_config_file}")
-            else:
-                print("[DIAG] No config file found, using built-in defaults.")
+        # Load configuration through shared ConfigLoader
+        self.config_loader.config = default_config  # Set defaults
+        config_dict = self.config_loader.load_config()
 
-        # Always check [logging] section from loaded TOML, fallback to global/root config if missing
-        output_dir = ""
-        log_level = os.environ.get("FIND_PROJECTS_LOGLEVEL", "INFO")
+        # Get logging configuration
+        log_level = config_dict.get(
+            "log_level", os.environ.get("FIND_PROJECTS_LOGLEVEL", "INFO")
+        )
         log_to_file = config_dict.get("log_to_file", False)
         log_file_path = config_dict.get("log_file_path", "")
-        if loaded_toml and "logging" in loaded_toml:
-            logging_cfg = loaded_toml["logging"]
-            print(f"[DIAG] Found [logging] section in config: {logging_cfg}")
-            log_to_file = logging_cfg.get("log_to_file", log_to_file)
-            log_level = logging_cfg.get("log_level", log_level)
-            output_dir = logging_cfg.get("output_dir", "")
-            log_file_path = logging_cfg.get("log_file_path", log_file_path)
-        elif global_toml and "logging" in global_toml:
-            logging_cfg = global_toml["logging"]
-            print(f"[DIAG] Found [logging] section in global config: {logging_cfg}")
-            log_to_file = logging_cfg.get("log_to_file", log_to_file)
-            log_level = logging_cfg.get("log_level", log_level)
-            output_dir = logging_cfg.get("output_dir", "")
-            log_file_path = logging_cfg.get("log_file_path", log_file_path)
-        else:
-            print("[DIAG] No [logging] section found in config or global config.")
+        output_dir = config_dict.get("output_dir", "")
 
-        # Print out the actual logging config values being used
-        print(
-            f"[DIAG] Logging config values: log_to_file={log_to_file}, log_level={log_level}, output_dir={output_dir}, log_file_path={log_file_path}"
-        )
-
-        # Environment variable overrides
+        # Apply environment overrides
         self._apply_env_overrides(config_dict)
 
         # Validate and filter
@@ -332,11 +249,19 @@ class ConfigManager:
             k: v for k, v in config_dict.items() if k in config_fields
         }
 
-        # Optionally print which config was loaded
-        if config_loaded:
-            logging.info(f"Loaded config: {config_loaded}")
-        else:
-            logging.info("Using built-in defaults (no config file found)")
+        # Ensure all required fields have default values
+        filtered_config_dict.setdefault("development_dirs", default_dirs)
+        filtered_config_dict.setdefault("default_editor", "vim")
+        filtered_config_dict.setdefault("max_scan_depth", 3)
+        filtered_config_dict.setdefault(
+            "skip_dirs", self.validator.SECURE_DEFAULTS["skip_dirs"]
+        )
+        filtered_config_dict.setdefault("max_projects", 1000)
+        filtered_config_dict.setdefault("max_query_length", 1000)
+        filtered_config_dict.setdefault("scan_timeout", 30)
+        filtered_config_dict.setdefault(
+            "allowed_editors", ["code", "vim", "nvim", "subl", "atom"]
+        )
 
         # Return LoadedConfig object
         return LoadedConfig(
@@ -350,20 +275,6 @@ class ConfigManager:
             log_file_path=log_file_path,
             output_dir=output_dir,
         )
-
-    def _load_toml_config(self, config_file: Path) -> Dict[str, Any]:
-        """Load TOML configuration file"""
-        try:
-            with open(config_file, "rb") as f:
-                file_config = tomllib.load(f)
-                if "development_dirs" in file_config:
-                    file_config["development_dirs"] = [
-                        os.path.expanduser(d) for d in file_config["development_dirs"]
-                    ]
-                return file_config
-        except Exception as e:
-            print(f"⚠️  Warning: Could not load TOML config: {e}")
-            return {}
 
     def _apply_env_overrides(self, config_dict: Dict[str, Any]) -> None:
         """Apply environment variable overrides"""
@@ -379,7 +290,7 @@ class ConfigManager:
         """Filter to existing directories"""
         existing_dirs = [d for d in dirs if os.path.exists(d)]
         if not existing_dirs:
-            print("⚠️  Warning: No configured development directories exist")
+            self.output.warning("No configured development directories exist")
         return existing_dirs
 
     def _validate_editor(self, editor: str) -> str:
@@ -387,7 +298,7 @@ class ConfigManager:
         try:
             return self.validator.validate_editor_command(editor)
         except ValueError as e:
-            print(f"⚠️  {e}, using 'code' as fallback")
+            self.output.warning(f"{e}, using 'code' as fallback")
             return "code"
 
 
@@ -456,33 +367,34 @@ class ProjectDetector:
 class ProjectScanner:
     """Scans directories for development projects"""
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, output: Output):
         self.config = config
         self.detector = ProjectDetector()
         self.validator = SecurityValidator()
         self.rate_limiter = RateLimiter()
+        self.output = output
 
     def find_git_projects(self) -> List[Project]:
         """Find all git repositories in configured directories"""
         projects = []
 
-        logging.info("Scanning directories:")
+        self.output.info("Scanning directories:")
         for dev_dir in self.config.development_dirs:
             projects.extend(self._scan_directory(dev_dir))
 
         # Sort by last modified (newest first)
         projects.sort(key=lambda x: x.last_modified, reverse=True)
-        logging.info(f"Total projects found: {len(projects)}")
+        self.output.info(f"Total projects found: {len(projects)}")
         return projects
 
     def _scan_directory(self, dev_dir: str) -> List[Project]:
         """Scan a single directory for projects"""
-        logging.info(f"Checking: {dev_dir}")
+        self.output.info(f"Checking: {dev_dir}")
         if not os.path.exists(dev_dir):
-            logging.error("Directory doesn't exist")
+            self.output.error("Directory doesn't exist")
             return []
 
-        logging.info("Directory exists, scanning...")
+        self.output.info("Directory exists, scanning...")
         projects = []
         project_count = 0
 
@@ -512,9 +424,9 @@ class ProjectScanner:
                         dirs.clear()  # Don't recurse into git repositories
 
         except Exception as e:
-            logging.error(f"Error scanning {dev_dir}: {e}")
+            self.output.error(f"Error scanning {dev_dir}: {e}")
 
-        logging.info(f"Found {project_count} projects in this directory")
+        self.output.info(f"Found {project_count} projects in this directory")
         return projects
 
     def _filter_unsafe_symlinks(self, root: str, dirs: List[str]) -> None:
@@ -525,7 +437,7 @@ class ProjectScanner:
                 if not self.validator.is_safe_symlink(
                     dir_path, self.config.development_dirs
                 ):
-                    logging.warning(f"Skipping unsafe symlink: {dir_path}")
+                    self.output.warning(f"Skipping unsafe symlink: {dir_path}")
                     dirs.remove(d)
 
     def _check_depth_limit(self, root: str, dev_dir: str) -> bool:
@@ -538,7 +450,9 @@ class ProjectScanner:
         if not self.validator.validate_project_path(
             project_path, self.config.development_dirs
         ):
-            logging.warning(f"Skipping project outside allowed dirs: {project_path}")
+            self.output.warning(
+                f"Skipping project outside allowed dirs: {project_path}"
+            )
             return None
 
         project_name = os.path.basename(project_path)
@@ -551,7 +465,7 @@ class ProjectScanner:
 
         project_type = self.detector.detect_project_type(project_path)
 
-        logging.info(f"Found: {project_name} at {relative_path}")
+        self.output.info(f"Found: {project_name} at {relative_path}")
 
         return Project(
             name=project_name,
@@ -686,16 +600,19 @@ class ProjectGrouper:
 class ProjectOpener:
     """Handles opening projects in editors"""
 
-    @staticmethod
+    def __init__(self, output: Output):
+        self.output = output
+        self.error_handler = ErrorHandler(output)
+
     def open_project(
-        project_path: str, project_name: str, editor: str = "code"
+        self, project_path: str, project_name: str, editor: str = "code"
     ) -> bool:
         """Open project in specified editor"""
         try:
             original_cwd = os.getcwd()
             os.chdir(project_path)
 
-            print(f"🚀 Opening {project_name} in {editor}...")
+            self.output.info(f"Opening {project_name} in {editor}...")
 
             result = subprocess.run(
                 [editor, "."], check=False, capture_output=False, text=True
@@ -704,26 +621,27 @@ class ProjectOpener:
             os.chdir(original_cwd)
 
             if result.returncode == 0:
-                print(f"✅ Opened {project_name} in {editor}")
-                print(f"CD_TO:{project_path}")
+                self.output.success(f"Opened {project_name} in {editor}")
+                self.output.info(f"CD_TO:{project_path}")
                 return True
             else:
-                print(f"❌ Editor exited with code {result.returncode}")
+                self.output.error(f"Editor exited with code {result.returncode}")
                 return False
 
         except FileNotFoundError:
-            print(f"❌ Editor '{editor}' not found in PATH")
+            self.output.error(f"Editor '{editor}' not found in PATH")
             return False
         except Exception as e:
-            print(f"❌ Error opening project: {e}")
+            self.error_handler.handle_error(e, f"Error opening project {project_name}")
             return False
 
 
 class UIRenderer:
     """User interface rendering"""
 
-    def __init__(self, detector: ProjectDetector):
+    def __init__(self, detector: ProjectDetector, output: Output = None):
         self.detector = detector
+        self.output = output
 
     def display_projects(
         self,
@@ -797,17 +715,19 @@ class UIRenderer:
 class FindProjectsApp:
     """Main application class"""
 
-    def __init__(self):
-        self.config_manager = ConfigManager()
+    def __init__(self, output: Output):
+        self.output = output
+        self.error_handler = ErrorHandler(self.output)
+        self.config_manager = ConfigManager(self.output)
         self.input_handler = InputHandler()
         self.search_engine = SearchEngine()
         self.grouper = ProjectGrouper()
-        self.opener = ProjectOpener()
+        self.opener = ProjectOpener(self.output)
         self.detector = ProjectDetector()
-        self.renderer = UIRenderer(self.detector)
+        self.renderer = UIRenderer(self.detector, self.output)
 
         self.config = self.config_manager.load_config()
-        self.scanner = ProjectScanner(self.config)
+        self.scanner = ProjectScanner(self.config, self.output)
 
         # Add instance variables for state
         self.group_by_type = False
@@ -815,7 +735,7 @@ class FindProjectsApp:
 
     def run(self, args) -> None:
         """Main application entry point"""
-        if args.config:
+        if hasattr(args, "config") and args.config:
             self._debug_config()
             return
 
@@ -831,20 +751,26 @@ class FindProjectsApp:
         """Print configuration debug information"""
         import platform
 
-        print(f"🖥️  Platform: {platform.system()} ({platform.machine()})")
-        print(f"🔧 Development directories: {self.config.development_dirs}")
-        print(f"📝 Default editor: {self.config.default_editor}")
-        print(f"🔍 Max scan depth: {self.config.max_scan_depth}")
-        print(f"🚫 Skip directories: {self.config.skip_dirs}")
-        print(f"📋 TOML support: {'✅ Available' if tomllib else '❌ Missing'}")
+        self.output.info(f"Platform: {platform.system()} ({platform.machine()})")
+        self.output.info(f"Development directories: {self.config.development_dirs}")
+        self.output.info(f"Default editor: {self.config.default_editor}")
+        self.output.info(f"Max scan depth: {self.config.max_scan_depth}")
+        self.output.info(f"Skip directories: {self.config.skip_dirs}")
+
+        # Get TOML support status from the ConfigLoader
+        self.output.info(
+            f"TOML support: {'Available' if self.config_manager.config_loader.has_toml else 'Missing'}"
+        )
 
     def _show_no_projects_message(self) -> None:
         """Show message when no projects found"""
-        print("\n❌ No git repositories found")
-        print("\nTip: Make sure you have git repositories in one of these directories:")
+        self.output.warning("\nNo git repositories found")
+        self.output.info(
+            "\nTip: Make sure you have git repositories in one of these directories:"
+        )
         for dev_dir in self.config.development_dirs:
-            print(f"  - {dev_dir}")
-        print(
+            self.output.info(f"  - {dev_dir}")
+        self.output.info(
             "\nOr set FIND_PROJECTS_DIRS environment variable to specify custom directories."
         )
 
@@ -876,7 +802,7 @@ class FindProjectsApp:
                 # In main mode, Ctrl+C immediately quits
                 break
 
-        print("\n👋 Goodbye!")
+        self.output.info("\nGoodbye!")
 
     def _find_next_selectable(self, projects: List[Project], current_index: int) -> int:
         """Find next selectable project (skip headers)"""
@@ -897,7 +823,7 @@ class FindProjectsApp:
             return False
         elif char == "t":
             self.group_by_type = not self.group_by_type
-            print(f"Debug: Toggled group_by_type to {self.group_by_type}")  # Debug line
+            self.output.debug(f"Toggled group_by_type to {self.group_by_type}")
         elif char == "/":
             self._handle_search_mode(all_projects)
         elif ord(char) == 13:  # Enter
@@ -979,7 +905,8 @@ class FindProjectsApp:
                 elif ord(char) == 13:  # Enter
                     if filtered and search_selected < len(filtered):
                         project = filtered[search_selected]
-                        self.opener.open_project(
+                        opener = ProjectOpener(self.output)
+                        opener.open_project(
                             project.path, project.name, self.config.default_editor
                         )
                         break
@@ -990,7 +917,8 @@ class FindProjectsApp:
                     num = int(char)
                     if 1 <= num <= min(15, len(filtered)):
                         project = filtered[num - 1]
-                        self.opener.open_project(
+                        opener = ProjectOpener(self.output)
+                        opener.open_project(
                             project.path, project.name, self.config.default_editor
                         )
                         break
@@ -1010,9 +938,9 @@ class FindProjectsApp:
             and not projects[self.selected_index].is_header
         ):
             project = projects[self.selected_index]
-            self.opener.open_project(
-                project.path, project.name, self.config.default_editor
-            )
+            # Create opener with output handler
+            opener = ProjectOpener(self.output)
+            opener.open_project(project.path, project.name, self.config.default_editor)
 
     def _handle_arrow_keys(self, projects: List[Project]) -> None:
         """Handle arrow key navigation"""
@@ -1059,16 +987,15 @@ class FindProjectsApp:
         ]
         if 1 <= num <= len(visible_projects):
             project_index, project = visible_projects[num - 1]
-            self.opener.open_project(
-                project.path, project.name, self.config.default_editor
-            )
+            opener = ProjectOpener(self.output)
+            opener.open_project(project.path, project.name, self.config.default_editor)
 
 
-def create_argument_parser() -> argparse.ArgumentParser:
+def create_argument_parser() -> ArgumentParser:
     """Create and configure argument parser"""
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
+        tool_name="find-projects",
         description="Interactive development project discovery and navigation with TOML configuration",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   find-projects              Interactive project browser
@@ -1083,14 +1010,31 @@ Configuration:
   Uses TOML configuration file at tools/find-projects/config/defaults.toml
   For Python < 3.11, install tomli: pip install tomli
         """,
+        version=__version__,
     )
 
-    parser.add_argument(
-        "--version", action="version", version=f"find-projects {__version__}"
+    # Add common arguments
+    parser.add_common_arguments()
+
+    # Add tool-specific arguments
+    parser.parser.add_argument(
+        "--show-config",
+        dest="config",
+        action="store_true",
+        help="Show configuration debug info",
     )
-    parser.add_argument(
-        "--config", action="store_true", help="Show configuration debug info"
+
+    # Add standard logging options
+    parser.parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        default="INFO",
+        help="Set the logging level",
     )
+    parser.parser.add_argument(
+        "--log-file", action="store_true", help="Log output to a file"
+    )
+    parser.parser.add_argument("--log-file-path", help="Specify custom log file path")
 
     return parser
 
@@ -1098,22 +1042,53 @@ Configuration:
 def main():
     """Main entry point"""
     parser = create_argument_parser()
-    args = parser.parse_args()
+    args = parser.parser.parse_args()
 
-    # Setup logging before running app
-    config_manager = ConfigManager()
+    # Create and configure output handler
+    output = Output("find-projects")
+
+    # Create config manager with output handler
+    config_manager = ConfigManager(output)
     loaded_config = config_manager.load_config()
-    setup_logging(
-        loaded_config.log_level,
-        loaded_config.log_to_file,
-        loaded_config.log_file_path,
-        loaded_config.output_dir,
-        tool_name="find-projects",
+
+    # Override logging settings from command line arguments if provided
+    log_level = (
+        args.log_level
+        if hasattr(args, "log_level") and args.log_level
+        else loaded_config.log_level
+    )
+    log_to_file = (
+        args.log_file
+        if hasattr(args, "log_file") and args.log_file
+        else loaded_config.log_to_file
+    )
+    log_file_path = (
+        args.log_file_path
+        if hasattr(args, "log_file_path") and args.log_file_path
+        else loaded_config.log_file_path
     )
 
-    app = FindProjectsApp()
+    # Configure output based on loaded config and command-line args
+    output = setup_tool_output(
+        tool_name="find-projects",
+        log_level=log_level,
+        log_to_file=log_to_file,
+        log_file_path=log_file_path,
+        output_dir=loaded_config.output_dir,
+        use_rich=not args.no_color if hasattr(args, "no_color") else True,
+    )
+
+    # Display tool banner
+    output.banner(
+        "find-projects",
+        __version__,
+        {"Description": "Interactive development project discovery and navigation"},
+    )
+
+    # Initialize app with configured output
+    app = FindProjectsApp(output)
     app.config = loaded_config.config
-    app.scanner = ProjectScanner(loaded_config.config)
+    app.scanner = ProjectScanner(loaded_config.config, output)
     app.run(args)
 
 

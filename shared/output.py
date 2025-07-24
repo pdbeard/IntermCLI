@@ -61,6 +61,60 @@ class SimpleProgressBar:
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
 
+def setup_tool_output(
+    tool_name: str,
+    log_level: str = "INFO",
+    use_rich: bool = True,
+    log_to_file: bool = False,
+    log_file_path: str = "",
+    output_dir: str = "",
+) -> "Output":
+    """
+    Configure and return an Output instance with proper logging setup.
+
+    Args:
+        tool_name: Name of the tool (used for logger name and log file name)
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        use_rich: Whether to use rich formatting if available
+        log_to_file: Whether to also log to a file
+        log_file_path: Specific path for the log file (optional)
+        output_dir: Directory to store log files (if log_to_file is True)
+
+    Returns:
+        Configured Output instance ready for use
+    """
+    # Create output instance
+    output = Output(
+        tool_name, use_rich=use_rich, verbose=(log_level.upper() == "DEBUG")
+    )
+
+    # Set the logging level directly on the logger
+    level = getattr(logging, log_level.upper(), logging.INFO)
+    output.logger.setLevel(level)
+
+    # Configure file logging if needed
+    if log_to_file:
+        if output_dir:
+            output_dir_path = os.path.expanduser(output_dir)
+            os.makedirs(output_dir_path, exist_ok=True)
+            log_file = os.path.join(output_dir_path, f"{tool_name}.log")
+        elif log_file_path:
+            log_file = os.path.expanduser(log_file_path)
+        else:
+            log_file = os.path.expanduser(f"~/{tool_name}.log")
+
+        # Add a file handler
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setFormatter(
+            logging.Formatter(
+                "[%(asctime)s] [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+            )
+        )
+        output.logger.addHandler(file_handler)
+
+    return output
+
+
 class Output:
     def __init__(self, tool_name: str, use_rich: bool = True, verbose: bool = False):
         """

@@ -40,7 +40,7 @@ from shared.arg_parser import ArgumentParser
 from shared.config_loader import ConfigLoader
 from shared.enhancement_loader import EnhancementLoader
 from shared.error_handler import ErrorHandler
-from shared.output import Output
+from shared.output import Output, setup_tool_output
 
 # Version
 __version__ = "0.1.0"
@@ -350,7 +350,19 @@ def main():
         return
 
     # Initialize output handling using shared Output
-    output = Output(TOOL_NAME, verbose=False)
+    output = setup_tool_output(
+        tool_name=TOOL_NAME,
+        log_level="INFO",
+        use_rich=True,
+        verbose=args.verbose if hasattr(args, "verbose") else False,
+    )
+
+    # Display tool banner
+    output.banner(
+        TOOL_NAME,
+        __version__,
+        {"Description": "Organize and declutter directories by sorting files"},
+    )
 
     # Load configuration
     config = load_config(args.config, output)

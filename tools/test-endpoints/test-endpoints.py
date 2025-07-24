@@ -40,7 +40,7 @@ from shared.config_loader import ConfigLoader
 from shared.enhancement_loader import EnhancementLoader
 from shared.error_handler import ErrorHandler
 from shared.network_utils import NetworkUtils
-from shared.output import Output
+from shared.output import setup_tool_output
 
 # Version
 __version__ = "0.1.0"
@@ -556,8 +556,17 @@ def check_dependencies(output=None):
 
 def main():
     # Initialize shared output utility
-    output = Output(TOOL_NAME, use_rich=True)
+    output = setup_tool_output(tool_name=TOOL_NAME, log_level="INFO", use_rich=True)
     error_handler = ErrorHandler(output)
+
+    # Display tool banner
+    output.banner(
+        TOOL_NAME,
+        __version__,
+        {
+            "Description": "Command-line API testing tool - fast, scriptable alternative to Postman"
+        },
+    )
 
     # Load configuration first
     config = load_config(output=output)

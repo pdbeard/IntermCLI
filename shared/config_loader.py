@@ -35,6 +35,7 @@ class ConfigLoader:
         self.logger = logger or self._get_default_logger()
         self.config: Dict[str, Any] = {}
         self.config_source: str = "built-in defaults"
+        self.has_toml = tomllib is not None
 
     def _get_default_logger(self) -> logging.Logger:
         """Create a basic logger if none provided."""
@@ -235,6 +236,35 @@ class ConfigLoader:
     def show_config_source(self) -> str:
         """Get the source of the loaded configuration."""
         return self.config_source
+
+    def add_config_file(self, file_path: Union[str, Path]) -> None:
+        """
+        Add a specific config file to be loaded.
+
+        Args:
+            file_path: Path to the config file to add
+        """
+        path = Path(file_path) if isinstance(file_path, str) else file_path
+        if not path.exists():
+            self.logger.warning(f"Config file not found: {path}")
+            return
+
+        try:
+            if not self.has_toml:
+                self.logger.warning(
+                    "TOML support not available, cannot load config file"
+                )
+                return
+
+            with open(path, "rb") as f:
+                file_config = tomllib.load(f)
+
+            # Update config with file values
+            self._deep_update(self.config, file_config)
+            self.config_source = str(path)
+            self.logger.debug(f"Added config from {path}")
+        except Exception as e:
+            self.logger.error(f"Error loading config from {path}: {e}")
 
 
 def load_config(

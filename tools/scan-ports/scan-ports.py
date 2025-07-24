@@ -14,7 +14,7 @@ Example usage:
     scan-ports --check-deps
 """
 
-import argparse
+import argparse  # Still needed for type annotations
 import re
 import sys
 from pathlib import Path
@@ -33,10 +33,11 @@ except ImportError:
     sys.exit(1)
 
 # Import shared utilities
+from shared.arg_parser import ArgumentParser
 from shared.config_loader import ConfigLoader
 from shared.error_handler import ErrorHandler
 from shared.network_utils import create_network_utils
-from shared.output import Output
+from shared.output import setup_tool_output
 
 # Check for optional dependencies (test compatibility)
 HAS_RICH = False
@@ -65,16 +66,26 @@ T = TypeVar("T")  # Define a generic type variable for futures
 __version__ = "0.1.0"
 TOOL_NAME = "scan-ports"
 
-# Initialize shared utilities
-output = Output(TOOL_NAME)
-error_handler = ErrorHandler(output)
-config_loader = ConfigLoader(TOOL_NAME, output.logger)
-network_utils = create_network_utils(timeout=3.0, logger=output.logger)
+# These will be initialized in main()
+output = None
+error_handler = None
+config_loader = None
+network_utils = None
 
 
 def check_optional_dependencies() -> Tuple[Dict[str, bool], List[str]]:
     """Check which optional dependencies are available"""
     global HAS_REQUESTS, HAS_URLLIB3, HAS_SSL, HAS_RICH
+
+    # Make sure network_utils is initialized
+    if network_utils is None:
+        return {
+            "requests": False,
+            "urllib3": False,
+            "ssl": False,
+            "rich": HAS_RICH,
+            "tomllib": False,
+        }, ["requests", "urllib3", "ssl", "tomllib"]
 
     # Update global flags based on network_utils
     HAS_REQUESTS = network_utils.has_requests
@@ -87,7 +98,7 @@ def check_optional_dependencies() -> Tuple[Dict[str, bool], List[str]]:
         "urllib3": HAS_URLLIB3,
         "ssl": HAS_SSL,
         "rich": HAS_RICH,
-        "tomllib": hasattr(config_loader, "load_config"),
+        "tomllib": config_loader.has_toml if config_loader else False,
     }
 
     missing = [name for name, available in deps.items() if not available]
@@ -137,31 +148,15 @@ def load_port_config() -> Dict[str, Any]:
     }
 
     try:
-        # Try to load config using the shared ConfigLoader
-        config = config_loader.load_config()
+        # Set the default configuration
+        config_loader.config = default_config
 
-        # Check if the ports.toml file exists and load it directly if needed
+        # Add the specific ports.toml file to the config loader
         if default_config_path.exists():
-            try:
-                with open(default_config_path, "rb") as f:
-                    # Use tomllib directly to maintain test compatibility
-                    try:
-                        import tomllib as toml_loader
-                    except ImportError:
-                        try:
-                            import tomli as toml_loader  # type: ignore
-                        except ImportError:
-                            toml_loader = None  # type: ignore
+            config_loader.add_config_file(default_config_path)
 
-                    if toml_loader:
-                        config_data = toml_loader.load(f)
-                        if config_data:
-                            return config_data
-            except Exception as e:
-                error_msg, error_code = error_handler.handle_config_error(
-                    "loading port configuration", e
-                )
-                output.debug(f"Error {error_code}: {error_msg}")
+        # Load configuration through shared ConfigLoader
+        config = config_loader.load_config()
 
         # If no port lists found in config, use default
         if "port_lists" not in config:
@@ -872,16 +867,36 @@ def handle_port_scan(args: argparse.Namespace, detect_services: bool) -> None:
             output.info(f"Version: {service_info['version']}")
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
+def create_argument_parser() -> ArgumentParser:
+    """Create and configure argument parser"""
+    parser = ArgumentParser(
+        tool_name=TOOL_NAME,
         description="Port scanner and service checker with TOML configuration",
-        epilog="By default, scans ALL ports defined in the TOML configuration file with service detection.",
+        epilog="""
+Examples:
+  scan-ports localhost        Scan localhost with default port list
+  scan-ports 192.168.1.1      Scan a specific IP address
+  scan-ports --list web       Scan ports from the 'web' list
+  scan-ports -p 8080          Check a specific port
+  scan-ports --show-lists     Show available port lists
+  scan-ports --check-deps     Check optional dependency status
+
+By default, scans ALL ports defined in the TOML configuration file with service detection.
+        """,
+        version=__version__,
     )
-    parser.add_argument(
-        "host", nargs="?", default="localhost", help="Host to scan (default: localhost)"
+
+    # Add common arguments
+    parser.add_common_arguments()
+
+    # Add tool-specific arguments
+    parser.add_positional_argument(
+        "host", "Host to scan (default: localhost)", nargs="?", default="localhost"
     )
-    parser.add_argument("-p", "--port", type=int, help="Check specific port")
-    parser.add_argument(
+
+    parser.add_option("port", "Check specific port", short_name="p", type=int)
+
+    parser.parser.add_argument(
         "-r",
         "--range",
         nargs=2,
@@ -889,63 +904,90 @@ def main() -> None:
         metavar=("START", "END"),
         help="Scan port range (e.g., -r 1000 2000)",
     )
-    parser.add_argument(
-        "-l",
-        "--list",
-        type=str,
-        help="Scan ports from specific lists (comma-separated, e.g., 'web,database')",
+
+    parser.add_option(
+        "list",
+        "Scan ports from specific lists (comma-separated, e.g., 'web,database')",
+        short_name="l",
     )
-    parser.add_argument(
-        "--show-lists", action="store_true", help="Show available port lists and exit"
+
+    parser.add_flag("show-lists", "Show available port lists and exit")
+
+    parser.add_flag("show-closed", "Show closed ports in output")
+
+    parser.add_flag(
+        "no-service-detection", "Disable service detection (faster scanning)"
     )
-    parser.add_argument(
-        "--show-closed", action="store_true", help="Show closed ports in output"
-    )
-    parser.add_argument(
-        "--no-service-detection",
-        action="store_true",
-        help="Disable service detection (faster scanning)",
-    )
-    parser.add_argument(
-        "--check-deps",
-        action="store_true",
-        help="Check optional dependency status and exit",
-    )
-    parser.add_argument(
-        "-t",
-        "--timeout",
-        type=float,
+
+    # Add a --show-config flag to match other tools
+    parser.add_flag("show-config", "Show configuration debug info")
+
+    parser.add_option(
+        "timeout",
+        "Connection timeout in seconds (default: 3)",
+        short_name="t",
         default=3,
-        help="Connection timeout in seconds (default: 3)",
-    )
-    parser.add_argument(
-        "--fast", action="store_true", help="Fast scan with shorter timeout"
-    )
-    parser.add_argument(
-        "--threads",
-        type=int,
-        default=50,
-        help="Number of concurrent threads (default: 50)",
-    )
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=f"scan-ports {__version__}",
-        help="Show version and exit",
+        type=float,
     )
 
-    args = parser.parse_args()
+    parser.add_flag("fast", "Fast scan with shorter timeout")
 
-    if args.check_deps:
-        print_dependency_status(verbose=True)
-        return
+    parser.add_option(
+        "threads", "Number of concurrent threads (default: 50)", default=50, type=int
+    )
 
-    if args.show_lists:
-        list_available_port_lists()
-        return
+    # Add standard logging options
+    parser.parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        default="INFO",
+        help="Set the logging level",
+    )
+    parser.parser.add_argument(
+        "--log-file", action="store_true", help="Log output to a file"
+    )
+    parser.parser.add_argument("--log-file-path", help="Specify custom log file path")
 
+    return parser
+
+
+def main() -> None:
+    # Create the argument parser and parse arguments
+    parser = create_argument_parser()
+    args = parser.parser.parse_args()
+
+    # Initialize globals
+    global output, error_handler, config_loader, network_utils
+
+    # Configure output based on arguments
+    output = setup_tool_output(
+        tool_name=TOOL_NAME,
+        log_level=args.log_level if hasattr(args, "log_level") else "INFO",
+        log_to_file=args.log_file if hasattr(args, "log_file") else False,
+        log_file_path=args.log_file_path if hasattr(args, "log_file_path") else "",
+        use_rich=not args.no_color if hasattr(args, "no_color") else True,
+    )
+
+    # Initialize other shared utilities with proper output
+    error_handler = ErrorHandler(output)
+    config_loader = ConfigLoader(TOOL_NAME, output.logger)
+    network_utils = create_network_utils(timeout=args.timeout, logger=output.logger)
+
+    # Display tool banner
+    output.banner(
+        TOOL_NAME,
+        __version__,
+        {
+            "Description": "Scan local or remote hosts for open ports and detect services"
+        },
+    )
+
+    # Apply any command-line overrides
     if args.fast:
         args.timeout = 1
+
+    # Re-initialize network_utils with the potentially adjusted timeout
+    network_utils = create_network_utils(timeout=args.timeout, logger=output.logger)
 
     detect_services = not args.no_service_detection
 
@@ -956,6 +998,25 @@ def main() -> None:
     if detect_services:
         print_dependency_status(verbose=False)
     output.blank()
+
+    # Handle special commands first
+    if args.check_deps:
+        print_dependency_status(verbose=True)
+        return
+
+    if args.show_config:
+        output.info(
+            f"TOML Support: {'Available' if config_loader.has_toml else 'Missing'}"
+        )
+        output.info(f"Service Detection Available: {HAS_REQUESTS and HAS_URLLIB3}")
+        # Show the config that will be used
+        config = load_port_config()
+        output.info(f"Number of Port Lists: {len(config.get('port_lists', {}))}")
+        return
+
+    if args.show_lists:
+        list_available_port_lists()
+        return
 
     try:
         if args.port:
