@@ -2,52 +2,29 @@
 
 IntermCLI provides a set of shared utilities that can be used across all tools in the suite. These utilities help maintain consistency, reduce code duplication, and make the codebase more maintainable.
 
-## Available Utilities
+## Overview
 
-### Config Loader (`shared/config_loader.py`)
+| Utility | Description | File |
+|---------|-------------|------|
+| Config Loader | Handles TOML configuration loading with proper precedence | `shared/config_loader.py` |
+| Enhancement Loader | Handles detection of optional dependencies | `shared/enhancement_loader.py` |
+| Output Handler | Provides consistent output formatting | `shared/output.py` |
+| Error Handler | Provides standardized error handling | `shared/error_handler.py` |
+| Network Utilities | Provides common network operations | `shared/network_utils.py` |
+| Argument Parser | Provides consistent argument parsing | `shared/arg_parser.py` |
+| Path Utilities | Ensures shared modules can be imported properly | `shared/path_utils.py` |
+| Tool Metadata | Provides consistent version and documentation handling | `shared/tool_metadata.py` |
 
-Handles TOML configuration loading with proper precedence:
+For detailed documentation and usage examples, see the [Shared Utilities Reference](./shared-utilities-reference.md).
 
-1. Command line arguments
-2. Environment variables
-3. Project-level config (`.intermcli.toml`)
-4. User tool-specific config (`~/.config/intermcli/{tool}.toml`)
-5. User global config (`~/.config/intermcli/config.toml`)
-6. Tool default config (`tools/{tool}/config/defaults.toml`)
-7. Built-in defaults
+## Integration Example
 
-**Example Usage:**
+For a complete example of using all shared utilities together, see the [Integration Example](./shared-utilities-reference.md#integration-example).
 
-```python
-from shared.config_loader import ConfigLoader
+## See Also
 
-# Initialize with tool name
-config_loader = ConfigLoader("scan-ports")
-
-# Load configuration (optionally pass command line args)
-config = config_loader.load_config()
-
-# Access configuration values (with default fallback)
-timeout = config_loader.get("common.timeout", 30)
-```
-
-### Enhancement Loader (`shared/enhancement_loader.py`)
-
-Handles detection of optional dependencies and provides consistent information about available enhancements.
-
-**Example Usage:**
-
-```python
-from shared.enhancement_loader import EnhancementLoader
-
-# Initialize with tool name
-enhancements = EnhancementLoader("scan-ports")
-
-# Check for dependencies
-has_requests = enhancements.check_dependency("requests")
-has_rich = enhancements.check_dependency("rich")
-
-# Register features that depend on these dependencies
+- [Output Style Guide](./output-style-guide.md) - Guidelines for consistent output formatting
+- [Developer Guide](./DEVELOPER-GUIDE.md) - Architecture, design principles, and contribution workflow
 enhancements.register_feature("enhanced_http", ["requests"])
 enhancements.register_feature("rich_output", ["rich"])
 
@@ -60,7 +37,7 @@ enhancements.print_status()
 
 ### Output Handler (`shared/output.py`)
 
-Provides consistent output formatting with optional rich enhancements.
+Provides consistent output formatting with optional rich enhancements. For comprehensive output styling guidelines, see [Output Style Guide](/docs/output-style-guide.md).
 
 **Example Usage:**
 
@@ -70,25 +47,47 @@ from shared.output import Output
 # Initialize with tool name
 output = Output("scan-ports")
 
+# Tool banner and configuration display
+output.banner("scan-ports", "1.0.0", {
+    "Target": "example.com",
+    "Ports": "1-1000",
+    "Timeout": "2s"
+})
+
+# Section headers
+output.header("Scan Results")
+output.subheader("Open Ports")
+
+# Task start/completion
+output.task_start("Scanning ports")
+# ... do work ...
+output.task_complete("Scanning ports", "Found 3 open ports")
+
 # Print different types of messages
 output.info("Regular information")
 output.success("Operation completed successfully")
 output.warning("Something might be wrong")
 output.error("Something went wrong")
 
+# Key-value pairs
+output.item("Host", "example.com")
+output.item("Total ports", "1000")
+output.item("Open ports", "3")
+
 # Print tables
-headers = ["Name", "Value", "Description"]
+headers = ["Port", "State", "Service"]
 rows = [
-    ["timeout", "30", "Connection timeout in seconds"],
-    ["port", "8080", "Port to scan"]
+    ["22", "open", "SSH"],
+    ["80", "open", "HTTP"],
+    ["443", "open", "HTTPS"]
 ]
 output.print_table(headers, rows)
 
 # Create progress bars
-with output.create_progress_bar(total=100) as progress:
+with output.create_progress_bar(total=100, description="Scanning") as progress:
     for i in range(100):
         # Do some work
-        progress.update()
+        progress.update(1)
 ```
 
 ### Network Utilities (`shared/network_utils.py`)

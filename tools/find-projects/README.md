@@ -1,33 +1,47 @@
 # find-projects
 
-Interactive development project discovery and navigation. Scan configured directories for git repositories, group and search projects, and open them in your preferred editor.
+Interactive development project discovery and navigation tool for efficiently finding and opening projects.
 
 ## Usage
 
 ```bash
-find-projects                # Launch interactive project browser
-find-projects --config       # Show configuration information
-find-projects --version      # Show version information
+# Launch interactive project browser
+find-projects
+
+# Display configuration information
+find-projects --config
+
+# Show version information
+find-projects --version
+
+# Search for specific project type
+find-projects --type python
 ```
 
+## Configuration
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--config` | `false` | Show configuration information and exit |
+| `--version` | `false` | Show version information and exit |
+| `--type` | None | Filter projects by type (python, js, go, etc.) |
+| `--editor` | System default | Editor to open projects with (overrides config) |
+| `--scan-only` | `false` | Scan and list projects without interactive mode |
+| `--refresh` | `false` | Force refresh of project cache |
+
+## Advanced Usage
+
+For custom directory configuration and editor integration, see the [comprehensive documentation](../docs/tools/find-projects.md).
+
 ## Features
+
 - Scans multiple directories for git repositories
 - Fuzzy search and grouping by project type
 - Open projects in your preferred editor (VS Code, Vim, etc.)
 - Configurable via TOML and environment variables
-- Secure scanning (symlink and path validation)
-- Fast, concurrent directory scanning
-
-## Configuration
-- Uses TOML config at `tools/find-projects/config/defaults.toml`
-- Override directories with `FIND_PROJECTS_DIRS` environment variable (colon-separated)
-- Set default editor with `FIND_PROJECTS_EDITOR` environment variable
-- For Python < 3.11, install `tomli` for TOML support: `pip install tomli`
-
-## Example
-```bash
-find-projects
-find-projects --config
+- Secure scanning with symlink and path validation
+- Fast concurrent directory scanning
+- Project type detection based on files and structure
 FIND_PROJECTS_DIRS=~/dev:~/src find-projects
 FIND_PROJECTS_EDITOR=nvim find-projects
 ```

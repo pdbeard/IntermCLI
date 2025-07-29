@@ -1,0 +1,17 @@
+# test-endpoints configuration file
+# HTTP API testing configuration
+
+version = "1.0"
+
+[general]
+timeout = 30                # Default request timeout in seconds
+max_redirects = 5           # Maximum number of redirects to follow
+verify_ssl = true           # Verify SSL certificates
+verbose = false             # Print detailed request/response information
+follow_redirects = true     # Automatically follow redirects
+output_format = "auto"      # "auto", "json", "yaml", "text"
+
+[default_headers]
+# Default headers to include in all requests
+"User-Agent" = "intermCLI/test-endpoints"
+"Accept" = "*/*"

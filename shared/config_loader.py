@@ -21,20 +21,23 @@ try:
     import tomllib  # Python 3.11+
 except ImportError:
     try:
-        import tomli as tomllib  # Fallback for older Python
+        import tomli as tomli_lib  # type: ignore # Fallback for older Python
+
+        tomllib = tomli_lib  # type: ignore
     except ImportError:
-        tomllib = None  # Will raise appropriate error during usage
+        tomllib = None  # type: ignore # Will raise appropriate error during usage
 
 
 class ConfigLoader:
-    def __init__(self, tool_name: str, logger=None):
+    def __init__(self, tool_name: str, logger: Optional[logging.Logger] = None) -> None:
         """Initialize config loader for a specific tool."""
         self.tool_name = tool_name
         self.logger = logger or self._get_default_logger()
         self.config: Dict[str, Any] = {}
         self.config_source: str = "built-in defaults"
+        self.has_toml = tomllib is not None
 
-    def _get_default_logger(self):
+    def _get_default_logger(self) -> logging.Logger:
         """Create a basic logger if none provided."""
         logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
         return logging.getLogger(self.tool_name)
@@ -79,6 +82,9 @@ class ConfigLoader:
         # Apply command line argument overrides if provided
         if cmd_args:
             self._apply_cmd_args(config, cmd_args)
+
+        # Perform final path expansions for any top-level path items we may have missed
+        self._expand_path_values(config)
 
         self.config = config
         return config
@@ -148,6 +154,22 @@ class ConfigLoader:
             ):
                 self._deep_update(base_config[key], value)
             else:
+                # Handle path expansion for any string that looks like a path
+                if (
+                    isinstance(value, str)
+                    and "~" in value
+                    and key.endswith(("_path", "_dir", "_directory"))
+                ):
+                    value = os.path.expanduser(value)
+                # Handle path expansion for lists of paths
+                elif isinstance(value, list) and key.endswith(
+                    ("_paths", "_dirs", "_directories")
+                ):
+                    value = [
+                        os.path.expanduser(v) if isinstance(v, str) and "~" in v else v
+                        for v in value
+                    ]
+
                 base_config[key] = value
 
     def _apply_env_overrides(self, config: Dict[str, Any]) -> None:
@@ -167,6 +189,40 @@ class ConfigLoader:
                     section[parts[-1]] = self._convert_env_value(value)
                 else:
                     config[config_key] = self._convert_env_value(value)
+
+    def _expand_path_values(self, config: Dict[str, Any]) -> None:
+        """
+        Expand path values in configuration, handling both single paths and lists of paths.
+
+        This is a final pass to catch any paths that might have been missed by the deep update
+        or environment variable handling.
+        """
+        for key, value in list(config.items()):
+            # Handle nested dictionaries recursively
+            if isinstance(value, dict):
+                self._expand_path_values(value)
+                continue
+
+            # Process keys that look like they contain paths
+            if (
+                isinstance(value, str)
+                and "~" in value
+                and (
+                    key.endswith(("_path", "_dir", "_directory"))
+                    or key in ("path", "dir", "directory")
+                )
+            ):
+                config[key] = os.path.expanduser(value)
+
+            # Handle lists of paths
+            elif isinstance(value, list) and (
+                key.endswith(("_paths", "_dirs", "_directories"))
+                or key in ("paths", "dirs", "directories", "development_dirs")
+            ):
+                config[key] = [
+                    os.path.expanduser(v) if isinstance(v, str) and "~" in v else v
+                    for v in value
+                ]
 
     def _apply_cmd_args(self, config: Dict[str, Any], cmd_args: Dict[str, Any]) -> None:
         """Apply command line argument overrides to config."""
@@ -233,6 +289,35 @@ class ConfigLoader:
     def show_config_source(self) -> str:
         """Get the source of the loaded configuration."""
         return self.config_source
+
+    def add_config_file(self, file_path: Union[str, Path]) -> None:
+        """
+        Add a specific config file to be loaded.
+
+        Args:
+            file_path: Path to the config file to add
+        """
+        path = Path(file_path) if isinstance(file_path, str) else file_path
+        if not path.exists():
+            self.logger.warning(f"Config file not found: {path}")
+            return
+
+        try:
+            if not self.has_toml:
+                self.logger.warning(
+                    "TOML support not available, cannot load config file"
+                )
+                return
+
+            with open(path, "rb") as f:
+                file_config = tomllib.load(f)
+
+            # Update config with file values
+            self._deep_update(self.config, file_config)
+            self.config_source = str(path)
+            self.logger.debug(f"Added config from {path}")
+        except Exception as e:
+            self.logger.error(f"Error loading config from {path}: {e}")
 
 
 def load_config(

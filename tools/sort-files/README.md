@@ -1,29 +1,56 @@
+# sort-files
 
-## sort-files
+Organize and declutter directories by automatically sorting files into subfolders based on type, date, size, or custom rules.
 
-Organize and declutter directories by automatically sorting files into subfolders based on file type, date, size, or user-defined custom rules.
-
-### Usage
+## Usage
 
 ```bash
-sort-files ~/Downloads                # Sort files by type in Downloads
-sort-files --by date ~/Documents      # Sort files by date
-sort-files --dry-run --show-skipped ~/Desktop   # Preview actions, show skipped files
-sort-files --config ~/.config/intermcli/sort-files.toml ~/Downloads  # Use custom config
+# Sort files by type (default)
+sort-files ~/Downloads
+
+# Sort files by date
+sort-files --by date ~/Documents
+
+# Copy files instead of moving them
+sort-files --copy ~/Desktop
+
+# Process subdirectories recursively
+sort-files --recursive ~/Projects
+
+# Preview actions without making changes
+sort-files --dry-run ~/Desktop
+
+# Use custom configuration
+sort-files --config ~/.config/intermcli/sort-files.toml ~/Downloads
 ```
 
-### Features
-- Sort by type, date, or size
-- Custom rules via TOML config
-- Dry run mode for preview
-- Safe by default (never overwrites files)
-- Cross-platform (Linux, macOS)
-- TOML-based configuration
+## Configuration
 
-### Configuration
-- Uses TOML config at `tools/sort-files/config/defaults.toml` (or custom path)
-- You can add, remove, or customize type folders and rules.
-- If TOML support is missing, a default set of rules is used.
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--by` | `type` | Sorting method: type, date, size, or custom |
+| `--copy` | `false` | Copy files instead of moving them |
+| `--recursive`, `-r` | `false` | Process subdirectories recursively |
+| `--dry-run` | `false` | Preview actions without making changes |
+| `--config` | Tool default | Path to custom configuration file |
+| `--show-skipped` | `false` | Display files that were skipped |
+| `--verbose` | `false` | Show detailed information during processing |
+
+## Advanced Usage
+
+For custom sorting rules and file type mapping, see the [comprehensive documentation](../docs/tools/sort-files.md).
+
+## Features
+
+- Sort by file type, date, or size
+- Copy or move files with safe overwrite protection
+- Recursively process subdirectories
+- Custom rules via TOML configuration
+- Dry run mode for previewing changes
+- Safe by default (never overwrites existing files)
+- Cross-platform compatibility (Linux, macOS)
+- TOML-based configuration without hardcoded values
+- If TOML support is missing, the tool will display an error message.
 
 **Example TOML snippet:**
 ```toml
@@ -46,4 +73,15 @@ archives = [".zip", ".tar", ".gz"]
 - If you see "TOML support not available", install `tomli` for Python < 3.11: `pip install tomli`
 - If the config file is missing, the tool will fall back to built-in defaults.
 
----
+### Options
+
+```
+--by {type,date,size}    How to organize files (default: type)
+--config CONFIG          Path to configuration file
+--dry-run                Show what would be done without moving files
+--copy                   Copy files instead of moving them
+--recursive, -r          Process subdirectories recursively
+--unsafe                 Allow overwriting files in destination
+--show-skipped           Show skipped files
+--check-deps             Check optional dependency status
+```

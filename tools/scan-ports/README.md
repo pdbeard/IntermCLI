@@ -1,31 +1,54 @@
-## scan-ports
+# scan-ports
 
-Scan local or remote hosts for open ports and detect running services. Supports configurable port lists, service detection, and both basic and enhanced detection modes.
+Port scanner that detects open ports and identifies running services on local or remote hosts.
 
-### Usage
+## Usage
 
 ```bash
-scan-ports localhost                # Scan localhost with default ports
-scan-ports 192.168.1.1              # Scan remote host
-scan-ports --list web               # Scan only web service ports
-scan-ports -p 3000,8080             # Scan specific ports
-scan-ports --show-lists             # Show available port lists
-scan-ports --check-deps             # Show optional dependency status
+# Basic scanning
+scan-ports localhost
+
+# Scan remote host
+scan-ports 192.168.1.1
+
+# Scan specific port list
+scan-ports --list web
+
+# Scan custom ports
+scan-ports -p 3000,8080
+
+# View available port lists
+scan-ports --show-lists
+
+# Check optional dependencies
+scan-ports --check-deps
 ```
 
-### Features
-- Configurable port lists via TOML
-- Service detection (basic and enhanced)
-- Fast concurrent scanning
-- Progressive enhancement (works with stdlib, optional dependencies add features)
-- Optional dependencies: requests, urllib3, tomli/tomllib
+## Configuration
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--list`, `-l` | `common` | Port list to scan (web, database, common, all) |
+| `--ports`, `-p` | None | Comma-separated ports or ranges (e.g., 80,443,8000-8100) |
+| `--timeout` | `1` | Connection timeout in seconds |
+| `--threads` | `10` | Number of concurrent scanning threads |
+| `--enhanced` | `false` | Use enhanced detection (requires requests) |
+| `--show-lists` | `false` | Display available port lists and exit |
+| `--check-deps` | `false` | Display optional dependency status and exit |
+
+## Advanced Usage
+
+For detailed port list configuration and custom service detection, see the [comprehensive documentation](../docs/tools/scan-ports.md).
+
+## Features
+
+- Configurable port lists via TOML configuration
+- Basic and enhanced service detection modes
+- Fast concurrent scanning with adjustable thread count
+- Progressive enhancement with optional dependencies
+- Support for CIDR notation for network scanning
 - Fully type-annotated with mypy support
 - Comprehensive test coverage
-
-### Configuration
-- Port lists and categories are configured via TOML: `tools/scan-ports/config/ports.toml`
-- You can add, remove, or customize port lists and service names.
-- If TOML support is missing, a default set of common ports is used.
 
 **Example TOML snippet:**
 ```toml

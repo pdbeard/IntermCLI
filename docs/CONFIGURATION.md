@@ -16,13 +16,16 @@ Configuration files are loaded in this order (Overrides as they go):
 5. User global: `~/.config/intermcli/config.toml`
 6. Tool defaults: `tools/{tool-name}/config/defaults.toml`
 
-Each tool will attempt to load its configuration from the following locations, in order:
+Each tool will load its configuration following a standard hierarchy, with each level overriding the previous:
 
-1. User tool-specific config: `~/.config/intermcli/{tool-name}.toml`
-2. Legacy user global config: `~/.config/intermcli/config.toml`
-3. Source-tree default config: `tools/{tool-name}/config/defaults.toml`
+1. Command line arguments
+2. Environment variables (e.g. `FIND_PROJECTS_DIRS`, `SCAN_PORTS_TIMEOUT`)
+3. Project config: `.intermcli.toml` (project root)
+4. User tool-specific: `~/.config/intermcli/{tool-name}.toml`
+5. User global: `~/.config/intermcli/config.toml`
+6. Tool defaults: `tools/{tool-name}/config/defaults.toml`
 
-If no config file is found, built-in defaults are used. The tool will print which config was loaded for debugging.
+All tools use the shared ConfigLoader utility to ensure consistent configuration handling. If no config file is found, the tool will log a warning and may fall back to minimal defaults.
 
 Example config directory:
 
@@ -64,9 +67,14 @@ Example config directory:
   User: `~/.config/intermcli/sort-files.toml`
   [Sort Files README](../tools/sort-files/README.md)
   ```toml
-  [sort]
-  method = "name"
-  ignore_hidden = true
+  [rules]
+  by_type = true
+  by_date = false
+  by_size = false
+
+  [type_folders]
+  images = [".jpg", ".jpeg", ".png", ".gif"]
+  documents = [".pdf", ".docx", ".txt"]
   ```
 
 - **Test Endpoints**

@@ -133,6 +133,15 @@ verify_installation() {
     if command -v python3 >/dev/null && python3 -c "import sys; print('Python', sys.version)" >/dev/null 2>&1; then
         echo -e "${GREEN}  ✅ Python environment working${NC}"
     fi
+
+    # Verify shared utilities
+    echo -e "${BLUE}  Checking shared utilities...${NC}"
+    if python3 -c "import sys; sys.path.insert(0, '$SCRIPT_ROOT'); from shared.output import Output; from shared.error_handler import ErrorHandler; print('  ✅ Shared utilities can be imported'); test_handler = ErrorHandler(Output('test')); print('  ✅ Error handler initialized correctly')" 2>/dev/null; then
+        echo -e "${GREEN}  ✅ Shared utilities verified${NC}"
+    else
+        echo -e "${YELLOW}  ⚠️  Some shared utilities may not be working correctly${NC}"
+        echo -e "${YELLOW}     You may need to reinstall or check the Python environment${NC}"
+    fi
 }
 
 # Interactive prompts
@@ -216,6 +225,7 @@ if [ "$1" = "--uninstall" ]; then
         echo -e "${GREEN}  ✅ Configuration removed${NC}"
     fi
     echo -e "${GREEN}✅ Uninstall complete${NC}"
+    echo -e "${YELLOW}Note: Shared utilities in $SCRIPT_ROOT/shared/ have not been removed${NC}"
     exit 0
 fi
 
@@ -253,8 +263,14 @@ log() {
     echo "$(date): $1" >> "$LOG_FILE"
 }
 
+log_error() {
+    echo "$(date): ERROR: $1" >> "$LOG_FILE"
+    echo -e "${RED}❌ $1${NC}" >&2
+}
+
 cleanup_on_failure() {
     echo -e "${RED}Installation failed, cleaning up...${NC}"
+    log_error "Installation failed, cleaning up..."
     for file in "${INSTALLED_FILES[@]}"; do
         rm -f "$file" 2>/dev/null && echo -e "${YELLOW}  Removed: $file${NC}"
     done
@@ -268,8 +284,10 @@ cleanup_on_exit() {
     local exit_code=$?
     if [ $exit_code -eq 130 ]; then
         echo -e "\n${YELLOW}Installation cancelled by user (Ctrl+C)${NC}"
+        log "Installation cancelled by user (Ctrl+C)"
     elif [ $exit_code -ne 0 ]; then
         echo -e "\n${RED}Installation failed, cleaning up...${NC}"
+        log_error "Installation failed with exit code $exit_code, cleaning up..."
         for file in "${INSTALLED_FILES[@]}"; do
             rm -f "$file" 2>/dev/null && echo -e "${YELLOW}  Removed: $file${NC}"
         done
@@ -470,6 +488,7 @@ install_tool_config "find-projects.toml" "$SCRIPT_ROOT/tools/find-projects/confi
 install_tool_config "scan-ports.toml" "$SCRIPT_ROOT/tools/scan-ports/config/ports.toml"
 install_tool_config "sort-files.toml" "$SCRIPT_ROOT/tools/sort-files/config/defaults.toml"
 install_tool_config "test-endpoints.toml" "$SCRIPT_ROOT/tools/test-endpoints/config/defaults.toml"
+install_tool_config "error-handler.toml" "$SCRIPT_ROOT/config/error-handler.toml" 2>/dev/null || echo -e "${YELLOW}  ⚠️  No error-handler.toml found, using defaults${NC}"
 install_tool_config "config.toml" "$SCRIPT_ROOT/config/defaults.toml"
 # Add more tool configs here
 
@@ -484,6 +503,7 @@ echo -e "  Platform: $PLATFORM"
 echo -e "  Python: $PYTHON_VERSION"
 echo -e "  Install to: $INSTALL_DIR"
 echo -e "  Config: $CONFIG_DIR"
+echo -e "  Shared utilities: Output, ErrorHandler, ConfigLoader, etc."
 if [ "$INSTALL_OPTIONAL" = true ]; then
     echo -e "  Optional dependencies: Will install"
 else
@@ -633,6 +653,10 @@ echo -e "  ${GREEN}find-projects --config${NC}      # View configuration"
 echo ""
 echo -e "${BLUE}⚙️  Configuration:${NC}"
 echo -e "  ${GREEN}$CONFIG_DIR/config.toml${NC}"
+echo ""
+echo -e "${BLUE}📚 Documentation:${NC}"
+echo -e "  ${GREEN}$SCRIPT_ROOT/docs/shared-utilities/index.md${NC}  # Shared utility documentation"
+echo -e "  ${GREEN}$SCRIPT_ROOT/docs/output-style-guide.md${NC}      # Output styling guide"
 echo ""
 echo -e "${BLUE}🗑️  To uninstall:${NC}"
 echo -e "  ${GREEN}$0 --uninstall${NC}"

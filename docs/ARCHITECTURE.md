@@ -31,9 +31,6 @@ intermcli/
 - Add new tools in `tools/` with their own README and config
 - Follow naming and architecture conventions
 - See [CONTRIBUTING.md](CONTRIBUTING.md) for details
-│   └── install-tool           # Script to add new tools
-└── tests/                     # Suite-wide integration tests (planned)
-```
 
 ## 🎯 Core Architecture Principles
 
@@ -43,7 +40,7 @@ Each tool in [`tools/`](tools/) is designed to be:
 - **Self-contained**: Can run with just its own directory
 - **Independently testable**: Has its own test suite
 - **Minimally coupled**: Uses shared utilities only when there's clear benefit
-- **Separately documented**: Complete documentation in its README and in `docs/tools/`
+- **Separately documented**: Complete documentation in its README
 
 **Current Status**: Both [`scan-ports`](tools/scan-ports/) and [`find-projects`](tools/find-projects/) follow this pattern.
 
@@ -158,13 +155,37 @@ interm config validate
 3. **Phase 3**: Implement comprehensive testing and config validation.
 4. **Phase 4**: Add plugin architecture for third-party tools.
 
-### When to Refactor
+### When to Extract Shared Code
 
-Extract to [`shared/`](shared/) when:
+Move code to [`shared/`](shared/) when:
 - **3+ tools** implement the same pattern
 - **Clear abstraction** emerges naturally
 - **Maintenance burden** of duplication becomes significant
 
+## 🔄 Development Workflow
+
+IntermCLI follows a structured branching strategy to ensure code stability and quality:
+
+### Branching Strategy
+
+- **main**: Production-ready, stable code only. This branch contains releases.
+- **staging**: Pre-production testing environment where all changes are validated.
+- **feature/*, bugfix/*, docs/***: Short-lived development branches for specific changes.
+
+### Development Process
+
+1. All new work is done in feature branches created from the `staging` branch.
+2. Pull requests are submitted to merge changes into `staging`.
+3. Automated tests and code reviews are performed on the `staging` branch.
+4. Once `staging` is stable and validated, it is merged into `main` for release.
+
+This approach ensures:
+- The `main` branch always contains stable, production-ready code
+- All changes are thoroughly tested in the `staging` environment
+- Code quality is maintained through peer review and automated testing
+
+See [Contributing](CONTRIBUTING.md) for detailed contribution guidelines.
+
 ---
 
-This architecture embraces the "start simple, evolve naturally" philosophy while maintaining clear migration paths toward a comprehensive configuration system and target structure.
+This architecture balances simplicity with extensibility, providing a comprehensive configuration system and clear structure.

@@ -13,17 +13,42 @@ Example usage:
     test-endpoints --collection my-api --request "Get Users" --env dev
 """
 
-import argparse
 import json
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
+from typing import Any, Dict
+
+# Ensure shared utilities are available
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+try:
+    from shared.path_utils import require_shared_utilities
+
+    require_shared_utilities()
+except ImportError:
+    # If even path_utils can't be imported, provide a fallback error
+    print("Error: IntermCLI shared utilities not found.")
+    print("Please make sure the IntermCLI suite is properly installed.")
+    sys.exit(1)
+
+# Import shared utilities
+from shared.arg_parser import ArgumentParser
+from shared.config_loader import ConfigLoader
+from shared.enhancement_loader import EnhancementLoader
+from shared.error_handler import ErrorHandler
+from shared.network_utils import NetworkUtils
+from shared.output import setup_tool_output
+
+# Version
+__version__ = "0.1.0"
+TOOL_NAME = "test-endpoints"
 
 # Optional enhancements
 try:
-    import requests
+    # import requests
 
     HAS_REQUESTS = True
 except ImportError:
@@ -31,9 +56,6 @@ except ImportError:
 
 try:
     from rich.console import Console
-    from rich.panel import Panel
-    from rich.syntax import Syntax
-    from rich.table import Table
 
     HAS_RICH = True
     console = Console()
@@ -41,16 +63,7 @@ except ImportError:
     HAS_RICH = False
     console = None
 
-# TOML support
-try:
-    import tomllib
-except ImportError:
-    try:
-        import tomli as tomllib
-    except ImportError:
-        tomllib = None
-
-__version__ = "0.1.0"
+# TOML support is handled by ConfigLoader from shared utilities
 
 
 class SimpleResponse:
@@ -67,7 +80,9 @@ class SimpleResponse:
         return json.loads(self.text)
 
 
-def make_request_simple(method, url, headers=None, data=None, timeout=30):
+def make_request_simple(
+    method, url, headers=None, data=None, timeout=30, output=None, error_handler=None
+):
     """Make HTTP request using urllib (stdlib only)"""
     headers = headers or {}
 
@@ -87,24 +102,147 @@ def make_request_simple(method, url, headers=None, data=None, timeout=30):
     except urllib.error.HTTPError as e:
         # Still return response for error status codes
         return SimpleResponse(e, url, start_time)
+    except Exception as e:
+        if error_handler:
+            error_handler.handle_network_operation(url, e, "connect to")
+        raise
 
 
 def make_request_enhanced(
-    method, url, headers=None, json_data=None, data=None, timeout=30, verify=True
+    method,
+    url,
+    headers=None,
+    json_data=None,
+    data=None,
+    timeout=30,
+    verify_ssl=True,
+    output=None,
+    error_handler=None,
 ):
-    """Make HTTP request using requests library"""
-    start_time = time.time()
+    """Make an HTTP request using the requests library"""
+    try:
+        import requests
 
-    kwargs = {"timeout": timeout, "verify": verify, "headers": headers or {}}
+        kwargs = {
+            "headers": headers or {},
+            "timeout": timeout,
+            "verify": verify_ssl,
+            "allow_redirects": True,
+        }
 
-    if json_data:
-        kwargs["json"] = json_data
-    elif data:
-        kwargs["data"] = data
+        if json_data:
+            kwargs["json"] = json_data
+        elif data:
+            kwargs["data"] = data
 
-    response = requests.request(method, url, **kwargs)
-    response.elapsed = time.time() - start_time
-    return response
+        # Create a progress bar if output has the method
+        if output and hasattr(output, "create_progress_bar"):
+            with output.create_progress_bar(
+                total=100, description=f"Requesting {method} {url}"
+            ) as progress_bar:
+                # Make the request
+                start_time = time.time()
+
+                # Update progress bar to show request in progress
+                progress_bar.update(10)  # Show initial progress
+
+                response = requests.request(method, url, **kwargs)
+
+                # Update progress bar to show request completed
+                progress_bar.update(90)  # Complete progress
+        else:
+            # Make the request without progress bar
+            start_time = time.time()
+            response = requests.request(method, url, **kwargs)
+
+        response.elapsed = time.time() - start_time
+        return response
+    except Exception as e:
+        if error_handler:
+            msg, code = error_handler.handle_network_operation(url, e, "connect to")
+        elif output:
+            output.error(f"Request failed: {e}")
+        raise
+
+
+def make_request(
+    method,
+    url,
+    headers=None,
+    json_data=None,
+    data=None,
+    timeout=30,
+    verify_ssl=True,
+    output=None,
+    error_handler=None,
+):
+    """
+    Make an HTTP request using the best available method (NetworkUtils, requests, or urllib)
+
+    Args:
+        method: HTTP method (GET, POST, etc.)
+        url: URL to request
+        headers: Dictionary of headers
+        json_data: JSON data for request body
+        data: String or bytes data for request body
+        timeout: Request timeout in seconds
+        verify_ssl: Whether to verify SSL certificates
+        output: Output utility for messages
+        error_handler: ErrorHandler for error handling
+
+    Returns:
+        Response object with status_code, headers, text, and elapsed properties
+    """
+    # Try to use shared NetworkUtils first (if available)
+    try:
+        # Initialize a NetworkUtils instance with our timeout
+        network_utils = NetworkUtils(timeout=timeout)
+
+        if hasattr(network_utils, "http_request"):
+            if output:
+                output.debug(f"Using shared NetworkUtils for {method} request to {url}")
+
+            # Convert parameters to NetworkUtils format
+            kwargs = {"headers": headers or {}, "verify": verify_ssl}
+
+            if json_data:
+                kwargs["json"] = json_data
+            elif data:
+                kwargs["data"] = data
+
+            start_time = time.time()
+            response = network_utils.http_request(method, url, **kwargs)
+            response.elapsed = time.time() - start_time
+            return response
+    except (ImportError, AttributeError) as e:
+        # Fall back to direct requests or urllib
+        if output:
+            output.debug(f"Falling back to direct request methods: {e}")
+
+    # Fall back to requests or urllib
+    if HAS_REQUESTS:
+        return make_request_enhanced(
+            method,
+            url,
+            headers,
+            json_data,
+            data,
+            timeout,
+            verify_ssl,
+            output,
+            error_handler,
+        )
+    else:
+        # Combine json_data and data for urllib
+        request_data = None
+        if json_data:
+            request_data = json_data
+        elif data:
+            request_data = data
+
+        return make_request_simple(
+            method, url, headers, request_data, timeout, output, error_handler
+        )
 
 
 def format_json(text):
@@ -116,16 +254,81 @@ def format_json(text):
         return text
 
 
-def print_response(response, verbose=False, show_headers=True):
-    """Print response in a readable format"""
-    if HAS_RICH and console:
-        print_response_rich(response, verbose, show_headers)
+def print_response(
+    response, verbose=False, show_headers=True, output_format="auto", output=None
+):
+    """Print response in a readable format based on the specified output format"""
+    # Use provided output or fallback to direct printing
+    has_output_utility = output is not None
+
+    # First, check if we need to convert the response to another format
+    response_body = getattr(response, "text", "")
+
+    # Handle different output formats
+    if output_format == "json" and response_body:
+        try:
+            # Try to parse and reformat as JSON regardless of the original format
+            parsed = json.loads(response_body)
+            response_body = json.dumps(parsed, indent=2, ensure_ascii=False)
+        except json.JSONDecodeError:
+            # If not valid JSON, keep original
+            output_format = "text"
+            if has_output_utility:
+                output.warning("Response is not valid JSON, displaying as text")
+            else:
+                print("⚠️ Response is not valid JSON, displaying as text")
+    elif output_format == "yaml" and response_body:
+        try:
+            # Convert to YAML if PyYAML is available
+            try:
+                import yaml
+
+                # Try to parse as JSON first, then convert to YAML
+                try:
+                    parsed = json.loads(response_body)
+                    response_body = yaml.dump(parsed, default_flow_style=False)
+                except json.JSONDecodeError:
+                    # If not JSON, try to load as YAML and redump (to pretty print)
+                    parsed = yaml.safe_load(response_body)
+                    response_body = yaml.dump(parsed, default_flow_style=False)
+            except ImportError:
+                if has_output_utility:
+                    output.warning(
+                        "YAML output format requires PyYAML: pip install pyyaml"
+                    )
+                else:
+                    print("⚠️ YAML output format requires PyYAML: pip install pyyaml")
+                output_format = "auto"  # Fallback to auto
+        except Exception:
+            output_format = "text"
+            if has_output_utility:
+                output.warning("Could not convert response to YAML, displaying as text")
+            else:
+                print("⚠️ Could not convert response to YAML, displaying as text")
+
+    # Now decide how to display it
+    if HAS_RICH and output and output.rich_console and output_format != "text":
+        print_response_rich(response, verbose, show_headers, response_body, output)
+    elif HAS_RICH and console and output_format != "text" and not has_output_utility:
+        print_response_rich(response, verbose, show_headers, response_body)
     else:
-        print_response_simple(response, verbose, show_headers)
+        print_response_simple(response, verbose, show_headers, response_body, output)
 
 
-def print_response_rich(response, verbose=False, show_headers=True):
+def print_response_rich(
+    response, verbose=False, show_headers=True, formatted_body=None, output=None
+):
     """Print response using rich formatting"""
+    # Use provided output or fallback to direct rich console
+    if output and output.rich_console:
+        rich_console = output.rich_console
+    else:
+        rich_console = console
+
+    if not rich_console:
+        print_response_simple(response, verbose, show_headers, formatted_body, output)
+        return
+
     # Status line
     status_color = (
         "green"
@@ -134,10 +337,12 @@ def print_response_rich(response, verbose=False, show_headers=True):
     )
     elapsed_ms = int(getattr(response, "elapsed", 0) * 1000)
 
-    console.print(f"[{status_color}]✅ {response.status_code}[/] ({elapsed_ms}ms)")
+    rich_console.print(f"[{status_color}]✅ {response.status_code}[/] ({elapsed_ms}ms)")
 
     # Headers
     if show_headers and hasattr(response, "headers"):
+        from rich.table import Table
+
         headers_table = Table(title="Headers", show_header=False, box=None)
         headers_table.add_column("Key", style="cyan")
         headers_table.add_column("Value", style="white")
@@ -145,23 +350,41 @@ def print_response_rich(response, verbose=False, show_headers=True):
         for key, value in response.headers.items():
             headers_table.add_row(key, str(value))
 
-        console.print(headers_table)
+        rich_console.print(headers_table)
 
     # Body
-    if hasattr(response, "text"):
+    if formatted_body is not None:
+        body = formatted_body
+    elif hasattr(response, "text"):
         body = response.text
-        if body:
-            try:
-                # Try to format as JSON
-                formatted = format_json(body)
-                syntax = Syntax(formatted, "json", theme="monokai", line_numbers=False)
-                console.print(Panel(syntax, title="Response Body"))
-            except Exception:
-                # Fall back to plain text
-                console.print(Panel(body, title="Response Body"))
+    else:
+        body = ""
+
+    if body:
+        try:
+            from rich.panel import Panel
+            from rich.syntax import Syntax
+
+            # Detect if the body is JSON
+            if body.strip().startswith(("{", "[")):
+                syntax = Syntax(body, "json", theme="monokai", line_numbers=False)
+                rich_console.print(Panel(syntax, title="Response Body"))
+            # Detect if the body is YAML
+            elif ":" in body and "\n" in body and "<" not in body:
+                syntax = Syntax(body, "yaml", theme="monokai", line_numbers=False)
+                rich_console.print(Panel(syntax, title="Response Body"))
+            else:
+                rich_console.print(Panel(body, title="Response Body"))
+        except Exception:
+            # Fall back to plain text
+            from rich.panel import Panel
+
+            rich_console.print(Panel(body, title="Response Body"))
 
 
-def print_response_simple(response, verbose=False, show_headers=True):
+def print_response_simple(
+    response, verbose=False, show_headers=True, formatted_body=None, output=None
+):
     """Print response using simple text formatting"""
     status_emoji = (
         "✅"
@@ -170,73 +393,198 @@ def print_response_simple(response, verbose=False, show_headers=True):
     )
     elapsed_ms = int(getattr(response, "elapsed", 0) * 1000)
 
-    print(f"{status_emoji} {response.status_code} ({elapsed_ms}ms)")
-    print()
+    # Use the output utility if provided
+    if output:
+        if 200 <= response.status_code < 300:
+            output.success(f"{response.status_code} ({elapsed_ms}ms)")
+        elif response.status_code >= 400:
+            output.error(f"{response.status_code} ({elapsed_ms}ms)")
+        else:
+            output.warning(f"{response.status_code} ({elapsed_ms}ms)")
+        output.info("")
+    else:
+        print(f"{status_emoji} {response.status_code} ({elapsed_ms}ms)")
+        print()
 
     # Headers
     if show_headers and hasattr(response, "headers"):
-        print("Headers:")
-        for key, value in response.headers.items():
-            print(f"  {key}: {value}")
-        print()
+        if output:
+            if hasattr(output, "print_key_value_section"):
+                # Use the new method for better formatting
+                output.print_key_value_section(
+                    "Headers",
+                    {key: value for key, value in response.headers.items()},
+                    sort_keys=True,
+                )
+                output.info("")
+            else:
+                # Fallback to old method
+                output.info("Headers:")
+                for key, value in response.headers.items():
+                    output.info(f"  {key}: {value}")
+                output.info("")
+        else:
+            print("Headers:")
+            for key, value in response.headers.items():
+                print(f"  {key}: {value}")
+            print()
 
     # Body
-    if hasattr(response, "text"):
+    if formatted_body is not None:
+        body = formatted_body
+    elif hasattr(response, "text"):
         body = response.text
-        if body:
+    else:
+        body = ""
+
+    if body:
+        if output:
+            # Use advanced output methods if available
+            if hasattr(output, "print_key_value_section") and body.strip().startswith(
+                "{"
+            ):
+                try:
+                    # For JSON objects, use print_key_value_section
+                    json_data = json.loads(body)
+                    if isinstance(json_data, dict):
+                        output.print_key_value_section("Response Body", json_data)
+                    else:
+                        # Fallback for non-dict JSON
+                        output.info("Body:")
+                        formatted = format_json(body)
+                        output.info(formatted)
+                except Exception:
+                    # Fallback to basic output
+                    output.info("Body:")
+                    output.info(body)
+            elif hasattr(output, "print_list") and body.strip().startswith("["):
+                try:
+                    # For JSON arrays, use print_list
+                    json_data = json.loads(body)
+                    if isinstance(json_data, list):
+                        output.print_list("Response Items", json_data)
+                    else:
+                        # Fallback for non-list JSON
+                        output.info("Body:")
+                        formatted = format_json(body)
+                        output.info(formatted)
+                except Exception:
+                    # Fallback to basic output
+                    output.info("Body:")
+                    output.info(body)
+            else:
+                # Fallback to old method
+                output.info("Body:")
+                # Try to format as JSON for backward compatibility with tests
+                try:
+                    if body.strip().startswith(("{", "[")):
+                        formatted = format_json(body)
+                        output.info(formatted)
+                    else:
+                        output.info(body)
+                except Exception:
+                    output.info(body)
+        else:
             print("Body:")
+            # Try to format as JSON for backward compatibility with tests
             try:
-                formatted = format_json(body)
-                print(formatted)
+                if body.strip().startswith(("{", "[")):
+                    formatted = format_json(body)
+                    print(formatted)
+                else:
+                    print(body)
             except Exception:
                 print(body)
 
 
-def load_collection(collection_path=None):
-    """Load a TOML collection file with robust fallback (user, legacy, source-tree)."""
-    from pathlib import Path
+def load_config(config_path=None, output=None) -> Dict[str, Any]:
+    """
+    Load TOML config using the shared ConfigLoader utility.
+    Args:
+        config_path (str or Path, optional): Path to a config file. If not provided, tries user and source-tree defaults.
+        output (Output, optional): Output utility for error handling
+    Returns:
+        dict: Configuration dictionary for HTTP requests and defaults.
+    """
+    # Default configuration
+    default_config = {
+        "general": {
+            "timeout": 30,
+            "max_redirects": 5,
+            "verify_ssl": True,
+            "verbose": False,
+            "follow_redirects": True,
+            "output_format": "auto",
+        },
+        "default_headers": {
+            "User-Agent": f"intermCLI/{TOOL_NAME}",
+            "Accept": "*/*",
+        },
+    }
 
-    script_dir = Path(__file__).parent
-    source_config_file = script_dir / "config" / "defaults.toml"
-    user_config_dir = Path.home() / ".config" / "intermcli"
-    user_config_file = user_config_dir / "test-endpoints.toml"
-    legacy_user_config_file = user_config_dir / "config.toml"
+    # Use the shared ConfigLoader
+    config_loader = ConfigLoader(TOOL_NAME)
 
-    config_loaded = None
-    config_paths = []
+    # Add the specific config file if provided
+    if config_path:
+        config_loader.add_config_file(config_path)
+
+    # Load the configuration with proper precedence
+    try:
+        config = config_loader.load_config()
+        # Merge with defaults for backward compatibility
+        for section in default_config:
+            if section not in config:
+                config[section] = default_config[section]
+            elif isinstance(default_config[section], dict):
+                for key, value in default_config[section].items():
+                    if key not in config[section]:
+                        config[section][key] = value
+        return config
+    except Exception as e:
+        if output:
+            error_handler = ErrorHandler(output, exit_on_critical=True)
+            msg, code = error_handler.handle_config_error(
+                config_path or "default config", e
+            )
+            # This will exit if exit_on_critical is True and the error is critical
+            error_handler.exit_if_critical(code)
+
+        # Otherwise return the default config
+        return default_config
+
+
+def load_collection(collection_path=None, output=None):
+    """
+    Load a collection configuration file using the shared ConfigLoader.
+
+    Args:
+        collection_path (str or Path, optional): Path to a collection file
+        output (Output, optional): Output utility for error handling
+
+    Returns:
+        dict: Collection configuration or None if not found
+    """
+    # Create a separate config loader for collections
+    collection_loader = ConfigLoader(TOOL_NAME, section_name="collections")
+
+    # Add the specific collection file if provided
     if collection_path:
-        config_paths.append(collection_path)
-    config_paths.extend(
-        [
-            str(user_config_file),
-            str(legacy_user_config_file),
-            str(source_config_file),
-        ]
-    )
+        collection_loader.add_config_file(collection_path)
 
-    if not tomllib:
-        print("❌ TOML support not available. Install tomli: pip install tomli")
+    try:
+        collection_config = collection_loader.load_config()
+        if output:
+            output.info("Loaded collection configuration")
+        return collection_config
+    except Exception as e:
+        if output:
+            error_handler = ErrorHandler(output)
+            msg, code = error_handler.handle_config_error(
+                collection_path or "default collection", e
+            )
+            output.warning("No collection config found, using defaults if any.")
         return None
-
-    for path in config_paths:
-        p = Path(path)
-        if p.exists():
-            try:
-                with open(p, "rb") as f:
-                    file_config = tomllib.load(f)
-                config_loaded = str(p)
-            except Exception as e:
-                print(f"❌ Failed to load collection: {path}: {e}")
-                file_config = None
-            break  # Use the first config found
-        else:
-            file_config = None
-
-    if config_loaded:
-        print(f"ℹ️  Loaded collection config: {config_loaded}")
-    else:
-        print("ℹ️  No collection config found, using defaults if any.")
-    return file_config
 
 
 def substitute_variables(text, variables):
@@ -250,92 +598,166 @@ def substitute_variables(text, variables):
     return text
 
 
-def check_dependencies():
-    """Check status of optional dependencies"""
-    deps = {
-        "requests": HAS_REQUESTS,
-        "rich": HAS_RICH,
-        "tomli/tomllib": tomllib is not None,
-    }
+def check_dependencies(output=None):
+    """Check status of optional dependencies using shared EnhancementLoader"""
+    enhancer = EnhancementLoader(TOOL_NAME)
+    enhancer.check_dependency("requests", "Enhanced HTTP features")
+    enhancer.check_dependency("rich", "Colorized output")
+    enhancer.check_dependency("pyyaml", "YAML response formatting")
 
-    print("🔍 Dependency Status:")
-    for dep, available in deps.items():
-        status = "✅ Available" if available else "❌ Not installed"
-        enhancement = ""
-        if dep == "requests":
-            enhancement = " (Enhanced HTTP features)"
-        elif dep == "rich":
-            enhancement = " (Colorized output)"
-        elif dep == "tomli/tomllib":
-            enhancement = " (Collection support)"
+    if output:
+        # Set output before printing status
+        enhancer.output = output
 
-        print(f"  {dep}: {status}{enhancement}")
+        # Custom display using new output methods if available
+        if hasattr(output, "print_key_value_section"):
+            # Create a dictionary of dependencies with their status
+            dependencies = {
+                key: "Available" if value else "Missing"
+                for key, value in enhancer.dependencies.items()
+            }
+
+            output.print_key_value_section(
+                f"Optional Dependencies for {TOOL_NAME}", dependencies, sort_keys=True
+            )
+
+            # Create a list of missing dependencies for installation instructions
+            missing = enhancer.get_missing_dependencies()
+            if missing:
+                output.info("\nTo enable all features, install missing dependencies:")
+
+                if hasattr(output, "print_list"):
+                    # Display as a list with pip install commands
+                    install_commands = [f"pip install {dep}" for dep in missing]
+                    output.print_list("Install Commands", install_commands)
+                else:
+                    # Fallback to simple output
+                    output.info(f"  pip install {' '.join(missing)}")
+        else:
+            # Fallback to original method
+            enhancer.print_status()
+    else:
+        enhancer.print_status()
+
+    if not HAS_REQUESTS and output:
+        output.warning(
+            "Without 'requests', only basic HTTP features will be available."
+        )
+        output.info("Install with: pip install requests")
+    elif not HAS_REQUESTS:
+        print("\nNote: Without 'requests', only basic HTTP features will be available.")
+        print("      Install with: pip install requests")
+
+    # Return list of missing dependencies
+    return enhancer.get_missing_dependencies()
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Command-line API testing tool - fast, scriptable alternative to Postman",
-        epilog="Example: test-endpoints GET https://httpbin.org/json",
+    # Initialize shared output utility
+    output = setup_tool_output(tool_name=TOOL_NAME, log_level="INFO", use_rich=True)
+    error_handler = ErrorHandler(output)
+
+    # Display tool banner
+    output.banner(
+        TOOL_NAME,
+        __version__,
+        {
+            "Description": "Command-line API testing tool - fast, scriptable alternative to Postman"
+        },
     )
+
+    # Load configuration first
+    config = load_config(output=output)
+    general_config = config.get("general", {})
+    default_headers = config.get("default_headers", {})
+
+    # Setup argument parser using the shared utility
+    parser = ArgumentParser(
+        TOOL_NAME,
+        "Command-line API testing tool - fast, scriptable alternative to Postman",
+        epilog="Example: test-endpoints GET https://httpbin.org/json",
+        version=__version__,
+    )
+
+    # Add common arguments
+    parser.add_common_arguments()
 
     # Basic request arguments
-    parser.add_argument(
+    parser.add_positional_argument(
         "method_or_url",
+        "HTTP method or URL (if method not specified, defaults to GET)",
         nargs="?",
-        help="HTTP method or URL (if method not specified, defaults to GET)",
     )
-    parser.add_argument("url", nargs="?", help="URL to request")
+    parser.add_positional_argument("url", "URL to request", nargs="?")
 
     # Request options
-    parser.add_argument(
+    parser.parser.add_argument(
         "-X", "--method", help="HTTP method (GET, POST, PUT, DELETE, etc.)"
     )
-    parser.add_argument(
+    parser.parser.add_argument(
         "-H", "--header", action="append", help="Add header (format: 'Key: Value')"
     )
-    parser.add_argument("-d", "--data", help="Request body data")
-    parser.add_argument("-j", "--json", help="JSON request body")
-    parser.add_argument(
+    parser.parser.add_argument("-d", "--data", help="Request body data")
+    parser.parser.add_argument("-j", "--json", help="JSON request body")
+    parser.parser.add_argument(
         "-p", "--param", action="append", help="Query parameter (format: 'key=value')"
     )
 
     # Output options
-    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
-    parser.add_argument(
+    output_group = parser.parser.add_argument_group("Output Options")
+    output_group.add_argument(
         "--no-headers", action="store_true", help="Don't show response headers"
     )
-    parser.add_argument("-o", "--output", help="Save response to file")
+    output_group.add_argument("-o", "--output", help="Save response to file")
+    output_group.add_argument(
+        "--format",
+        choices=["auto", "json", "yaml", "text"],
+        help="Output format (auto, json, yaml, text)",
+    )
 
     # Request behavior
-    parser.add_argument(
-        "-t", "--timeout", type=int, default=30, help="Request timeout in seconds"
+    request_group = parser.parser.add_argument_group("Request Options")
+    request_group.add_argument(
+        "-t",
+        "--timeout",
+        type=int,
+        help=f"Request timeout in seconds (default: {general_config.get('timeout', 30)})",
     )
-    parser.add_argument(
+    request_group.add_argument(
         "--no-verify", action="store_true", help="Disable SSL verification"
     )
-    parser.add_argument("--follow", action="store_true", help="Follow redirects")
+    request_group.add_argument("--follow", action="store_true", help="Follow redirects")
 
     # Collections and environments
-    parser.add_argument("--collection", help="Collection name or path to TOML file")
-    parser.add_argument("--request", help="Request name from collection")
-    parser.add_argument("--env", help="Environment name")
-    parser.add_argument(
+    collection_group = parser.parser.add_argument_group("Collections")
+    collection_group.add_argument(
+        "--collection", help="Collection name or path to TOML file"
+    )
+    collection_group.add_argument("--request", help="Request name from collection")
+    collection_group.add_argument("--env", help="Environment name")
+    collection_group.add_argument(
         "--set", action="append", help="Set variable (format: 'key=value')"
     )
 
-    # Utility
-    parser.add_argument(
-        "--check-deps", action="store_true", help="Check optional dependency status"
-    )
-    parser.add_argument(
-        "--version", action="version", version=f"test-endpoints {__version__}"
-    )
+    # The --config argument is already added by add_common_arguments()
 
-    args = parser.parse_args()
+    # Utility
+    # The --check-deps argument is already added by add_common_arguments()
+
+    args = parser.parser.parse_args()
+
+    # Apply verbosity setting to output
+    output.verbose = args.verbose
+
+    # If config file specified, reload with that file
+    if args.config:
+        config = load_config(args.config, output=output)
+        general_config = config.get("general", {})
+        default_headers = config.get("default_headers", {})
 
     # Check dependencies and exit
     if args.check_deps:
-        check_dependencies()
+        check_dependencies(output=output)
         return
 
     # Parse method and URL
@@ -347,15 +769,17 @@ def main():
         method = args.method.upper() if args.method else "GET"
         url = args.method_or_url
     else:
-        parser.print_help()
+        parser.parser.print_help()
         return
 
     # Validate URL
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
 
-    # Parse headers
-    headers = {}
+    # Set up headers starting with defaults from config
+    headers = default_headers.copy()
+
+    # Add headers from command line (overriding defaults)
     if args.header:
         for header in args.header:
             if ":" in header:
@@ -380,47 +804,63 @@ def main():
         try:
             json_data = json.loads(args.json)
         except json.JSONDecodeError as e:
-            print(f"❌ Invalid JSON: {e}")
+            error_msg, error_code = error_handler.handle_value_error(
+                "JSON data", e, "parse"
+            )
+            output.error(f"Invalid JSON: {e}")
             return
     elif args.data:
         data = args.data
 
+    # Get timeout from args or config
+    timeout = (
+        args.timeout if args.timeout is not None else general_config.get("timeout", 30)
+    )
+
+    # Get SSL verification setting
+    verify_ssl = (
+        not args.no_verify if args.no_verify else general_config.get("verify_ssl", True)
+    )
+
+    # Get output format
+    output_format = (
+        args.format if args.format else general_config.get("output_format", "auto")
+    )
+
     # Make request
-    print(f"🌐 {method} {url}")
+    output.info(f"🌐 {method} {url}")
 
     try:
-        if HAS_REQUESTS:
-            response = make_request_enhanced(
-                method=method,
-                url=url,
-                headers=headers,
-                json_data=json_data,
-                data=data,
-                timeout=args.timeout,
-                verify=not args.no_verify,
-            )
-        else:
-            # Use stdlib
-            request_data = json_data if json_data else data
-            response = make_request_simple(
-                method=method,
-                url=url,
-                headers=headers,
-                data=request_data,
-                timeout=args.timeout,
-            )
+        response = make_request(
+            method=method,
+            url=url,
+            headers=headers,
+            json_data=json_data,
+            data=data,
+            timeout=timeout,
+            verify_ssl=verify_ssl,
+            output=output,
+            error_handler=error_handler,
+        )
 
         # Print response
-        print_response(response, args.verbose, not args.no_headers)
+        print_response(
+            response, args.verbose, not args.no_headers, output_format, output
+        )
 
         # Save to file if requested
         if args.output:
-            with open(args.output, "w") as f:
-                f.write(response.text)
-            print(f"\n💾 Response saved to {args.output}")
+            try:
+                with open(args.output, "w") as f:
+                    f.write(response.text)
+                output.success(f"Response saved to {args.output}")
+            except Exception as e:
+                error_handler.handle_file_operation(
+                    Path(args.output), e, operation="write"
+                )
 
     except Exception as e:
-        print(f"❌ Request failed: {e}")
+        error_handler.handle_network_operation(url, e, "connect to")
         sys.exit(1)
 
 

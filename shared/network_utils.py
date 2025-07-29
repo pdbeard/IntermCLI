@@ -12,7 +12,9 @@ from typing import Any, Dict, List, Optional, Union
 
 
 class NetworkUtils:
-    def __init__(self, timeout: float = 3.0, logger=None):
+    def __init__(
+        self, timeout: float = 3.0, logger: Optional[logging.Logger] = None
+    ) -> None:
         """
         Initialize network utilities with default timeout.
 
@@ -28,7 +30,7 @@ class NetworkUtils:
         self.has_urllib3 = self._check_module("urllib3")
         self.has_ssl = self._check_module("ssl")
 
-    def _get_default_logger(self):
+    def _get_default_logger(self) -> logging.Logger:
         """Create a basic logger if none provided."""
         logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
         return logging.getLogger("network_utils")
@@ -528,7 +530,9 @@ class NetworkUtils:
             }
 
 
-def create_network_utils(timeout: float = 3.0, logger=None) -> NetworkUtils:
+def create_network_utils(
+    timeout: float = 3.0, logger: Optional[logging.Logger] = None
+) -> NetworkUtils:
     """
     Helper function to create a network utilities instance.
 
