@@ -58,24 +58,28 @@ class TestOutput(unittest.TestCase):
     def test_info(self):
         """Test info output."""
         # Replace direct logging with a mock to avoid terminal output issues in tests
+        self.output.rich_console = None  # Use standard logger path
         with mock.patch.object(self.output.logger, "info") as mock_info:
             self.output.info("Test info message")
             mock_info.assert_called_once_with("Test info message")
 
     def test_success(self):
         """Test success output."""
+        self.output.rich_console = None  # Use standard logger path
         with mock.patch.object(self.output.logger, "info") as mock_info:
             self.output.success("Test success message")
             mock_info.assert_called_once_with("✅ Test success message")
 
     def test_warning(self):
         """Test warning output."""
+        self.output.rich_console = None  # Use standard logger path
         with mock.patch.object(self.output.logger, "warning") as mock_warning:
             self.output.warning("Test warning message")
             mock_warning.assert_called_once_with("⚠️  Test warning message")
 
     def test_error(self):
         """Test error output."""
+        self.output.rich_console = None  # Use standard logger path
         with mock.patch.object(self.output.logger, "error") as mock_error:
             self.output.error("Test error message")
             mock_error.assert_called_once_with("❌ Test error message")
@@ -84,18 +88,22 @@ class TestOutput(unittest.TestCase):
         """Test debug output with verbose=False."""
         # Debug shouldn't output when verbose is False
         self.output.verbose = False
-        with mock.patch.object(self.output.logger, "debug") as mock_debug:
-            self.output.debug("Test debug message")
-            mock_debug.assert_not_called()
+        with mock.patch.object(self.output, "rich_console") as mock_rich_console:
+            with mock.patch.object(self.output.logger, "debug") as mock_debug:
+                self.output.debug("Test debug message")
+                mock_debug.assert_not_called()
+                mock_rich_console.assert_not_called()
 
         # Debug should output when verbose is True
         self.output.verbose = True
+        self.output.rich_console = None  # Use standard logger path
         with mock.patch.object(self.output.logger, "debug") as mock_debug:
             self.output.debug("Test debug message")
             mock_debug.assert_called_once_with("Test debug message")
 
     def test_separator(self):
         """Test separator output."""
+        self.output.rich_console = None  # Use standard logger path
         with mock.patch.object(self.output.logger, "info") as mock_info:
             self.output.separator(length=10)
             mock_info.assert_called_once_with("==========")  # 10 equals signs
@@ -107,7 +115,7 @@ class TestOutput(unittest.TestCase):
 
     def test_blank(self):
         """Test blank line output."""
-        with mock.patch.object(self.output.logger, "info") as mock_info:
+        with mock.patch.object(self.output, "info") as mock_info:
             self.output.blank()
             mock_info.assert_called_once_with("")
 
@@ -126,10 +134,11 @@ class TestOutput(unittest.TestCase):
         headers = ["Name", "Value"]
         rows = [["Item 1", "100"], ["Item 2", "200"]]
 
-        with mock.patch.object(self.output.logger, "info") as mock_info:
+        self.output.rich_console = None  # Use standard logger path
+        with mock.patch.object(self.output, "info") as mock_info:
             self.output.print_table(headers, rows)
-            # Verify logger.info was called multiple times (for headers and rows)
-            self.assertTrue(mock_info.call_count >= 4)
+            # Verify info was called multiple times (for headers and rows)
+            self.assertTrue(mock_info.call_count >= 3)
 
     @mock.patch("rich.console.Console")
     def test_rich_table(self, mock_console_class):

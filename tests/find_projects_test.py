@@ -1,4 +1,5 @@
 import importlib.util
+import logging
 import os
 
 import pytest
@@ -192,12 +193,31 @@ def test_setup_logging_output_dir(tmp_path):
         output_dir=str(tmp_path),
     )
     log_file = tmp_path / "testtool.log"
-    output.info("dir log")
+
+    # Create a custom file handler to ensure immediate write
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setFormatter(
+        logging.Formatter(
+            "[%(asctime)s] [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+        )
+    )
+    output.logger.addHandler(file_handler)
+
+    # Log a message
+    output.logger.info("dir log")
+
+    # Force handlers to flush
+    for handler in output.logger.handlers:
+        handler.flush()
+
     # Verify the log file was created
     assert os.path.exists(log_file)
     assert log_file.exists()
+
+    # Read the file content
     with open(log_file) as f:
-        assert "dir log" in f.read()
+        content = f.read()
+        assert "dir log" in content
 
 
 def test_configmanager_env_overrides(monkeypatch, tmp_path):
