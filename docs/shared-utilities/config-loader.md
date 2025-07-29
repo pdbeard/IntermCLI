@@ -33,17 +33,25 @@ config = config_loader.load_config()
 timeout = config.get("timeout", 30)
 ```
 
-### Adding Custom Config Files
+### With Tool-Specific Config File
 
 ```python
 from pathlib import Path
 from shared.config_loader import ConfigLoader
+from shared.output import Output
+
+# Initialize output utility
+output = Output("scan-ports")
 
 # Initialize with tool name
 config_loader = ConfigLoader("scan-ports")
 
-# Add a custom config file (will be loaded with highest precedence)
-config_loader.add_config_file(Path("/path/to/custom/config.toml"))
+# Add the tool's default config file
+default_config_path = Path(__file__).resolve().parent / "config" / "defaults.toml"
+if default_config_path.exists():
+    config_loader.add_config_file(str(default_config_path))
+else:
+    output.warning(f"Default config file not found at {default_config_path}")
 
 # Load configuration
 config = config_loader.load_config()

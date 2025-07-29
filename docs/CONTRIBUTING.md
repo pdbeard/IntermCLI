@@ -4,11 +4,11 @@ We welcome contributions—new tools, features, bug fixes, and docs!
 
 ## Quick Contribution Guide
 1. Fork the repo
-2. Create a feature branch: `git checkout -b feature/my-feature`
+2. Create a feature branch from `staging`: `git checkout -b feature/my-feature staging`
 3. Add your tool in `tools/` with its own README and config
 4. Add your tool to `tools_manifest.toml`
 5. Test with both minimal and enhanced dependencies
-6. Submit a PR with a clear description
+6. Submit a PR to merge into the `staging` branch with a clear description
 
 ## Tool Guidelines
 - Use `action-target` naming (e.g., `scan-ports`, `find-projects`)
@@ -39,15 +39,17 @@ We welcome contributions—new tools, features, bug fixes, and docs!
 
 
 ## PR Workflow
-- All changes should be submitted via pull request
+- All changes should be submitted via pull request to the `staging` branch
 - PRs must pass CI (lint, tests, audit, pre-commit)
 - Write clear commit messages and PR descriptions
+- Only stable, tested changes in `staging` are promoted to `main`
 
 
 ## Branching & Releases
-- Main development happens on `main` branch
-- Use feature branches for new tools/features
-- Releases are tagged and changelog is updated automatically
+- Production-ready code is maintained in the `main` branch
+- All development changes are merged into `staging` first for testing
+- After validation in staging, changes are promoted to `main` via pull request
+- Use feature branches for development work, branched from `staging`
 
 ---
 
@@ -102,13 +104,22 @@ Before submitting a PR, please ensure:
 
 ---
 
-## 🌳 Branching Model
+## 🌳 Branching Strategy
 
-- **main**: Production-ready code
-- **develop**: Integration branch for features
+- **main**: Production-ready, stable code only
+- **staging**: Pre-production testing environment where all changes are validated
 - **feature/**: New features (e.g., `feature/scan-ports-enhancement`)
-- **tool/**: Major tool-specific changes (e.g., `tool/find-projects`)
-- **release/**: Release preparation (e.g., `release/v1.0.0`)
+- **bugfix/**: Bug fixes (e.g., `bugfix/fix-port-scan-timeout`)
+- **docs/**: Documentation updates (e.g., `docs/update-installation`)
+- **hotfix/**: Urgent production fixes (e.g., `hotfix/critical-security-issue`)
+
+### Workflow
+
+1. Create a feature, bugfix, or docs branch from the latest `staging` branch
+2. When work is complete, submit a pull request to merge into `staging`
+3. After code review and testing in the staging environment, your changes will be merged
+4. Once `staging` is stable and ready for release, a pull request is created to merge `staging` into `main`
+5. The `main` branch always contains production-ready code
 
 ---
 
@@ -122,14 +133,14 @@ Before submitting a PR, please ensure:
 
 ## 🚀 Release Process
 
-1. Create release branch: `git checkout -b release/vX.Y.Z`
-2. Update `CHANGELOG.md`
-3. Update version numbers in relevant files
-4. Update `tools_manifest.toml` and configuration docs if needed
-5. Test thoroughly (all supported Python versions)
-6. Merge to `main`
-7. Create GitHub release with binaries (if applicable)
-8. Merge back to `develop`
+1. Ensure all intended changes are merged into `staging`
+2. Thoroughly test the `staging` branch (all supported Python versions)
+3. Update `CHANGELOG.md` in the `staging` branch
+4. Update version numbers in relevant files
+5. Update `tools_manifest.toml` and configuration docs if needed
+6. Create a pull request from `staging` to `main`
+7. After approval and merge to `main`, create a GitHub release with appropriate tag
+8. Continue development in `staging` for the next release cycle
 
 ---
 

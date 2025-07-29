@@ -17,6 +17,7 @@ Interactive terminal utilities for developers. A suite of independent CLI tools 
 
 ## Features
 - Fast, self-contained CLI tools for port scanning, project discovery, file sorting, and endpoint testing
+- Consistent configuration system using TOML files
 - Progressive enhancement: works with Python stdlib, optional dependencies add features
 - Cross-platform: Linux and macOS
 
@@ -45,19 +46,18 @@ cd intermcli
 - [Shared Utilities](docs/shared-utilities/index.md): Common utilities for all tools
 - [Output Style Guide](docs/output-style-guide.md): Guidelines for consistent output formatting
 
-## Branching Strategy  (not yet used)
-Planned branching strategy for development and releases:
+## Branching Strategy
+Our branching strategy for development and releases:
 
-- **main**: Stable release branch. All production-ready code is merged here.
-- **dev**: Active development branch. New features, fixes, and enhancements are merged here first.
-- **feature/*, bugfix/*, enhancement/***: Short-lived branches for specific changes. Merge into `dev` via pull request.
-- **release/***: (Optional) Used for preparing major releases.
+- **main**: Stable release branch. Contains only production-ready, tested code.
+- **staging**: Pre-production testing branch. All changes are merged here first for validation.
+- **feature/*, bugfix/*, docs/*, hotfix/***: Short-lived branches for specific changes. Merge into `staging` via pull request.
 
 **Workflow:**
-1. Create a feature branch from `dev` (e.g., `feature/my-feature`).
-2. Open a pull request to merge into `dev`.
-3. After review and testing, changes are merged into `main` for release.
-4. Branch protection rules may require PRs for changes to `main`.
+1. Create a feature branch from `staging` (e.g., `feature/my-feature`).
+2. Open a pull request to merge into `staging`.
+3. After review and testing in staging, changes are promoted to `main` via pull request.
+4. Branch protection rules require PRs and approvals for changes to `main`.
 
 See [Contributing](docs/CONTRIBUTING.md) for PR and code review details.
 
@@ -86,7 +86,7 @@ sort-files --config ~/.config/intermcli/sort-files.toml ~/Downloads
 - Dry run mode for safe preview
 - Safe by default (never overwrites files)
 - Cross-platform (Linux, macOS)
-- TOML-based configuration
+- Fully configurable using TOML files, no hardcoded values
 
 ## 🔧 Installation
 

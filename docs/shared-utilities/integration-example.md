@@ -162,8 +162,19 @@ def main():
 
     # Load configuration
     config_loader = ConfigLoader(TOOL_NAME)
+
+    # Add the tool's default configuration file
+    default_config_path = Path(__file__).resolve().parent / "config" / "defaults.toml"
+    if default_config_path.exists():
+        config_loader.add_config_file(str(default_config_path))
+    else:
+        output.warning(f"Default config file not found at {default_config_path}")
+
+    # Add custom config if specified
     if args.get("config"):
         config_loader.add_config_file(Path(args["config"]))
+
+    # Load configuration with command line args
     config = config_loader.load_config(args)
 
     # Show config if requested

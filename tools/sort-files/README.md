@@ -25,8 +25,10 @@ sort-files --config ~/.config/intermcli/sort-files.toml ~/Downloads  # Use custo
 
 ### Configuration
 - Uses TOML config at `tools/sort-files/config/defaults.toml` (or custom path)
+- Configuration follows the IntermCLI hierarchy (tool defaults, user global, user tool-specific, project local)
 - You can add, remove, or customize type folders and rules.
-- If TOML support is missing, a default set of rules is used.
+- All settings are defined in the configuration file, no hardcoded values.
+- If TOML support is missing, the tool will display an error message.
 
 **Example TOML snippet:**
 ```toml
