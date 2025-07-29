@@ -59,13 +59,30 @@ def load_config(config_path=None, output=None) -> Dict[str, Any]:
     """
     # Use the shared ConfigLoader
     config_loader = ConfigLoader(TOOL_NAME)
+
     # Add the specific config file if provided
     if config_path:
         config_loader.add_config_file(config_path)
 
+    # Add default configuration file for this tool
+    default_config_path = Path(__file__).resolve().parent / "config" / "defaults.toml"
+    if default_config_path.exists():
+        config_loader.add_config_file(str(default_config_path))
+    else:
+        if output:
+            output.warning(f"Default config file not found at {default_config_path}")
+
     # Load the configuration with proper precedence
     try:
         config = config_loader.load_config()
+
+        # Validate minimum required configuration
+        if "type_folders" not in config and output:
+            output.warning(
+                "No type_folders configuration found. File type sorting may not work correctly."
+            )
+            config["type_folders"] = {}
+
         return config
     except Exception as e:
         if output:
@@ -249,7 +266,15 @@ def sort_files(
 
         if dry_run:
             operation = "copy" if copy_mode else "move"
-            msg = f"Would {operation}: {entry.name} → {dest_dir.name}/"
+            if (
+                output.verbose
+                or "show_extensions" in rules
+                and rules["show_extensions"]
+            ):
+                ext = entry.suffix.lower()
+                msg = f"Would {operation}: {entry.name} → {dest_dir.name}/ [{ext or 'no extension'}]"
+            else:
+                msg = f"Would {operation}: {entry.name} → {dest_dir.name}/"
             output.info(msg)
         else:
             # Create destination directory with error handling
@@ -333,6 +358,15 @@ def main():
         help="Process subdirectories recursively",
     )
     arg_parser.parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Enable verbose output",
+    )
+    arg_parser.parser.add_argument(
+        "--show-extensions", action="store_true", help="Show file extensions in output"
+    )
+    arg_parser.parser.add_argument(
         "--unsafe", action="store_true", help="Allow overwriting files in destination"
     )
     arg_parser.parser.add_argument(
@@ -352,9 +386,9 @@ def main():
     # Initialize output handling using shared Output
     output = setup_tool_output(
         tool_name=TOOL_NAME,
-        log_level="INFO",
+        log_level="DEBUG" if args.verbose else "INFO",
         use_rich=True,
-        verbose=args.verbose if hasattr(args, "verbose") else False,
+        log_to_file=False,
     )
 
     # Display tool banner
@@ -367,17 +401,34 @@ def main():
     # Load configuration
     config = load_config(args.config, output)
 
+    if not config:
+        output.error(
+            "No valid configuration found. Please check your configuration files."
+        )
+        sys.exit(1)
+
     # Override with command line arguments
     config["rules"] = {
         "by_type": args.by == "type",
         "by_date": args.by == "date",
         "by_size": args.by == "size",
         "custom": config.get("rules", {}).get("custom", {}),
+        "show_extensions": args.show_extensions,
     }
     config["dry_run"] = args.dry_run
     config["copy"] = args.copy
-    config["recursive"] = args.recursive
-    config["safe"] = not args.unsafe
+    config["recursive"] = args.recursive or config.get("settings", {}).get(
+        "recursive", False
+    )
+    config["safe"] = (
+        not args.unsafe
+        if hasattr(args, "unsafe")
+        else config.get("settings", {}).get("safe", True)
+    )
+
+    # Get other settings from config with fallbacks
+    config["skip_hidden"] = config.get("dirs", {}).get("skip_hidden", True)
+    config["skip_dirs"] = config.get("dirs", {}).get("skip_dirs", [])
 
     target_dir = Path(args.directory).expanduser().resolve()
     if not target_dir.exists() or not target_dir.is_dir():
@@ -422,14 +473,14 @@ def main():
     moved, skipped = sort_files(
         target_dir,
         config["rules"],
-        config["type_folders"],
+        config.get("type_folders", {}),
         dry_run=config["dry_run"],
         safe=config["safe"],
         skip_hidden=config.get("skip_hidden", True),
         skip_dirs=config.get("skip_dirs", []),
         output=output,
-        copy_mode=args.copy,
-        recursive=args.recursive,
+        copy_mode=config.get("copy", False),
+        recursive=config.get("recursive", False),
     )
 
     # --- Summary Table ---
