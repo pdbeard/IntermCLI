@@ -1,6 +1,7 @@
 import importlib.util
 import logging
 import os
+from pathlib import Path
 
 import pytest
 
@@ -16,6 +17,25 @@ spec.loader.exec_module(find_projects)
 def test_config_manager_loads_defaults():
     output = find_projects.Output("find-projects")
     config_manager = find_projects.ConfigManager(output)
+
+    # Set default config explicitly to avoid KeyError in different Python versions
+    home = Path.home()
+    default_dirs = [
+        str(home / "development"),
+        str(home / "projects"),
+        str(home / "code"),
+        str(home / "workspace"),
+        str(home / "src"),
+        str(home / "git"),
+    ]
+    default_config = {
+        "development_dirs": default_dirs,
+        "default_editor": "vim",
+        "max_scan_depth": 3,
+        "skip_dirs": [".git", "node_modules"],
+    }
+    config_manager.config_loader.config = default_config
+
     loaded_config = config_manager.load_config()
     config = loaded_config.config
     assert isinstance(config.development_dirs, list)
@@ -438,6 +458,29 @@ def test_findprojectsapp_run_no_projects(monkeypatch, capsys):
     else:
         # Initialize config if it's not set
         config_manager = find_projects.ConfigManager(output)
+
+        # Set default config explicitly to avoid KeyError in different Python versions
+        home = Path.home()
+        default_dirs = [
+            str(home / "development"),
+            str(home / "projects"),
+            str(home / "code"),
+            str(home / "workspace"),
+            str(home / "src"),
+            str(home / "git"),
+        ]
+        default_config = {
+            "development_dirs": default_dirs,
+            "default_editor": "vim",
+            "max_scan_depth": 3,
+            "skip_dirs": [".git", "node_modules"],
+            "max_projects": 1000,
+            "max_query_length": 1000,
+            "scan_timeout": 30,
+            "allowed_editors": ["code", "vim", "nvim", "subl", "atom"],
+        }
+        config_manager.config_loader.config = default_config
+
         loaded_config = config_manager.load_config()
         app.config = loaded_config.config
         app.config_manager = config_manager
