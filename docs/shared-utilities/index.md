@@ -22,4 +22,4 @@ For detailed documentation on how to use each utility, click on the utility name
 ## See Also
 
 - [Output Style Guide](../output-style-guide.md) - Guidelines for consistent output formatting
-- [CONTRIBUTING.md](../CONTRIBUTING.md) - Guidelines for contributing to IntermCLI
+- [Developer Guide](../DEVELOPER-GUIDE.md) - Architecture, design principles, and contribution workflow

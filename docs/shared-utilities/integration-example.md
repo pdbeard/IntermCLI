@@ -299,5 +299,5 @@ def check_dependencies():
 
 ## See Also
 
-- [CONTRIBUTING Guide](../CONTRIBUTING.md) - Guide for project contributors
+- [Developer Guide](../DEVELOPER-GUIDE.md) - Architecture, design principles, and contribution workflow
 - All individual utility documentation in this directory

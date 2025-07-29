@@ -2,29 +2,29 @@
 
 IntermCLI provides a set of shared utilities that can be used across all tools in the suite. These utilities help maintain consistency, reduce code duplication, and make the codebase more maintainable.
 
-**Note:** Detailed documentation for each utility has been moved to the [shared-utilities](./shared-utilities/index.md) directory.
-
-## Available Utilities
+## Overview
 
 | Utility | Description | File |
 |---------|-------------|------|
-| [Config Loader](./shared-utilities/config-loader.md) | Handles TOML configuration loading with proper precedence | `shared/config_loader.py` |
-| [Enhancement Loader](./shared-utilities/enhancement-loader.md) | Handles detection of optional dependencies | `shared/enhancement_loader.py` |
-| [Output Handler](./shared-utilities/output-handler.md) | Provides consistent output formatting | `shared/output.py` |
-| [Error Handler](./shared-utilities/error-handler.md) | Provides standardized error handling | `shared/error_handler.py` |
-| [Network Utilities](./shared-utilities/network-utils.md) | Provides common network operations | `shared/network_utils.py` |
-| [Argument Parser](./shared-utilities/argument-parser.md) | Provides consistent argument parsing | `shared/arg_parser.py` |
-| [Path Utilities](./shared-utilities/path-utils.md) | Ensures shared modules can be imported properly | `shared/path_utils.py` |
-| [Tool Metadata](./shared-utilities/tool-metadata.md) | Provides consistent version and documentation handling | `shared/tool_metadata.py` |
+| Config Loader | Handles TOML configuration loading with proper precedence | `shared/config_loader.py` |
+| Enhancement Loader | Handles detection of optional dependencies | `shared/enhancement_loader.py` |
+| Output Handler | Provides consistent output formatting | `shared/output.py` |
+| Error Handler | Provides standardized error handling | `shared/error_handler.py` |
+| Network Utilities | Provides common network operations | `shared/network_utils.py` |
+| Argument Parser | Provides consistent argument parsing | `shared/arg_parser.py` |
+| Path Utilities | Ensures shared modules can be imported properly | `shared/path_utils.py` |
+| Tool Metadata | Provides consistent version and documentation handling | `shared/tool_metadata.py` |
+
+For detailed documentation and usage examples, see the [Shared Utilities Reference](./shared-utilities-reference.md).
 
 ## Integration Example
 
-For a complete example of using all shared utilities together, see the [Integration Example](./shared-utilities/integration-example.md).
+For a complete example of using all shared utilities together, see the [Integration Example](./shared-utilities-reference.md#integration-example).
 
 ## See Also
 
 - [Output Style Guide](./output-style-guide.md) - Guidelines for consistent output formatting
-- [CONTRIBUTING.md](./CONTRIBUTING.md) - Guidelines for contributing to IntermCLI
+- [Developer Guide](./DEVELOPER-GUIDE.md) - Architecture, design principles, and contribution workflow
 enhancements.register_feature("enhanced_http", ["requests"])
 enhancements.register_feature("rich_output", ["rich"])
 

@@ -118,5 +118,4 @@ from shared.arg_parser import ArgumentParser
 
 ## See Also
 
-- [CONTRIBUTING Guide](../CONTRIBUTING.md) - Guide for project contributors
-- [CONTRIBUTING.md](../CONTRIBUTING.md) - Guidelines for contributing to IntermCLI
+- [Developer Guide](../DEVELOPER-GUIDE.md) - Architecture, design principles, and contribution workflow

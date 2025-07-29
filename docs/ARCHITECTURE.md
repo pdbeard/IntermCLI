@@ -155,9 +155,9 @@ interm config validate
 3. **Phase 3**: Implement comprehensive testing and config validation.
 4. **Phase 4**: Add plugin architecture for third-party tools.
 
-### When to Refactor
+### When to Extract Shared Code
 
-Extract to [`shared/`](shared/) when:
+Move code to [`shared/`](shared/) when:
 - **3+ tools** implement the same pattern
 - **Clear abstraction** emerges naturally
 - **Maintenance burden** of duplication becomes significant
@@ -188,4 +188,4 @@ See [Contributing](CONTRIBUTING.md) for detailed contribution guidelines.
 
 ---
 
-This architecture embraces the "start simple, evolve naturally" philosophy while maintaining clear migration paths toward a comprehensive configuration system and target structure.
+This architecture balances simplicity with extensibility, providing a comprehensive configuration system and clear structure.
