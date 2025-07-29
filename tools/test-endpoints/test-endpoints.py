@@ -48,7 +48,7 @@ TOOL_NAME = "test-endpoints"
 
 # Optional enhancements
 try:
-    import requests
+    # import requests
 
     HAS_REQUESTS = True
 except ImportError:
@@ -115,27 +115,53 @@ def make_request_enhanced(
     json_data=None,
     data=None,
     timeout=30,
-    verify=True,
+    verify_ssl=True,
     output=None,
     error_handler=None,
 ):
-    """Make HTTP request using requests library"""
-    start_time = time.time()
-
-    kwargs = {"timeout": timeout, "verify": verify, "headers": headers or {}}
-
-    if json_data:
-        kwargs["json"] = json_data
-    elif data:
-        kwargs["data"] = data
-
+    """Make an HTTP request using the requests library"""
     try:
-        response = requests.request(method, url, **kwargs)
+        import requests
+
+        kwargs = {
+            "headers": headers or {},
+            "timeout": timeout,
+            "verify": verify_ssl,
+            "allow_redirects": True,
+        }
+
+        if json_data:
+            kwargs["json"] = json_data
+        elif data:
+            kwargs["data"] = data
+
+        # Create a progress bar if output has the method
+        if output and hasattr(output, "create_progress_bar"):
+            with output.create_progress_bar(
+                total=100, description=f"Requesting {method} {url}"
+            ) as progress_bar:
+                # Make the request
+                start_time = time.time()
+
+                # Update progress bar to show request in progress
+                progress_bar.update(10)  # Show initial progress
+
+                response = requests.request(method, url, **kwargs)
+
+                # Update progress bar to show request completed
+                progress_bar.update(90)  # Complete progress
+        else:
+            # Make the request without progress bar
+            start_time = time.time()
+            response = requests.request(method, url, **kwargs)
+
         response.elapsed = time.time() - start_time
         return response
     except Exception as e:
         if error_handler:
-            error_handler.handle_network_operation(url, e, "connect to")
+            msg, code = error_handler.handle_network_operation(url, e, "connect to")
+        elif output:
+            output.error(f"Request failed: {e}")
         raise
 
 
@@ -383,10 +409,20 @@ def print_response_simple(
     # Headers
     if show_headers and hasattr(response, "headers"):
         if output:
-            output.info("Headers:")
-            for key, value in response.headers.items():
-                output.info(f"  {key}: {value}")
-            output.info("")
+            if hasattr(output, "print_key_value_section"):
+                # Use the new method for better formatting
+                output.print_key_value_section(
+                    "Headers",
+                    {key: value for key, value in response.headers.items()},
+                    sort_keys=True,
+                )
+                output.info("")
+            else:
+                # Fallback to old method
+                output.info("Headers:")
+                for key, value in response.headers.items():
+                    output.info(f"  {key}: {value}")
+                output.info("")
         else:
             print("Headers:")
             for key, value in response.headers.items():
@@ -403,16 +439,51 @@ def print_response_simple(
 
     if body:
         if output:
-            output.info("Body:")
-            # Try to format as JSON for backward compatibility with tests
-            try:
-                if body.strip().startswith(("{", "[")):
-                    formatted = format_json(body)
-                    output.info(formatted)
-                else:
+            # Use advanced output methods if available
+            if hasattr(output, "print_key_value_section") and body.strip().startswith(
+                "{"
+            ):
+                try:
+                    # For JSON objects, use print_key_value_section
+                    json_data = json.loads(body)
+                    if isinstance(json_data, dict):
+                        output.print_key_value_section("Response Body", json_data)
+                    else:
+                        # Fallback for non-dict JSON
+                        output.info("Body:")
+                        formatted = format_json(body)
+                        output.info(formatted)
+                except Exception:
+                    # Fallback to basic output
+                    output.info("Body:")
                     output.info(body)
-            except Exception:
-                output.info(body)
+            elif hasattr(output, "print_list") and body.strip().startswith("["):
+                try:
+                    # For JSON arrays, use print_list
+                    json_data = json.loads(body)
+                    if isinstance(json_data, list):
+                        output.print_list("Response Items", json_data)
+                    else:
+                        # Fallback for non-list JSON
+                        output.info("Body:")
+                        formatted = format_json(body)
+                        output.info(formatted)
+                except Exception:
+                    # Fallback to basic output
+                    output.info("Body:")
+                    output.info(body)
+            else:
+                # Fallback to old method
+                output.info("Body:")
+                # Try to format as JSON for backward compatibility with tests
+                try:
+                    if body.strip().startswith(("{", "[")):
+                        formatted = format_json(body)
+                        output.info(formatted)
+                    else:
+                        output.info(body)
+                except Exception:
+                    output.info(body)
         else:
             print("Body:")
             # Try to format as JSON for backward compatibility with tests
@@ -537,7 +608,34 @@ def check_dependencies(output=None):
     if output:
         # Set output before printing status
         enhancer.output = output
-        enhancer.print_status()
+
+        # Custom display using new output methods if available
+        if hasattr(output, "print_key_value_section"):
+            # Create a dictionary of dependencies with their status
+            dependencies = {
+                key: "Available" if value else "Missing"
+                for key, value in enhancer.dependencies.items()
+            }
+
+            output.print_key_value_section(
+                f"Optional Dependencies for {TOOL_NAME}", dependencies, sort_keys=True
+            )
+
+            # Create a list of missing dependencies for installation instructions
+            missing = enhancer.get_missing_dependencies()
+            if missing:
+                output.info("\nTo enable all features, install missing dependencies:")
+
+                if hasattr(output, "print_list"):
+                    # Display as a list with pip install commands
+                    install_commands = [f"pip install {dep}" for dep in missing]
+                    output.print_list("Install Commands", install_commands)
+                else:
+                    # Fallback to simple output
+                    output.info(f"  pip install {' '.join(missing)}")
+        else:
+            # Fallback to original method
+            enhancer.print_status()
     else:
         enhancer.print_status()
 

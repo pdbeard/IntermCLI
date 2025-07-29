@@ -411,9 +411,20 @@ def test_findprojectsapp_run_no_projects(monkeypatch, capsys):
     find_projects = import_find_projects()
     output = find_projects.Output("find-projects")
     app = find_projects.FindProjectsApp(output)
+
     # Ensure app.config is a Config, not LoadedConfig
     if hasattr(app.config, "config"):
         app.config = app.config.config
+    else:
+        # Initialize config if it's not set
+        config_manager = find_projects.ConfigManager(output)
+        loaded_config = config_manager.load_config()
+        app.config = loaded_config.config
+        app.config_manager = config_manager
+
+    # Initialize the scanner which is missing
+    app.scanner = find_projects.ProjectScanner(app.config, output)
+    # Now mock the scanner's find_git_projects method
     app.scanner.find_git_projects = lambda: []
 
     # Override the _show_no_projects_message method to print directly to stdout instead of using output.warning

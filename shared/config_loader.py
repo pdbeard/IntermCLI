@@ -83,6 +83,9 @@ class ConfigLoader:
         if cmd_args:
             self._apply_cmd_args(config, cmd_args)
 
+        # Perform final path expansions for any top-level path items we may have missed
+        self._expand_path_values(config)
+
         self.config = config
         return config
 
@@ -151,6 +154,22 @@ class ConfigLoader:
             ):
                 self._deep_update(base_config[key], value)
             else:
+                # Handle path expansion for any string that looks like a path
+                if (
+                    isinstance(value, str)
+                    and "~" in value
+                    and key.endswith(("_path", "_dir", "_directory"))
+                ):
+                    value = os.path.expanduser(value)
+                # Handle path expansion for lists of paths
+                elif isinstance(value, list) and key.endswith(
+                    ("_paths", "_dirs", "_directories")
+                ):
+                    value = [
+                        os.path.expanduser(v) if isinstance(v, str) and "~" in v else v
+                        for v in value
+                    ]
+
                 base_config[key] = value
 
     def _apply_env_overrides(self, config: Dict[str, Any]) -> None:
@@ -170,6 +189,40 @@ class ConfigLoader:
                     section[parts[-1]] = self._convert_env_value(value)
                 else:
                     config[config_key] = self._convert_env_value(value)
+
+    def _expand_path_values(self, config: Dict[str, Any]) -> None:
+        """
+        Expand path values in configuration, handling both single paths and lists of paths.
+
+        This is a final pass to catch any paths that might have been missed by the deep update
+        or environment variable handling.
+        """
+        for key, value in list(config.items()):
+            # Handle nested dictionaries recursively
+            if isinstance(value, dict):
+                self._expand_path_values(value)
+                continue
+
+            # Process keys that look like they contain paths
+            if (
+                isinstance(value, str)
+                and "~" in value
+                and (
+                    key.endswith(("_path", "_dir", "_directory"))
+                    or key in ("path", "dir", "directory")
+                )
+            ):
+                config[key] = os.path.expanduser(value)
+
+            # Handle lists of paths
+            elif isinstance(value, list) and (
+                key.endswith(("_paths", "_dirs", "_directories"))
+                or key in ("paths", "dirs", "directories", "development_dirs")
+            ):
+                config[key] = [
+                    os.path.expanduser(v) if isinstance(v, str) and "~" in v else v
+                    for v in value
+                ]
 
     def _apply_cmd_args(self, config: Dict[str, Any], cmd_args: Dict[str, Any]) -> None:
         """Apply command line argument overrides to config."""

@@ -289,8 +289,13 @@ class ConfigManager:
     def _filter_existing_dirs(self, dirs: List[str]) -> List[str]:
         """Filter to existing directories"""
         existing_dirs = [d for d in dirs if os.path.exists(d)]
+        # Only show warning message once during initialization,
+        # not during config loading
         if not existing_dirs:
-            self.output.warning("No configured development directories exist")
+            # Use status_update instead of warning for a cleaner display
+            self.output.status_update(
+                "No configured development directories exist", "warning"
+            )
         return existing_dirs
 
     def _validate_editor(self, editor: str) -> str:
@@ -378,23 +383,34 @@ class ProjectScanner:
         """Find all git repositories in configured directories"""
         projects = []
 
+        # Check if we have any directories to scan
+        if not self.config.development_dirs:
+            self.output.status_update("No development directories to scan", "warning")
+            return projects
+
         self.output.info("Scanning directories:")
-        for dev_dir in self.config.development_dirs:
-            projects.extend(self._scan_directory(dev_dir))
+
+        # Use a progress bar to show scanning progress
+        total_dirs = len(self.config.development_dirs)
+        with self.output.create_progress_bar(
+            total=total_dirs, description="Scanning directories"
+        ) as progress:
+            for dev_dir in self.config.development_dirs:
+                projects.extend(self._scan_directory(dev_dir))
+                progress.update(1)
 
         # Sort by last modified (newest first)
         projects.sort(key=lambda x: x.last_modified, reverse=True)
-        self.output.info(f"Total projects found: {len(projects)}")
+        self.output.task_complete("Project scan", f"Found {len(projects)} projects")
         return projects
 
     def _scan_directory(self, dev_dir: str) -> List[Project]:
         """Scan a single directory for projects"""
-        self.output.info(f"Checking: {dev_dir}")
         if not os.path.exists(dev_dir):
-            self.output.error("Directory doesn't exist")
+            self.output.error(f"Directory doesn't exist: {dev_dir}")
             return []
 
-        self.output.info("Directory exists, scanning...")
+        self.output.task_start("Scanning", f"{dev_dir}")
         projects = []
         project_count = 0
 
@@ -426,7 +442,9 @@ class ProjectScanner:
         except Exception as e:
             self.output.error(f"Error scanning {dev_dir}: {e}")
 
-        self.output.info(f"Found {project_count} projects in this directory")
+        self.output.task_complete(
+            "Directory scan", f"Found {project_count} projects in {dev_dir}"
+        )
         return projects
 
     def _filter_unsafe_symlinks(self, root: str, dirs: List[str]) -> None:
@@ -465,7 +483,9 @@ class ProjectScanner:
 
         project_type = self.detector.detect_project_type(project_path)
 
-        self.output.info(f"Found: {project_name} at {relative_path}")
+        self.output.status_update(
+            f"Found project: {project_name} ({project_type})", "info"
+        )
 
         return Project(
             name=project_name,
@@ -612,7 +632,8 @@ class ProjectOpener:
             original_cwd = os.getcwd()
             os.chdir(project_path)
 
-            self.output.info(f"Opening {project_name} in {editor}...")
+            # Use task_start to indicate the opening process
+            self.output.task_start("Opening project", f"{project_name} in {editor}")
 
             result = subprocess.run(
                 [editor, "."], check=False, capture_output=False, text=True
@@ -621,7 +642,12 @@ class ProjectOpener:
             os.chdir(original_cwd)
 
             if result.returncode == 0:
-                self.output.success(f"Opened {project_name} in {editor}")
+                # Display project information using print_key_value_section
+                self.output.print_key_value_section(
+                    "Project opened",
+                    {"Name": project_name, "Editor": editor, "Path": project_path},
+                )
+                # Special marker for shell wrapper scripts
                 self.output.info(f"CD_TO:{project_path}")
                 return True
             else:
@@ -718,7 +744,7 @@ class FindProjectsApp:
     def __init__(self, output: Output):
         self.output = output
         self.error_handler = ErrorHandler(self.output)
-        self.config_manager = ConfigManager(self.output)
+        self.config_manager = None  # Will be set from main()
         self.input_handler = InputHandler()
         self.search_engine = SearchEngine()
         self.grouper = ProjectGrouper()
@@ -726,8 +752,9 @@ class FindProjectsApp:
         self.detector = ProjectDetector()
         self.renderer = UIRenderer(self.detector, self.output)
 
-        self.config = self.config_manager.load_config()
-        self.scanner = ProjectScanner(self.config, self.output)
+        # Config will be set from main() to avoid duplicate config loading
+        self.config = None
+        self.scanner = None  # Will be set from main()
 
         # Add instance variables for state
         self.group_by_type = False
@@ -751,27 +778,53 @@ class FindProjectsApp:
         """Print configuration debug information"""
         import platform
 
-        self.output.info(f"Platform: {platform.system()} ({platform.machine()})")
-        self.output.info(f"Development directories: {self.config.development_dirs}")
-        self.output.info(f"Default editor: {self.config.default_editor}")
-        self.output.info(f"Max scan depth: {self.config.max_scan_depth}")
-        self.output.info(f"Skip directories: {self.config.skip_dirs}")
+        # Add debug info for config loading
+        config_source = self.config_manager.config_loader.show_config_source()
+        config_files = self.config_manager.config_loader._get_config_files()
 
-        # Get TOML support status from the ConfigLoader
-        self.output.info(
-            f"TOML support: {'Available' if self.config_manager.config_loader.has_toml else 'Missing'}"
+        # Use new key-value section method for cleaner config display
+        self.output.print_key_value_section(
+            "Configuration",
+            {
+                "Platform": f"{platform.system()} ({platform.machine()})",
+                "Development directories": str(self.config.development_dirs),
+                "Default editor": self.config.default_editor,
+                "Max scan depth": str(self.config.max_scan_depth),
+                "Skip directories": str(self.config.skip_dirs),
+                "TOML support": (
+                    "Available"
+                    if self.config_manager.config_loader.has_toml
+                    else "Missing"
+                ),
+                "Config source": config_source,
+            },
         )
+
+        # Print the paths being searched for config files
+        self.output.subheader("Config File Paths Checked:")
+        for file_path, desc in config_files:
+            exists = "✅ Found" if file_path.exists() else "❌ Not found"
+            self.output.info(f"  {exists}: {file_path} ({desc})")
 
     def _show_no_projects_message(self) -> None:
         """Show message when no projects found"""
-        self.output.warning("\nNo git repositories found")
+        self.output.warning("No git repositories found")
+
+        # Add a blank line for better spacing
+        self.output.blank()
+
+        # Check if we have any development directories before showing the list
+        if self.config.development_dirs:
+            # Use the print_list method for cleaner list output
+            self.output.print_list(
+                self.config.development_dirs,
+                title="Tip: Make sure you have git repositories in one of these directories:",
+            )
+        else:
+            self.output.info("No development directories configured.")
+
         self.output.info(
-            "\nTip: Make sure you have git repositories in one of these directories:"
-        )
-        for dev_dir in self.config.development_dirs:
-            self.output.info(f"  - {dev_dir}")
-        self.output.info(
-            "\nOr set FIND_PROJECTS_DIRS environment variable to specify custom directories."
+            "Or set FIND_PROJECTS_DIRS environment variable to specify custom directories."
         )
 
     def _interactive_browse(self, projects: List[Project]) -> None:
@@ -859,7 +912,9 @@ class FindProjectsApp:
             print(f"Query: {query}_")
             print(f"Found {len(filtered)} matches\n")
 
-            # Show results
+            # Create and display results table
+            # Note: We still use print() here because we need precise control
+            # for the interactive UI with selection indicators
             for i, project in enumerate(filtered[:15]):
                 prefix = "► " if i == search_selected else "  "
                 type_icon = self.detector.get_type_icon(project.project_type)
@@ -1044,11 +1099,11 @@ def main():
     parser = create_argument_parser()
     args = parser.parser.parse_args()
 
-    # Create and configure output handler
-    output = Output("find-projects")
+    # First create a basic output handler for initial setup
+    initial_output = Output("find-projects")
 
     # Create config manager with output handler
-    config_manager = ConfigManager(output)
+    config_manager = ConfigManager(initial_output)
     loaded_config = config_manager.load_config()
 
     # Override logging settings from command line arguments if provided
@@ -1087,7 +1142,9 @@ def main():
 
     # Initialize app with configured output
     app = FindProjectsApp(output)
+    # Use the loaded config directly
     app.config = loaded_config.config
+    app.config_manager = config_manager
     app.scanner = ProjectScanner(loaded_config.config, output)
     app.run(args)
 

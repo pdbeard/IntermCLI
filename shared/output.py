@@ -57,6 +57,63 @@ class SimpleProgressBar:
         sys.stdout.flush()
 
 
+class SimpleTableAdapter:
+    """Simple table adapter for non-rich environments"""
+
+    def __init__(
+        self, title: Optional[str] = None, headers: Optional[List[str]] = None
+    ) -> None:
+        self.title = title
+        self.headers = headers or []
+        self.rows = []
+
+    def add_row(self, *cells) -> None:
+        """Add a row to the table"""
+        self.rows.append([str(cell) for cell in cells])
+
+    def add_column(self, header: str) -> None:
+        """Add a column to the table"""
+        self.headers.append(header)
+
+    def __str__(self) -> str:
+        """String representation of the table"""
+        if not self.rows:
+            return "(No data)"
+
+        # Calculate column widths
+        widths = [len(str(h)) for h in self.headers]
+        for row in self.rows:
+            for i, cell in enumerate(row):
+                if i < len(widths):
+                    widths[i] = max(widths[i], len(str(cell)))
+
+        lines = []
+
+        # Add title if present
+        if self.title:
+            lines.append(self.title)
+            lines.append("-" * len(self.title))
+
+        # Add headers
+        if self.headers:
+            header_row = " | ".join(
+                str(h).ljust(widths[i]) for i, h in enumerate(self.headers)
+            )
+            lines.append(header_row)
+            lines.append("-" * len(header_row))
+
+        # Add rows
+        for row in self.rows:
+            row_str = " | ".join(
+                str(cell).ljust(widths[i])
+                for i, cell in enumerate(row)
+                if i < len(widths)
+            )
+            lines.append(row_str)
+
+        return "\n".join(lines)
+
+
 # Setup default logging
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
@@ -308,6 +365,21 @@ class Output:
         else:
             self._print_simple_table(headers, rows)
 
+    def print_table_obj(self, table: Any) -> None:
+        """
+        Print a table object created with create_table().
+
+        Args:
+            table: Table object (Rich Table or SimpleTableAdapter)
+        """
+        if isinstance(table, SimpleTableAdapter):
+            self.info(str(table))
+        elif self.rich_console:
+            self.rich_console.print(table)
+        else:
+            # Fallback for unknown table type
+            self.info(str(table))
+
     def _print_simple_table(self, headers: List[str], rows: List[List[Any]]) -> None:
         """
         Print a simple ASCII table without rich.
@@ -365,6 +437,84 @@ class Output:
             task_id = progress.add_task(description, total=total)
             return RichProgressAdapter(progress, task_id)
         return SimpleProgressBar(total, description)
+
+    def create_table(
+        self, title: Optional[str] = None, headers: Optional[List[str]] = None
+    ) -> Any:
+        """
+        Create a table object that can be populated and then printed.
+
+        Args:
+            title: Optional title for the table
+            headers: Optional list of column headers
+
+        Returns:
+            Table object that can be populated with add_row and then printed
+        """
+        if self.rich_console:
+            try:
+                from rich.table import Table
+
+                table = Table(title=title)
+                if headers:
+                    for header in headers:
+                        table.add_column(header)
+                return table
+            except ImportError:
+                pass
+
+        # Return a simple table adapter for non-rich environments
+        return SimpleTableAdapter(title, headers)
+
+    def print_list(
+        self, items: List[str], numbered: bool = False, title: Optional[str] = None
+    ) -> None:
+        """
+        Print a formatted list of items.
+
+        Args:
+            items: List of items to print
+            numbered: Whether to use numbered list (True) or bullet points (False)
+            title: Optional title for the list
+        """
+        if title:
+            self.subheader(title)
+
+        for i, item in enumerate(items, 1):
+            prefix = f"{i}." if numbered else "•"
+            self.info(f"{prefix} {item}")
+
+    def status_update(self, message: str, status: str = "in_progress") -> None:
+        """
+        Show a status update with appropriate icon.
+
+        Args:
+            message: Status message to display
+            status: Status type: "in_progress", "success", "warning", "error", or "info"
+        """
+        icons = {
+            "in_progress": "🔄",
+            "success": "✅",
+            "warning": "⚠️",
+            "error": "❌",
+            "info": "ℹ️",
+        }
+        icon = icons.get(status, "•")
+
+        if self.rich_console:
+            status_style = {
+                "in_progress": "info",
+                "success": "success",
+                "warning": "warning",
+                "error": "error",
+                "info": "info",
+            }.get(status, "info")
+
+            self.rich_console.print(
+                f"[{status_style}]{icon} {message}[/{status_style}]"
+            )
+        else:
+            self.logger.info(f"{icon} {message}")
 
     def print_markdown(self, markdown_text: str) -> None:
         """
@@ -515,4 +665,54 @@ class Output:
                     self.logger.info(f"{key}: {value}")
 
         # Add a blank line after the banner
+        self.blank()
+
+    def print_grouped_data(
+        self, data: Dict[str, List[str]], show_empty: bool = False
+    ) -> None:
+        """
+        Print grouped data with sections.
+
+        Args:
+            data: Dictionary mapping section names to lists of items
+            show_empty: Whether to show empty sections
+        """
+        for section, items in data.items():
+            if not items and not show_empty:
+                continue
+
+            self.subheader(section)
+
+            if items:
+                for item in items:
+                    self.info(f"  • {item}")
+            else:
+                self.info("  (No items)")
+
+            self.blank()
+
+    def print_key_value_section(self, title: str, data: Dict[str, str]) -> None:
+        """
+        Print a section with key-value pairs.
+
+        Args:
+            title: Section title
+            data: Dictionary of key-value pairs to display
+        """
+        self.subheader(title)
+
+        if not data:
+            self.info("  (No data)")
+            return
+
+        # Calculate max key length for alignment
+        max_key_len = max(len(key) for key in data.keys())
+
+        for key, value in data.items():
+            aligned_key = key.ljust(max_key_len)
+            if self.rich_console:
+                self.rich_console.print(f"  [bold]{aligned_key}:[/bold] {value}")
+            else:
+                self.logger.info(f"  {aligned_key}: {value}")
+
         self.blank()

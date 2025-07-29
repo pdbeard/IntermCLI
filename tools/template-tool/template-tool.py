@@ -13,8 +13,8 @@ Example usage:
 """
 
 import sys
+import time
 from pathlib import Path
-from typing import Any, Dict
 
 # Ensure shared utilities are available
 parent_path = str(Path(__file__).resolve().parent.parent)
@@ -42,9 +42,9 @@ TOOL_NAME = "template-tool"
 
 
 # --- Core functionality ---
-def process_input(input_data: Any, config: Dict[str, Any], output: Output) -> Any:
+def process_input(input_data, config, output):
     """
-    Process input data according to configuration.
+    Process input with this tool.
 
     Args:
         input_data: The input data to process
@@ -56,16 +56,58 @@ def process_input(input_data: Any, config: Dict[str, Any], output: Output) -> An
     """
     # Implement tool-specific logic here
     output.info(f"Processing input: {input_data}")
+
+    # Demonstrate progress bar if available
+    if hasattr(output, "create_progress_bar"):
+        # Example of using a progress bar for a long-running operation
+        progress = output.create_progress_bar(total=100, desc="Processing data")
+
+        # Simulate processing steps
+        for i in range(100):
+            # Update progress bar
+            progress.update(1)
+            # Sleep briefly to simulate work
+            time.sleep(0.01)
+
+        # Always close the progress bar when done
+        progress.close()
+
     return input_data
 
 
 # --- Dependency checking ---
-def check_dependencies():
+def check_dependencies(output=None):
     """Check status of optional dependencies"""
     enhancer = EnhancementLoader(TOOL_NAME)
     enhancer.check_dependency("rich", "Rich output formatting")
     # Add other optional dependencies here
-    enhancer.print_status()
+
+    if output and hasattr(output, "print_key_value_section"):
+        # Create a dictionary of dependencies with their status
+        dependencies = {
+            key: "Available" if value else "Missing"
+            for key, value in enhancer.dependencies.items()
+        }
+
+        output.print_key_value_section(
+            f"Optional Dependencies for {TOOL_NAME}", dependencies, sort_keys=True
+        )
+
+        # Create a list of missing dependencies for installation instructions
+        missing = enhancer.get_missing_dependencies()
+        if missing:
+            output.info("\nTo enable all features, install missing dependencies:")
+
+            if hasattr(output, "print_list"):
+                # Display as a list with pip install commands
+                install_commands = [f"pip install {dep}" for dep in missing]
+                output.print_list("Install Commands", install_commands)
+            else:
+                # Fallback to simple output
+                output.info(f"  pip install {' '.join(missing)}")
+    else:
+        # Fallback to original method
+        enhancer.print_status()
 
 
 # --- CLI ---
@@ -117,13 +159,13 @@ def main():
     # Parse arguments
     args = arg_parser.parser.parse_args()
 
-    # Check dependencies if requested
-    if args.check_deps:
-        check_dependencies()
-        return
-
     # Initialize output handling
     output = Output(TOOL_NAME, verbose=False)
+
+    # Check dependencies if requested
+    if args.check_deps:
+        check_dependencies(output)
+        return
 
     # Display banner with metadata
     output.banner(
@@ -146,9 +188,23 @@ def main():
         result = process_input(args.input, config, output)
         output.task_complete("Processing input", "Completed successfully")
 
-        output.header("Results")
-        output.item("Input", args.input)
-        output.item("Result", str(result))
+        # Use new output methods if available
+        if hasattr(output, "print_key_value_section"):
+            output.print_key_value_section(
+                "Results",
+                {
+                    "Input": args.input,
+                    "Result": str(result),
+                    "Dry Run": "Yes" if args.dry_run else "No",
+                    "Copy Mode": "Yes" if args.copy else "No",
+                    "Recursive": "Yes" if args.recursive else "No",
+                },
+            )
+        else:
+            # Fallback to basic output
+            output.header("Results")
+            output.item("Input", args.input)
+            output.item("Result", str(result))
     else:
         output.error("No input provided")
         arg_parser.parser.print_help()
