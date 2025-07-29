@@ -2,14 +2,9 @@
 """
 Tests for the ArgumentParser shared utility.
 """
-import os
-import sys
 import unittest
 from argparse import ArgumentParser as ArgParser
 from unittest.mock import patch
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from shared.arg_parser import ArgumentParser
 

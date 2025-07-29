@@ -31,9 +31,6 @@ intermcli/
 - Add new tools in `tools/` with their own README and config
 - Follow naming and architecture conventions
 - See [CONTRIBUTING.md](CONTRIBUTING.md) for details
-│   └── install-tool           # Script to add new tools
-└── tests/                     # Suite-wide integration tests (planned)
-```
 
 ## 🎯 Core Architecture Principles
 
