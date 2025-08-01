@@ -46,9 +46,10 @@ from shared.output import setup_tool_output
 __version__ = "0.1.0"
 TOOL_NAME = "test-endpoints"
 
+
 # Optional enhancements
 try:
-    # import requests
+    import requests as _requests  # noqa: F401
 
     HAS_REQUESTS = True
 except ImportError:
@@ -412,9 +413,7 @@ def print_response_simple(
             if hasattr(output, "print_key_value_section"):
                 # Use the new method for better formatting
                 output.print_key_value_section(
-                    "Headers",
-                    {key: value for key, value in response.headers.items()},
-                    sort_keys=True,
+                    "Headers", {key: value for key, value in response.headers.items()}
                 )
                 output.info("")
             else:
@@ -618,7 +617,7 @@ def check_dependencies(output=None):
             }
 
             output.print_key_value_section(
-                f"Optional Dependencies for {TOOL_NAME}", dependencies, sort_keys=True
+                f"Optional Dependencies for {TOOL_NAME}", dependencies
             )
 
             # Create a list of missing dependencies for installation instructions
