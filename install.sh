@@ -244,7 +244,7 @@ if ! command -v pip3 &> /dev/null; then
 fi
 
 # Uninstall section: remove all tools from manifest
-if [ "$1" = "--uninstall" ]; then
+if [ $# -ge 1 ] && [ "$1" = "--uninstall" ]; then
     echo -e "${BLUE}🗑️  Uninstalling IntermCLI...${NC}"
     if ask_yes_no "Remove installed tools?" "y"; then
         parse_tools | while IFS="|" read -r tool_name _ _; do
@@ -262,7 +262,7 @@ if [ "$1" = "--uninstall" ]; then
 fi
 
 DRY_RUN=false
-if [ "$1" = "--dry-run" ]; then
+if [ $# -ge 1 ] && [ "$1" = "--dry-run" ]; then
     DRY_RUN=true
     echo -e "${BLUE}🔍 Dry run mode - showing what would be installed${NC}"
 fi
