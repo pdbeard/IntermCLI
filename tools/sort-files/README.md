@@ -59,14 +59,22 @@ by_type = true
 by_date = false
 by_size = false
 
+[size_thresholds]
+# Override default size categories (in bytes)
+huge = 104857600   # 100 MB
+large = 10485760   # 10 MB
+medium = 1048576   # 1 MB
+
 [type_folders]
 images = [".jpg", ".jpeg", ".png", ".gif"]
 documents = [".pdf", ".docx", ".txt"]
 archives = [".zip", ".tar", ".gz"]
 ```
 
+
 ### Customizing
 - Edit the TOML config to add new folders, rules, or patterns.
+- Use the `[size_thresholds]` section to customize what counts as a huge, large, or medium file (in bytes).
 - Use `sort-files --config <path>` to specify a custom config file.
 
 ### Troubleshooting

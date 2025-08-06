@@ -83,6 +83,12 @@ def load_config(config_path=None, output=None) -> Dict[str, Any]:
             )
             config["type_folders"] = {}
 
+        # Set default size thresholds, allow override from config
+        size_cfg = config.get("size_thresholds", {})
+        config["huge_size"] = int(size_cfg.get("huge", DEFAULT_HUGE_SIZE))
+        config["large_size"] = int(size_cfg.get("large", DEFAULT_LARGE_SIZE))
+        config["medium_size"] = int(size_cfg.get("medium", DEFAULT_MEDIUM_SIZE))
+
         return config
     except Exception as e:
         if output:
@@ -157,6 +163,59 @@ def handle_file_operation_error(
     return msg, reason
 
 
+# --- Default size thresholds (can be overridden in config) ---
+DEFAULT_HUGE_SIZE = 1024 * 1024 * 100  # 100 MB
+DEFAULT_LARGE_SIZE = 1024 * 1024 * 10  # 10 MB
+DEFAULT_MEDIUM_SIZE = 1024 * 1024  # 1 MB
+
+
+# --- Destination folder logic ---
+def get_destination_folder(
+    entry: Path, target_dir: Path, rules: dict, type_folders: dict
+) -> Path:
+    custom_rules = rules.get("custom", {})
+    custom_folder = match_custom_rule(entry.name, custom_rules)
+    if custom_folder:
+        return target_dir / custom_folder
+    if rules.get("by_type", True):
+        return target_dir / get_file_type(entry, type_folders)
+    if rules.get("by_date", False):
+        mtime = datetime.fromtimestamp(entry.stat().st_mtime)
+        return target_dir / mtime.strftime("%Y-%m")
+    if rules.get("by_size", False):
+        size = entry.stat().st_size
+        # Get thresholds from config (attached to entry's parent config)
+        # Assume config is globally available or pass as needed
+        from inspect import currentframe, getouterframes
+
+        # Find the config in the call stack (from main or sort_files)
+        config = None
+        for frameinfo in getouterframes(currentframe()):
+            local_vars = frameinfo.frame.f_locals
+            if "config" in local_vars:
+                config = local_vars["config"]
+                break
+        if config is None:
+            # Fallback to defaults if config not found
+            huge = DEFAULT_HUGE_SIZE
+            large = DEFAULT_LARGE_SIZE
+            medium = DEFAULT_MEDIUM_SIZE
+        else:
+            huge = config.get("huge_size", DEFAULT_HUGE_SIZE)
+            large = config.get("large_size", DEFAULT_LARGE_SIZE)
+            medium = config.get("medium_size", DEFAULT_MEDIUM_SIZE)
+        size_categories = [
+            (huge, "huge"),
+            (large, "large"),
+            (medium, "medium"),
+        ]
+        for threshold, label in size_categories:
+            if size > threshold:
+                return target_dir / label
+        return target_dir / "small"
+    return target_dir / "other"
+
+
 def sort_files(
     target_dir: Path,
     rules: Dict[str, Any],
@@ -199,19 +258,13 @@ def sort_files(
         if entry.is_dir():
             if entry.name in skip_dirs or (skip_hidden and entry.name.startswith(".")):
                 continue
-            # Process subdirectories if recursive mode is enabled
             if recursive:
-                # Skip folders that might be destination folders to avoid infinite recursion
-                is_destination_folder = False
-                for _, dest_dir in moved:
-                    if entry.name == dest_dir.name:
-                        is_destination_folder = True
-                        break
-
+                # Avoid infinite recursion by skipping destination folders
+                is_destination_folder = any(
+                    entry.name == dest_dir.name for _, dest_dir in moved
+                )
                 if is_destination_folder:
                     continue
-
-                # Recursively process subdirectory
                 sub_moved, sub_skipped = sort_files(
                     entry,
                     rules,
@@ -230,35 +283,7 @@ def sort_files(
         if skip_hidden and entry.name.startswith("."):
             continue
 
-        # --- Custom rules first ---
-        custom_rules = rules.get("custom", {})
-        custom_folder = match_custom_rule(entry.name, custom_rules)
-        if custom_folder:
-            dest_dir = target_dir / custom_folder
-        # --- By type ---
-        elif rules.get("by_type", True):
-            folder = get_file_type(entry, type_folders)
-            dest_dir = target_dir / folder
-        # --- By date ---
-        elif rules.get("by_date", False):
-            mtime = datetime.fromtimestamp(entry.stat().st_mtime)
-            folder = mtime.strftime("%Y-%m")
-            dest_dir = target_dir / folder
-        # --- By size ---
-        elif rules.get("by_size", False):
-            size = entry.stat().st_size
-            if size > 1024 * 1024 * 100:
-                folder = "huge"
-            elif size > 1024 * 1024 * 10:
-                folder = "large"
-            elif size > 1024 * 1024:
-                folder = "medium"
-            else:
-                folder = "small"
-            dest_dir = target_dir / folder
-        else:
-            dest_dir = target_dir / "other"
-
+        dest_dir = get_destination_folder(entry, target_dir, rules, type_folders)
         dest = dest_dir / entry.name
         if safe and dest.exists():
             skipped.append((entry, "exists"))
@@ -266,18 +291,13 @@ def sort_files(
 
         if dry_run:
             operation = "copy" if copy_mode else "move"
-            if (
-                output.verbose
-                or "show_extensions" in rules
-                and rules["show_extensions"]
-            ):
+            if output.verbose or rules.get("show_extensions", False):
                 ext = entry.suffix.lower()
                 msg = f"Would {operation}: {entry.name} → {dest_dir.name}/ [{ext or 'no extension'}]"
             else:
                 msg = f"Would {operation}: {entry.name} → {dest_dir.name}/"
             output.info(msg)
         else:
-            # Create destination directory with error handling
             try:
                 dest_dir.mkdir(parents=True, exist_ok=True)
             except Exception as e:
@@ -289,13 +309,11 @@ def sort_files(
                     (entry, reason.split(":", 1)[1] if ":" in reason else reason)
                 )
                 continue
-
-            # Move or copy the file based on the option
             try:
                 if copy_mode:
-                    shutil.copy2(str(entry), str(dest))
+                    shutil.copy2(entry, dest)
                 else:
-                    shutil.move(str(entry), str(dest))
+                    shutil.move(entry, dest)
                 moved.append((entry, dest_dir))
             except Exception as e:
                 _, reason = handle_file_operation_error(entry, e, output)
