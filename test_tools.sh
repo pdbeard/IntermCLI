@@ -220,8 +220,9 @@ run_tool_tests() {
 
     # Common tests for all tools
 
-    # Test basic help
-    run_test "$tool_name basic help" "$tool_path --help" 0 "usage:"
+
+    # Test basic help (case-insensitive match for 'usage:' or 'Usage:')
+    run_test "$tool_name basic help" "$tool_path --help" 0 "[Uu]sage:"
 
     # Test version flag
     run_test "$tool_name version" "$tool_path --version" 0 "[0-9]\\.[0-9]\\.[0-9]"
@@ -244,8 +245,8 @@ run_tool_tests() {
                 run_error_test "Invalid URL" "$tool_path GET https://invalid-domain-123456789.org" 1 "Failed to connect"
             fi
 
-            # Test dependency check - check for failures containing traceback
-            run_test "Check dependencies" "$tool_path --check-deps" 1 "Traceback"
+            # Test dependency check - expect exit code 0 and info about missing dependencies
+            run_test "Check dependencies" "$tool_path --check-deps" 0 "Optional Dependencies"
 
             # Error case - Missing URL argument
             # When just 'GET' is provided, it interprets GET as the URL and tries to connect to it

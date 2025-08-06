@@ -11,7 +11,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 # Detect Python and pip (prefer venv if active)
-if [ -n "$VIRTUAL_ENV" ] && [ -x "$VIRTUAL_ENV/bin/python" ]; then
+if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "${VIRTUAL_ENV:-}/bin/python" ]; then
     PYTHON_BIN="$VIRTUAL_ENV/bin/python"
     PIP_BIN="$VIRTUAL_ENV/bin/pip"
 else

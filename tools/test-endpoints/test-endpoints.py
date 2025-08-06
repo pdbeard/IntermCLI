@@ -256,7 +256,12 @@ def format_json(text):
 
 
 def print_response(
-    response, verbose=False, show_headers=True, output_format="auto", output=None
+    response,
+    verbose=False,
+    show_headers=True,
+    output_format="auto",
+    output=None,
+    full_output=False,
 ):
     """Print response in a readable format based on the specified output format"""
     # Use provided output or fallback to direct printing
@@ -308,16 +313,23 @@ def print_response(
                 print("⚠️ Could not convert response to YAML, displaying as text")
 
     # Now decide how to display it
-    if HAS_RICH and output and output.rich_console and output_format != "text":
-        print_response_rich(response, verbose, show_headers, response_body, output)
-    elif HAS_RICH and console and output_format != "text" and not has_output_utility:
-        print_response_rich(response, verbose, show_headers, response_body)
+    if HAS_RICH and console and output_format != "text":
+        print_response_rich(
+            response, verbose, show_headers, response_body, None, full_output
+        )
     else:
-        print_response_simple(response, verbose, show_headers, response_body, output)
+        print_response_simple(
+            response, verbose, show_headers, response_body, None, full_output
+        )
 
 
 def print_response_rich(
-    response, verbose=False, show_headers=True, formatted_body=None, output=None
+    response,
+    verbose=False,
+    show_headers=True,
+    formatted_body=None,
+    output=None,
+    full_output=False,
 ):
     """Print response using rich formatting"""
     # Use provided output or fallback to direct rich console
@@ -327,7 +339,9 @@ def print_response_rich(
         rich_console = console
 
     if not rich_console:
-        print_response_simple(response, verbose, show_headers, formatted_body, output)
+        print_response_simple(
+            response, verbose, show_headers, formatted_body, output, full_output
+        )
         return
 
     # Status line
@@ -362,29 +376,68 @@ def print_response_rich(
         body = ""
 
     if body:
+        display_body = body
+        truncated = False
+        if not full_output:
+            MAX_BODY_LINES = 40
+            MAX_LINE_LENGTH = 160
+            try:
+                parsed_json = json.loads(body)
+                pretty = json.dumps(parsed_json, indent=2, ensure_ascii=False)
+            except Exception:
+                pretty = body
+            lines = pretty.splitlines()
+            if len(lines) > MAX_BODY_LINES:
+                lines = lines[:MAX_BODY_LINES]
+                truncated = True
+            lines = [
+                (
+                    line
+                    if len(line) <= MAX_LINE_LENGTH
+                    else line[:MAX_LINE_LENGTH] + " ..."
+                )
+                for line in lines
+            ]
+            display_body = "\n".join(lines)
         try:
             from rich.panel import Panel
             from rich.syntax import Syntax
 
             # Detect if the body is JSON
-            if body.strip().startswith(("{", "[")):
-                syntax = Syntax(body, "json", theme="monokai", line_numbers=False)
+            if display_body.strip().startswith(("{", "[")):
+                syntax = Syntax(
+                    display_body, "json", theme="monokai", line_numbers=False
+                )
                 rich_console.print(Panel(syntax, title="Response Body"))
             # Detect if the body is YAML
-            elif ":" in body and "\n" in body and "<" not in body:
-                syntax = Syntax(body, "yaml", theme="monokai", line_numbers=False)
+            elif (
+                ":" in display_body and "\n" in display_body and "<" not in display_body
+            ):
+                syntax = Syntax(
+                    display_body, "yaml", theme="monokai", line_numbers=False
+                )
                 rich_console.print(Panel(syntax, title="Response Body"))
             else:
-                rich_console.print(Panel(body, title="Response Body"))
+                rich_console.print(Panel(display_body, title="Response Body"))
+            if truncated:
+                rich_console.print(
+                    "[yellow]... (output truncated, showing first 40 lines)[/]"
+                )
         except Exception:
-            # Fall back to plain text
             from rich.panel import Panel
 
-            rich_console.print(Panel(body, title="Response Body"))
+            rich_console.print(Panel(display_body, title="Response Body"))
+            if truncated:
+                rich_console.print("... (output truncated, showing first 40 lines)")
 
 
 def print_response_simple(
-    response, verbose=False, show_headers=True, formatted_body=None, output=None
+    response,
+    verbose=False,
+    show_headers=True,
+    formatted_body=None,
+    output=None,
+    full_output=False,
 ):
     """Print response using simple text formatting"""
     status_emoji = (
@@ -394,39 +447,15 @@ def print_response_simple(
     )
     elapsed_ms = int(getattr(response, "elapsed", 0) * 1000)
 
-    # Use the output utility if provided
-    if output:
-        if 200 <= response.status_code < 300:
-            output.success(f"{response.status_code} ({elapsed_ms}ms)")
-        elif response.status_code >= 400:
-            output.error(f"{response.status_code} ({elapsed_ms}ms)")
-        else:
-            output.warning(f"{response.status_code} ({elapsed_ms}ms)")
-        output.info("")
-    else:
-        print(f"{status_emoji} {response.status_code} ({elapsed_ms}ms)")
-        print()
+    print(f"{status_emoji} {response.status_code} ({elapsed_ms}ms)")
+    print()
 
     # Headers
     if show_headers and hasattr(response, "headers"):
-        if output:
-            if hasattr(output, "print_key_value_section"):
-                # Use the new method for better formatting
-                output.print_key_value_section(
-                    "Headers", {key: value for key, value in response.headers.items()}
-                )
-                output.info("")
-            else:
-                # Fallback to old method
-                output.info("Headers:")
-                for key, value in response.headers.items():
-                    output.info(f"  {key}: {value}")
-                output.info("")
-        else:
-            print("Headers:")
-            for key, value in response.headers.items():
-                print(f"  {key}: {value}")
-            print()
+        print("Headers:")
+        for key, value in response.headers.items():
+            print(f"  {key}: {value}")
+        print()
 
     # Body
     if formatted_body is not None:
@@ -437,63 +466,32 @@ def print_response_simple(
         body = ""
 
     if body:
-        if output:
-            # Use advanced output methods if available
-            if hasattr(output, "print_key_value_section") and body.strip().startswith(
-                "{"
-            ):
-                try:
-                    # For JSON objects, use print_key_value_section
-                    json_data = json.loads(body)
-                    if isinstance(json_data, dict):
-                        output.print_key_value_section("Response Body", json_data)
-                    else:
-                        # Fallback for non-dict JSON
-                        output.info("Body:")
-                        formatted = format_json(body)
-                        output.info(formatted)
-                except Exception:
-                    # Fallback to basic output
-                    output.info("Body:")
-                    output.info(body)
-            elif hasattr(output, "print_list") and body.strip().startswith("["):
-                try:
-                    # For JSON arrays, use print_list
-                    json_data = json.loads(body)
-                    if isinstance(json_data, list):
-                        output.print_list("Response Items", json_data)
-                    else:
-                        # Fallback for non-list JSON
-                        output.info("Body:")
-                        formatted = format_json(body)
-                        output.info(formatted)
-                except Exception:
-                    # Fallback to basic output
-                    output.info("Body:")
-                    output.info(body)
-            else:
-                # Fallback to old method
-                output.info("Body:")
-                # Try to format as JSON for backward compatibility with tests
-                try:
-                    if body.strip().startswith(("{", "[")):
-                        formatted = format_json(body)
-                        output.info(formatted)
-                    else:
-                        output.info(body)
-                except Exception:
-                    output.info(body)
-        else:
-            print("Body:")
-            # Try to format as JSON for backward compatibility with tests
-            try:
-                if body.strip().startswith(("{", "[")):
-                    formatted = format_json(body)
-                    print(formatted)
-                else:
-                    print(body)
-            except Exception:
-                print(body)
+        print("Body:")
+        MAX_BODY_LINES = 40
+        MAX_LINE_LENGTH = 160
+        try:
+            parsed_json = json.loads(body)
+            pretty = json.dumps(parsed_json, indent=2, ensure_ascii=False)
+        except Exception:
+            pretty = body
+        lines = pretty.splitlines()
+        truncated = False
+        if not full_output and len(lines) > MAX_BODY_LINES:
+            lines = lines[:MAX_BODY_LINES]
+            truncated = True
+        if not full_output:
+            lines = [
+                (
+                    line
+                    if len(line) <= MAX_LINE_LENGTH
+                    else line[:MAX_LINE_LENGTH] + " ..."
+                )
+                for line in lines
+            ]
+        for line in lines:
+            print(line)
+        if truncated:
+            print(f"... (output truncated, showing first {MAX_BODY_LINES} lines)")
 
 
 def load_config(config_path=None, output=None) -> Dict[str, Any]:
@@ -713,6 +711,11 @@ def main():
         choices=["auto", "json", "yaml", "text"],
         help="Output format (auto, json, yaml, text)",
     )
+    output_group.add_argument(
+        "--full-output",
+        action="store_true",
+        help="Show the full response body (disable truncation in output)",
+    )
 
     # Request behavior
     request_group = parser.parser.add_argument_group("Request Options")
@@ -842,9 +845,14 @@ def main():
             error_handler=error_handler,
         )
 
-        # Print response
+        # Print response (always use classic output, not output utility)
         print_response(
-            response, args.verbose, not args.no_headers, output_format, output
+            response,
+            args.verbose,
+            not args.no_headers,
+            output_format,
+            None,
+            args.full_output,
         )
 
         # Save to file if requested
