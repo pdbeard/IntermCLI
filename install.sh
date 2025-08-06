@@ -19,11 +19,10 @@ else
     PIP_BIN="pip3"
 fi
 
-# Things to have early
+NON_INTERACTIVE=false
 OPTIONAL_MISSING=()
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOOLS_MANIFEST="$SCRIPT_ROOT/tools_manifest.toml"
-INSTALL_OPTIONAL=false
 
 
 # Add function to parse [logging] section from config.toml
@@ -75,9 +74,9 @@ validate_environment() {
 }
 
 detect_shell_profile() {
-    if [ -n "$ZSH_VERSION" ] || [[ "$SHELL" == */zsh ]]; then
+    if [ -n "${ZSH_VERSION:-}" ] || [[ "$SHELL" == */zsh ]]; then
         echo "$HOME/.zshrc"
-    elif [ -n "$BASH_VERSION" ] || [[ "$SHELL" == */bash ]]; then
+    elif [ -n "${BASH_VERSION:-}" ] || [[ "$SHELL" == */bash ]]; then
         if [[ "$OSTYPE" == "darwin"* ]] && [ -f "$HOME/.bash_profile" ]; then
             echo "$HOME/.bash_profile"
         else
@@ -105,7 +104,7 @@ try:
     with open('$TOOLS_MANIFEST', 'rb') as f:
         data = tomllib.load(f)
     for tool in data['tool']:
-        print(f\"{tool['name']}|{tool['script']}|{tool.get('is_executable', False)}\")
+        print(f\"{tool['name']}|{tool['script']}|{tool.get('install', False)}\")
 except Exception as e:
     print('Error parsing tools_manifest.toml:', e, file=sys.stderr)
     sys.exit(1)
@@ -148,27 +147,30 @@ verify_installation() {
 ask_yes_no() {
     local prompt="$1"
     local default="$2"
+    if [ "$NON_INTERACTIVE" = true ]; then
+        # Auto-answer all prompts: Y for default yes, N for default no
+        if [ "$default" = "y" ]; then
+            return 0
+        else
+            return 1
+        fi
+    fi
     local response
-
     if [ "$default" = "y" ]; then
         prompt="$prompt [Y/n]: "
     else
         prompt="$prompt [y/N]: "
     fi
-
     while true; do
-        # Temporarily disable set -e for read
         set +e
         read -r -p "$prompt" response
         local read_exit_code=$?
         set -e
-
         if [ $read_exit_code -ne 0 ]; then
             echo ""
             echo -e "${YELLOW}Installation cancelled by user${NC}"
             exit 130
         fi
-
         response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
         case $response in
             y|yes) return 0 ;;
@@ -185,25 +187,55 @@ ask_yes_no() {
     done
 }
 
-# Handle command-line arguments
-if [ $# -eq 0 ] || [ "$1" = "install" ]; then
-    echo "IntermCLI Installation Script"
-    echo ""
-    echo "Usage: $0 [OPTIONS]"
-    echo ""
-    echo "Options:"
-    echo "  --install, -i  Install IntermCLI tools"
-    echo "  --help, -h     Show this help message"
-    echo "  --version, -v  Show version information"
-    echo "  --uninstall    Remove IntermCLI"
-    echo "  --dry-run      Show what would be installed without installing"
-    exit 0
-fi
 
-if [ "$1" = "--version" ] || [ "$1" = "-v" ]; then
-    echo "IntermCLI Installation Script v1.0.0"
-    exit 0
-fi
+# Handle command-line arguments (add --non-interactive, -y, --prefix, --user, --global)
+INSTALL_DIR=""
+INSTALL_SCOPE=""
+ARGS=("$@")
+idx=0
+while [ $idx -lt ${#ARGS[@]} ]; do
+    arg="${ARGS[$idx]}"
+    case "$arg" in
+        --non-interactive|-y)
+            NON_INTERACTIVE=true
+            ;;
+        --help|-h)
+            echo "IntermCLI Installation Script"
+            echo ""
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --install, -i         Install IntermCLI tools"
+            echo "  --help, -h            Show this help message"
+            echo "  --version, -v         Show version information"
+            echo "  --uninstall           Remove IntermCLI"
+            echo "  --dry-run             Show what would be installed without installing"
+            echo "  --non-interactive, -y Run install with no prompts (for CI/testing)"
+            echo "  --prefix DIR          Install to DIR (overrides user/global install dir)"
+            echo "  --user                Force user install (default)"
+            echo "  --global              Force global install (requires sudo)"
+            exit 0
+            ;;
+        --version|-v)
+            echo "IntermCLI Installation Script v1.0.0"
+            exit 0
+            ;;
+        --prefix)
+            idx=$((idx+1))
+            INSTALL_DIR="${ARGS[$idx]}"
+            ;;
+        --prefix=*)
+            INSTALL_DIR="${arg#*=}"
+            ;;
+        --user)
+            INSTALL_SCOPE="user"
+            ;;
+        --global)
+            INSTALL_SCOPE="global"
+            ;;
+    esac
+    idx=$((idx+1))
+done
 
 # Check for pip3
 if ! command -v pip3 &> /dev/null; then
@@ -235,14 +267,11 @@ if [ "$1" = "--dry-run" ]; then
     echo -e "${BLUE}🔍 Dry run mode - showing what would be installed${NC}"
 fi
 
-# Detect platform
+USER_INSTALL_DIR="$HOME/.local/bin"
+GLOBAL_INSTALL_DIR="/usr/local/bin"
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    USER_INSTALL_DIR="$HOME/.local/bin"
-    GLOBAL_INSTALL_DIR="/usr/local/bin"
     PLATFORM="Linux"
 elif [[ "$OSTYPE" == "darwin"* ]]; then
-    USER_INSTALL_DIR="$HOME/.local/bin"
-    GLOBAL_INSTALL_DIR="/usr/local/bin"
     PLATFORM="macOS"
 else
     echo -e "${RED}❌ Unsupported platform: $OSTYPE${NC}"
@@ -357,6 +386,7 @@ echo ""
 # Check dependencies using requirements.txt
 echo -e "${BLUE}📦 Checking dependencies...${NC}"
 
+
 OPTIONAL_MISSING=()
 if [ "$NEEDS_TOMLI" = true ]; then
     OPTIONAL_MISSING+=("tomli")
@@ -364,7 +394,6 @@ fi
 
 if [ -f "$SCRIPT_ROOT/requirements.txt" ]; then
     echo -e "${BLUE}  Reading requirements.txt...${NC}"
-    TEMP_FILE=$(mktemp -t intermcli.XXXXXX)
     "$PYTHON_BIN" -c "
 import sys
 import re
@@ -403,31 +432,13 @@ for pkg in available_deps:
     print(f'  ✅ {pkg}')
 for pkg in missing_deps:
     print(f'  ⚪ {pkg} - optional')
-with open('$TEMP_FILE', 'w') as f:
-    f.write('\n'.join(missing_deps))
 "
-    OPTIONAL_MISSING+=($(cat "$TEMP_FILE" 2>/dev/null || true))
-    rm -f "$TEMP_FILE"
 else
     echo -e "${YELLOW}  ⚠️  requirements.txt not found${NC}"
 fi
 
-INSTALL_OPTIONAL=false
-if [ ${#OPTIONAL_MISSING[@]} -gt 0 ]; then
-    echo ""
-    echo -e "${YELLOW}📋 Optional Python packages not found:${NC}"
-    for dep in "${OPTIONAL_MISSING[@]}"; do
-        echo -e "    • $dep"
-    done
-    echo ""
-    if ask_yes_no "Install optional Python dependencies for enhanced features?" "y"; then
-        INSTALL_OPTIONAL=true
-    else
-        echo -e "${YELLOW}Some features may be unavailable without optional dependencies.${NC}"
-    fi
-fi
 
-# Installation scope
+# Installation scope logic
 echo ""
 echo -e "${BLUE}🎯 Installation Scope:${NC}"
 echo -e "  ${GREEN}User installation:${NC} $USER_INSTALL_DIR (recommended for terminal tools)"
@@ -436,13 +447,30 @@ echo ""
 echo -e "${BLUE}ℹ️  User installation is recommended for terminal utilities${NC}"
 echo -e "   Tools will be available in your terminal after adding to PATH${NC}"
 
-if ask_yes_no "Use user installation (recommended)?" "y"; then
-    INSTALL_DIR="$USER_INSTALL_DIR"
-    INSTALL_SCOPE="user"
+if [ -n "$INSTALL_DIR" ]; then
+    # Prefix overrides everything
+    if [ -z "$INSTALL_SCOPE" ]; then
+        INSTALL_SCOPE="user"
+    fi
+    echo -e "${YELLOW}  ⚠️  Using custom install directory: $INSTALL_DIR${NC}"
 else
-    INSTALL_DIR="$GLOBAL_INSTALL_DIR"
-    INSTALL_SCOPE="global"
-    echo -e "${YELLOW}  ⚠️  Global installation requires administrator privileges${NC}"
+    if [ -n "$INSTALL_SCOPE" ]; then
+        if [ "$INSTALL_SCOPE" = "user" ]; then
+            INSTALL_DIR="$USER_INSTALL_DIR"
+        else
+            INSTALL_DIR="$GLOBAL_INSTALL_DIR"
+            echo -e "${YELLOW}  ⚠️  Global installation requires administrator privileges${NC}"
+        fi
+    else
+        if ask_yes_no "Use user installation (recommended)?" "y"; then
+            INSTALL_DIR="$USER_INSTALL_DIR"
+            INSTALL_SCOPE="user"
+        else
+            INSTALL_DIR="$GLOBAL_INSTALL_DIR"
+            INSTALL_SCOPE="global"
+            echo -e "${YELLOW}  ⚠️  Global installation requires administrator privileges${NC}"
+        fi
+    fi
 fi
 
 # VALIDATE ENVIRONMENT AFTER DETERMINING SCOPE
@@ -496,6 +524,7 @@ install_tool_config "config.toml" "$SCRIPT_ROOT/config/defaults.toml"
 cp "$SCRIPT_ROOT/tools_manifest.toml" "$CONFIG_DIR/tools_manifest.toml"
 echo -e "${GREEN}  ✅ tools_manifest.toml updated${NC}"
 
+
 # Installation summary
 echo ""
 echo -e "${BLUE}📋 Installation Summary:${NC}"
@@ -504,13 +533,9 @@ echo -e "  Python: $PYTHON_VERSION"
 echo -e "  Install to: $INSTALL_DIR"
 echo -e "  Config: $CONFIG_DIR"
 echo -e "  Shared utilities: Output, ErrorHandler, ConfigLoader, etc."
-if [ "$INSTALL_OPTIONAL" = true ]; then
-    echo -e "  Optional dependencies: Will install"
-else
-    echo -e "  Optional dependencies: Skip"
-fi
 
 echo ""
+
 if ! ask_yes_no "Proceed with installation?" "y"; then
     echo -e "${YELLOW}Installation cancelled${NC}"
     exit 0
@@ -519,31 +544,6 @@ fi
 # Start installation
 echo ""
 echo -e "${BLUE}🚀 Starting installation...${NC}"
-
-# Install optional dependencies if chosen
-if [ "$INSTALL_OPTIONAL" = true ] && [ ${#OPTIONAL_MISSING[@]} -gt 0 ]; then
-    echo -e "${BLUE}📦 Installing optional Python dependencies...${NC}"
-    if [ "$DRY_RUN" = false ]; then
-        # Use --user only if not in venv
-        if [ -n "$VIRTUAL_ENV" ]; then
-            if "$PIP_BIN" install "${OPTIONAL_MISSING[@]}"; then
-                echo -e "${GREEN}  ✅ Optional dependencies installed in venv${NC}"
-            else
-                echo -e "${YELLOW}  ⚠️  Failed to install some packages in venv${NC}"
-                echo -e "${YELLOW}     Manual install: $PIP_BIN install ${OPTIONAL_MISSING[*]}${NC}"
-            fi
-        else
-            if "$PYTHON_BIN" -m pip install --user "${OPTIONAL_MISSING[@]}"; then
-                echo -e "${GREEN}  ✅ Optional dependencies installed${NC}"
-            else
-                echo -e "${YELLOW}  ⚠️  Failed to install some packages${NC}"
-                echo -e "${YELLOW}     Manual install: $PYTHON_BIN -m pip install --user ${OPTIONAL_MISSING[*]}${NC}"
-            fi
-        fi
-    else
-        echo -e "${BLUE}  Would install: ${OPTIONAL_MISSING[*]}${NC}"
-    fi
-fi
 
 # Create install directory
 if [ "$INSTALL_SCOPE" = "global" ]; then
@@ -588,9 +588,9 @@ fi"
 
 # Install tools
 echo -e "${BLUE}🔧 Installing tools...${NC}"
-parse_tools | while IFS="|" read -r tool_name tool_script is_executable; do
-    # Use case-insensitive check for is_executable
-    if [ "$(echo "$is_executable" | tr '[:upper:]' '[:lower:]')" = "true" ]; then
+parse_tools | while IFS="|" read -r tool_name tool_script install_flag; do
+    # Only install tools with install=true
+    if [ "$(echo "$install_flag" | tr '[:upper:]' '[:lower:]')" = "true" ]; then
         if [ -f "$SCRIPT_ROOT/$tool_script" ]; then
             if [ "$INSTALL_SCOPE" = "global" ]; then
                 sudo cp "$SCRIPT_ROOT/$tool_script" "$INSTALL_DIR/$tool_name"
@@ -604,10 +604,14 @@ parse_tools | while IFS="|" read -r tool_name tool_script is_executable; do
         else
             echo -e "${YELLOW}  ⚠️  $tool_name not found at $SCRIPT_ROOT/$tool_script, skipping${NC}"
         fi
-    else
-        create_tool_wrapper "$tool_name" "$tool_script"
     fi
 done
+# Always copy shared libraries to install dir
+if [ -d "$INSTALL_DIR/shared" ]; then
+    rm -rf "$INSTALL_DIR/shared"
+fi
+cp -r "$SCRIPT_ROOT/shared" "$INSTALL_DIR/shared"
+echo -e "${GREEN}  ✅ shared utilities installed to $INSTALL_DIR/shared${NC}"
 
 # PATH check (improved)
 echo ""
