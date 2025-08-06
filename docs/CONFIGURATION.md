@@ -1,22 +1,13 @@
+
 # ⚙️ IntermCLI Configuration
 
-## Overview
+Your quick reference for configuring IntermCLI tools using TOML files, environment variables, and command-line options.
 
 IntermCLI uses a hierarchical configuration system for flexible customization. All config files use **TOML format** for readability and maintainability.
 
 ## 📁 Configuration File Locations
 
-
-Configuration files are loaded in this order (Overrides as they go):
-
-1. Command line arguments
-2. Environment variables (e.g. `FIND_PROJECTS_DIRS`, `SCAN_PORTS_TIMEOUT`)
-3. Project config: `.intermcli.toml` (project root)
-4. User tool-specific: `~/.config/intermcli/{tool-name}.toml`
-5. User global: `~/.config/intermcli/config.toml`
-6. Tool defaults: `tools/{tool-name}/config/defaults.toml`
-
-Each tool will load its configuration following a standard hierarchy, with each level overriding the previous:
+Configuration files are loaded in this order (each overrides the previous):
 
 1. Command line arguments
 2. Environment variables (e.g. `FIND_PROJECTS_DIRS`, `SCAN_PORTS_TIMEOUT`)
@@ -272,39 +263,31 @@ interm config reset scan-ports
 
 ### Common Issues
 
-1. **TOML support not available**
-
-   ```bash
-   # Check Python version
-   python3 --version
-
-   # Install tomli for Python < 3.11
-   pip install tomli
-   ```
-
-2. **TOML syntax errors**
-
-   ```bash
-   # Tools will show syntax errors with line numbers
-   scan-ports --check-config
-   find-projects --config
-   ```
-
-3. **Configuration not loading**
-
-   ```bash
-   # Check file permissions
-   ls -la ~/.config/intermcli/scan-ports.toml
-   ls -la tools/scan-ports/config/defaults.toml
-   ```
-
-4. **Environment variables not working**
-
-   ```bash
-   # Check variable names (tool-specific prefixes)
-   echo $SCAN_PORTS_TIMEOUT
-   echo $FIND_PROJECTS_DIRS
-   ```
+- [ ] **TOML support not available**
+    ```bash
+    # Check Python version
+    python3 --version
+    # Install tomli for Python < 3.11
+    pip install tomli
+    ```
+- [ ] **TOML syntax errors**
+    ```bash
+    # Tools will show syntax errors with line numbers
+    scan-ports --check-config
+    find-projects --config
+    ```
+- [ ] **Configuration not loading**
+    ```bash
+    # Check file permissions
+    ls -la ~/.config/intermcli/scan-ports.toml
+    ls -la tools/scan-ports/config/defaults.toml
+    ```
+- [ ] **Environment variables not working**
+    ```bash
+    # Check variable names (tool-specific prefixes)
+    echo $SCAN_PORTS_TIMEOUT
+    echo $FIND_PROJECTS_DIRS
+    ```
 
 
 ### Debug Configuration Loading

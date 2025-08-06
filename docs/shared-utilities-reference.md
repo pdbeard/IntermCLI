@@ -12,14 +12,15 @@ The configuration system provides hierarchical configuration loading with fallba
 4. User configuration
 5. Tool defaults
 
+debug_mode = settings.get("debug", False)
 ```python
-from shared.config_loader import ConfigManager
+from shared.config_loader import ConfigLoader
 
 # Initialize with tool name
-config = ConfigManager("my-tool")
+config_loader = ConfigLoader("my-tool")
 
 # Load configuration with fallbacks
-settings = config.load_config()
+settings = config_loader.load_config()
 
 # Access configuration values
 debug_mode = settings.get("debug", False)
@@ -36,20 +37,20 @@ debug_mode = settings.get("debug", False)
 The argument parser provides consistent command-line argument handling for all tools:
 
 ```python
-from shared.arg_parser import create_parser
+from shared.arg_parser import ArgumentParser
 
 # Create a parser with tool metadata
-parser = create_parser(
-    name="my-tool",
+parser = ArgumentParser(
+    tool_name="my-tool",
     description="My amazing tool description",
     version="1.0.0"
 )
 
 # Add tool-specific arguments
-parser.add_argument("--option", help="Tool-specific option")
+parser.parser.add_argument("--option", help="Tool-specific option")
 
 # Parse arguments
-args = parser.parse_args()
+args = parser.parser.parse_args()
 ```
 
 ### Key Features:
@@ -63,14 +64,17 @@ args = parser.parse_args()
 The output handler ensures consistent terminal output formatting across all tools:
 
 ```python
-from shared.output import print_header, print_success, print_info, print_warning, print_error
+from shared.output import Output
+
+# Initialize output handler
+output = Output("my-tool")
 
 # Display various message types
-print_header("Operation Starting")
-print_info("Processing file: example.txt")
-print_warning("Resource usage is high")
-print_success("Operation completed successfully")
-print_error("Failed to connect to service")
+output.header("Operation Starting")
+output.info("Processing file: example.txt")
+output.warning("Resource usage is high")
+output.success("Operation completed successfully")
+output.error("Failed to connect to service")
 ```
 
 ### Key Features:
@@ -84,16 +88,19 @@ print_error("Failed to connect to service")
 The error handler provides standardized error handling and reporting:
 
 ```python
-from shared.error_handler import handle_error, ErrorLevel
+from shared.output import Output
+from shared.error_handler import ErrorHandler
+
+output = Output("my-tool")
+error_handler = ErrorHandler(output)
 
 try:
     # Your code here
     result = potentially_failing_function()
 except Exception as e:
-    # Handle with appropriate error level
-    handle_error(e, ErrorLevel.WARNING)
-    # Or exit with error
-    handle_error(e, ErrorLevel.FATAL, exit_code=1)
+    msg, code = error_handler.handle_file_operation("somefile.txt", e)
+    output.error(msg)
+    # Optionally exit or handle further
 ```
 
 ### Key Features:
@@ -107,13 +114,13 @@ except Exception as e:
 The enhancement loader enables graceful handling of optional dependencies:
 
 ```python
-from shared.enhancement_loader import try_import
+from shared.enhancement_loader import EnhancementLoader
 
-# Try to import an optional dependency
-rich = try_import("rich", "For enhanced terminal output")
+enhancements = EnhancementLoader("my-tool")
+has_rich = enhancements.check_dependency("rich")
 
-# Use if available, fallback if not
-if rich:
+if has_rich:
+    import rich
     rich.print("[bold green]Enhanced output enabled[/bold green]")
 else:
     print("Enhanced output disabled (install 'rich' package to enable)")
@@ -125,25 +132,26 @@ else:
 - No hard dependencies on optional packages
 
 ## Network Utilities (`network_utils.py`)
+download_file("https://example.com/file.zip", "file.zip")
 
 The network utilities module provides common network operations:
 
 ```python
-from shared.network_utils import (
-    check_port_open, get_local_ip, download_file, make_request
-)
+from shared.network_utils import NetworkUtils
+
+network = NetworkUtils(timeout=3.0)
 
 # Check if port is open
-is_open = check_port_open("example.com", 80)
+is_open = network.check_port("example.com", 80)
 
-# Get local IP address
-local_ip = get_local_ip()
+# Scan multiple ports
+open_ports = network.scan_ports("example.com", [80, 443, 8080])
 
-# Download a file with progress
-download_file("https://example.com/file.zip", "file.zip")
+# Detect service on a port
+banner = network.detect_service_banner("localhost", 22)
 
-# Make HTTP request with error handling
-response = make_request("https://api.example.com/data")
+# Make HTTP request (with fallback between requests and urllib)
+response = network.make_http_request("https://api.example.com/data")
 ```
 
 ### Key Features:
@@ -153,29 +161,25 @@ response = make_request("https://api.example.com/data")
 - Proxy support
 
 ## Path Utilities (`path_utils.py`)
+data_dir = ensure_dir_exists(f"{root}/data")
+temp_dir = get_temp_dir()
 
 The path utilities ensure consistent path handling across platforms:
 
 ```python
-from shared.path_utils import (
-    get_project_root, ensure_dir_exists, normalize_path,
-    get_config_dir, get_temp_dir
-)
+from shared.path_utils import add_shared_path, ensure_shared_imports, require_shared_utilities
 
-# Get project root directory
-root = get_project_root()
+# Add the shared module directory to the Python path
+add_shared_path()
 
-# Ensure directory exists
-data_dir = ensure_dir_exists(f"{root}/data")
+# Ensure shared modules can be imported
+if ensure_shared_imports():
+    print("Shared utilities are available.")
+else:
+    print("Shared utilities are missing.")
 
-# Normalize path across platforms
-path = normalize_path("~/documents/file.txt")
-
-# Get configuration directory
-config_dir = get_config_dir()
-
-# Get temporary directory
-temp_dir = get_temp_dir()
+# Require shared utilities or exit
+require_shared_utilities()
 ```
 
 ### Key Features:
@@ -184,26 +188,23 @@ temp_dir = get_temp_dir()
 - Directory creation with permissions
 
 ## Tool Metadata (`tool_metadata.py`)
+description = get_tool_description()
 
 The tool metadata module provides consistent version and documentation handling:
 
 ```python
-from shared.tool_metadata import (
-    get_tool_version, get_tool_description,
-    get_tool_manifest, load_manifest
+from shared.tool_metadata import ToolMetadata
+
+metadata = ToolMetadata(
+    tool_name="my-tool",
+    version="1.0.0",
+    description="My tool description",
+    examples=["my-tool --help", "my-tool run"]
 )
 
-# Get version of current tool
-version = get_tool_version()
-
-# Get tool description
-description = get_tool_description()
-
-# Get tool manifest data
-manifest = get_tool_manifest("my-tool")
-
-# Load the entire tools manifest
-all_tools = load_manifest()
+print(metadata.get_full_name())
+print(metadata.get_banner())
+print(metadata.get_help_text())
 ```
 
 ### Key Features:
@@ -218,50 +219,48 @@ Here's a complete example showing how these utilities work together:
 ```python
 #!/usr/bin/env python3
 
-from shared.arg_parser import create_parser
-from shared.config_loader import ConfigManager
-from shared.output import print_header, print_success, print_error
-from shared.error_handler import handle_error, ErrorLevel
-from shared.tool_metadata import get_tool_version, get_tool_description
+from shared.arg_parser import ArgumentParser
+from shared.config_loader import ConfigLoader
+from shared.output import Output
+from shared.error_handler import ErrorHandler
+from shared.tool_metadata import ToolMetadata
 
 def main():
-    # Set up tool with consistent metadata
     tool_name = "example-tool"
-
-    # Create parser with metadata
-    parser = create_parser(
-        name=tool_name,
-        description=get_tool_description(tool_name),
-        version=get_tool_version(tool_name)
+    metadata = ToolMetadata(
+        tool_name=tool_name,
+        version="1.0.0",
+        description="Example tool for IntermCLI"
     )
 
-    # Add tool-specific arguments
-    parser.add_argument("--option", help="Tool-specific option")
-
-    # Parse arguments
-    args = parser.parse_args()
+    # Create parser with metadata
+    parser = ArgumentParser(
+        tool_name=tool_name,
+        description=metadata.description,
+        version=metadata.version
+    )
+    parser.parser.add_argument("--option", help="Tool-specific option")
+    args = parser.parser.parse_args()
 
     # Load configuration with fallbacks
-    config = ConfigManager(tool_name)
-    settings = config.load_config()
+    config_loader = ConfigLoader(tool_name)
+    settings = config_loader.load_config()
 
     # Merge arguments with configuration
-    option_value = args.option or settings.get("option")
+    option_value = getattr(args, "option", None) or settings.get("option")
+
+    output = Output(tool_name)
+    error_handler = ErrorHandler(output)
 
     try:
-        # Tool operation begins
-        print_header(f"Starting {tool_name}")
-
+        output.header(f"Starting {tool_name}")
         # Tool-specific logic here
         # ...
-
-        # Success message
-        print_success(f"{tool_name} completed successfully")
+        output.success(f"{tool_name} completed successfully")
         return 0
-
     except Exception as e:
-        # Handle error and exit
-        handle_error(e, ErrorLevel.FATAL, exit_code=1)
+        msg, code = error_handler.handle_file_operation("somefile.txt", e)
+        output.error(msg)
         return 1
 
 if __name__ == "__main__":

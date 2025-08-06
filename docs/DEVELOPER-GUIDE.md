@@ -137,30 +137,28 @@ intermcli/
 
 ### Adding a New Tool
 
-### Adding a New Tool
-
 When adding a new tool to the ecosystem, follow these guidelines:
 
-1. Create a new directory in `tools/` with a hyphenated name following the action-target pattern (e.g., `analyze-logs`)
-2. Include a main Python file with the same name (e.g., `analyze-logs.py`)
-3. Add a README.md with clear usage examples
-4. Create a `config/` subdirectory for tool-specific configuration files
-5. Add the tool to `tools_manifest.toml`
-6. Add tests in the `tests/` directory
-7. Leverage the shared foundation library:
-   ```python
-   # Import shared utilities
-   from shared.config_loader import ConfigLoader
-   from shared.output import Output, setup_tool_output
-   from shared.error_handler import ErrorHandler
+- [ ] Create a new directory in `tools/` with a hyphenated name following the action-target pattern (e.g., `analyze-logs`)
+- [ ] Include a main Python file with the same name (e.g., `analyze-logs.py`)
+- [ ] Add a README.md with clear usage examples
+- [ ] Create a `config/` subdirectory for tool-specific configuration files
+- [ ] Add the tool to `tools_manifest.toml`
+- [ ] Add tests in the `tests/` directory
+- [ ] Leverage the shared foundation library:
+    ```python
+    # Import shared utilities
+    from shared.config_loader import ConfigLoader
+    from shared.output import Output, setup_tool_output
+    from shared.error_handler import ErrorHandler
 
-   # Use consistent patterns
-   output = setup_tool_output("tool-name", log_level="INFO")
-   config_loader = ConfigLoader("tool-name")
-   error_handler = ErrorHandler(output)
-   ```
-8. Implement progressive enhancement for optional dependencies
-9. Follow the consistent interface patterns
+    # Use consistent patterns
+    output = setup_tool_output("tool-name", log_level="INFO")
+    config_loader = ConfigLoader("tool-name")
+    error_handler = ErrorHandler(output)
+    ```
+- [ ] Implement progressive enhancement for optional dependencies
+- [ ] Follow the consistent interface patterns
 
 ## Code Style & Standards
 
@@ -189,18 +187,18 @@ pre-commit run --all-files
 
 ### Documentation Standards
 
-- Each tool should have its own README.md
-- Use the [Output Style Guide](/docs/output-style-guide.md) for consistent user experience
-- Include usage examples for common cases
-- Document configuration options
+- [ ] Each tool should have its own README.md
+- [ ] Use the [Output Style Guide](/docs/output-style-guide.md) for consistent user experience
+- [ ] Include usage examples for common cases
+- [ ] Document configuration options
 
 ## Testing Requirements
 
-- All code should have appropriate tests
-- Test with both minimal and optional dependencies
-- Include unit and integration tests
-- Test on Python 3.9+
-- Use `pytest` and tools from `requirements-dev.txt`
+- [ ] All code should have appropriate tests
+- [ ] Test with both minimal and optional dependencies
+- [ ] Include unit and integration tests
+- [ ] Test on Python 3.9+
+- [ ] Use `pytest` and tools from `requirements-dev.txt`
 
 ### Running Tests
 

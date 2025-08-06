@@ -1,5 +1,7 @@
 # IntermCLI User Guide
 
+Your quick-start reference for installing, configuring, and using IntermCLI tools for development and system administration.
+
 This guide covers the essentials of installing and using IntermCLI tools.
 
 ## Installation
@@ -104,15 +106,16 @@ test-endpoints --suite api-tests.json
 
 ## Tips and Tricks
 
-- Use the `--help` flag with any tool for quick reference
-- All tools support the `--version` flag to display version information
-- Configuration files use TOML format for readability and consistency
-- Set common environment variables for quick configuration:
-  - `INTERMCLI_LOG_LEVEL`: Set logging detail (DEBUG, INFO, WARNING, ERROR)
-  - `INTERMCLI_NO_COLOR`: Disable colored output (set to any value)
+- [ ] Use the `--help` flag with any tool for quick reference
+- [ ] All tools support the `--version` flag to display version information
+- [ ] Configuration files use TOML format for readability and consistency
+- [ ] Set common environment variables for quick configuration:
+    - `INTERMCLI_LOG_LEVEL`: Set logging detail (DEBUG, INFO, WARNING, ERROR)
+    - `INTERMCLI_NO_COLOR`: Disable colored output (set to any value)
 
 ## Next Steps
 
 - See each tool's README for tool-specific options
 - Check the [Configuration Guide](CONFIGURATION.md) for detailed configuration options
-- Explore the [Advanced Topics](ADVANCED-TOPICS.md) for power-user features
+
+<!-- Advanced Topics guide is not available. Add it when created. -->
