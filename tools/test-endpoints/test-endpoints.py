@@ -598,55 +598,13 @@ def substitute_variables(text, variables):
 def check_dependencies(output=None):
     """Check status of optional dependencies using shared EnhancementLoader"""
     enhancer = EnhancementLoader(TOOL_NAME)
-    enhancer.check_dependency("requests", "Enhanced HTTP features")
-    enhancer.check_dependency("rich", "Colorized output")
-    enhancer.check_dependency("pyyaml", "YAML response formatting")
+    dep_map = {
+        "Enhanced HTTP features": "requests",
+        "Colorized output": "rich",
+        "YAML support": "yaml",
+    }
 
-    if output:
-        # Set output before printing status
-        enhancer.output = output
-
-        # Custom display using new output methods if available
-        if hasattr(output, "print_key_value_section"):
-            # Create a dictionary of dependencies with their status
-            dependencies = {
-                key: "Available" if value else "Missing"
-                for key, value in enhancer.dependencies.items()
-            }
-
-            output.print_key_value_section(
-                f"Optional Dependencies for {TOOL_NAME}", dependencies
-            )
-
-            # Create a list of missing dependencies for installation instructions
-            missing = enhancer.get_missing_dependencies()
-            if missing:
-                output.info("\nTo enable all features, install missing dependencies:")
-
-                if hasattr(output, "print_list"):
-                    # Display as a list with pip install commands
-                    install_commands = [f"pip install {dep}" for dep in missing]
-                    output.print_list("Install Commands", install_commands)
-                else:
-                    # Fallback to simple output
-                    output.info(f"  pip install {' '.join(missing)}")
-        else:
-            # Fallback to original method
-            enhancer.print_status()
-    else:
-        enhancer.print_status()
-
-    if not HAS_REQUESTS and output:
-        output.warning(
-            "Without 'requests', only basic HTTP features will be available."
-        )
-        output.info("Install with: pip install requests")
-    elif not HAS_REQUESTS:
-        print("\nNote: Without 'requests', only basic HTTP features will be available.")
-        print("      Install with: pip install requests")
-
-    # Return list of missing dependencies
-    return enhancer.get_missing_dependencies()
+    enhancer.check_and_report_dependencies(dep_map, output)
 
 
 def main():
@@ -759,7 +717,7 @@ def main():
 
     # Check dependencies and exit
     if args.check_deps:
-        check_dependencies(output=output)
+        check_dependencies(output)
         return
 
     # Parse method and URL
@@ -795,6 +753,7 @@ def main():
             if "=" in param:
                 params.append(param)
         if params:
+
             separator = "&" if "?" in url else "?"
             url += separator + "&".join(params)
 

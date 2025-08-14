@@ -18,7 +18,7 @@ import argparse  # Still needed for type annotations
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TypeVar
+from typing import Any, Dict, List, Optional, TypeVar
 
 # Ensure shared utilities are available
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -35,6 +35,7 @@ except ImportError:
 # Import shared utilities
 from shared.arg_parser import ArgumentParser
 from shared.config_loader import ConfigLoader
+from shared.enhancement_loader import EnhancementLoader
 from shared.error_handler import ErrorHandler
 from shared.network_utils import create_network_utils
 from shared.output import setup_tool_output
@@ -73,57 +74,12 @@ config_loader = None
 network_utils = None
 
 
-def check_optional_dependencies() -> Tuple[Dict[str, bool], List[str]]:
-    """Check which optional dependencies are available"""
-    global HAS_REQUESTS, HAS_URLLIB3, HAS_SSL, HAS_RICH
-
-    # Make sure network_utils is initialized
-    if network_utils is None:
-        return {
-            "requests": False,
-            "urllib3": False,
-            "ssl": False,
-            "rich": HAS_RICH,
-            "tomllib": False,
-        }, ["requests", "urllib3", "ssl", "tomllib"]
-
-    # Update global flags based on network_utils
-    HAS_REQUESTS = network_utils.has_requests
-    HAS_URLLIB3 = network_utils.has_urllib3
-    HAS_SSL = network_utils.has_ssl
-
-    # Use network_utils dependency checking plus rich
-    deps = {
-        "requests": HAS_REQUESTS,
-        "urllib3": HAS_URLLIB3,
-        "ssl": HAS_SSL,
-        "rich": HAS_RICH,
-        "tomllib": config_loader.has_toml if config_loader else False,
+def check_dependencies(output=None):
+    enhancer = EnhancementLoader(TOOL_NAME)
+    dep_map = {
+        "Colorized output": "rich",
     }
-
-    missing = [name for name, available in deps.items() if not available]
-    return deps, missing
-
-
-def print_dependency_status(verbose: bool = False) -> None:
-    """Print status of optional dependencies"""
-    deps, missing = check_optional_dependencies()
-
-    if verbose:
-        output.info("Optional Dependencies Status:")
-        for name, available in deps.items():
-            status = "✅ Available" if available else "❌ Missing"
-            output.info(f"{name:10}: {status}")
-
-        if missing:
-            if "tomllib" in missing:
-                output.info("For TOML support on Python < 3.11: pip3 install tomli")
-            other_missing = [m for m in missing if m != "tomllib"]
-            if other_missing:
-                output.info(
-                    f"To enable enhanced service detection: pip3 install {' '.join(other_missing)}"
-                )
-        output.blank()
+    enhancer.check_and_report_dependencies(dep_map, output)
 
 
 def load_port_config() -> Dict[str, Any]:
@@ -677,12 +633,9 @@ def scan_all_configured_ports(
     output.info(f"Scanning ALL configured ports ({len(all_ports)} total) on {host}")
     output.info(f"Using {threads} threads for parallel scanning")
     if detect_services:
-        deps, missing = check_optional_dependencies()
         enhanced = network_utils.has_requests
         method = "enhanced" if enhanced else "basic"
         output.info(f"Service detection enabled ({method} mode)")
-        if missing and not enhanced:
-            output.info(f"Install {', '.join(missing)} for enhanced detection")
     output.info(f"Port lists included: {', '.join(config['port_lists'].keys())}")
     output.separator(char="=", length=90)
 
@@ -995,13 +948,11 @@ def main() -> None:
     output.info(f"Timeout: {args.timeout}s")
     output.info(f"Threads: {args.threads}")
     output.info(f"Service Detection: {'Enabled' if detect_services else 'Disabled'}")
-    if detect_services:
-        print_dependency_status(verbose=False)
     output.blank()
 
     # Handle special commands first
     if args.check_deps:
-        print_dependency_status(verbose=True)
+        check_dependencies(output)
         return
 
     if args.show_config:

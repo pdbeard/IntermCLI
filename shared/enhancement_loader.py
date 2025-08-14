@@ -205,19 +205,56 @@ class EnhancementLoader:
 
         return common_deps
 
+    def check_and_report_dependencies(self, dep_map: dict, output=None):
+        """
+        Check and report status of dependencies given a {label: module} map.
+        Args:
+            dep_map: dict mapping display label to module name
+            output: Output utility (optional)
+        """
+        for label, module in dep_map.items():
+            self.check_dependency(module, label)
+        if output:
+            self.output = output
+            if hasattr(output, "print_key_value_section"):
+                dependencies = {
+                    key: "Available" if value else "Missing"
+                    for key, value in self.dependencies.items()
+                }
+                output.print_key_value_section(
+                    f"Optional Dependencies for {self.tool_name}", dependencies
+                )
+                missing = [k for k, v in self.dependencies.items() if not v]
+                missing_pkgs = [dep_map.get(dep, dep) for dep in missing]
+                if missing_pkgs:
+                    output.info(
+                        "\nTo enable all features, install missing dependencies:"
+                    )
+                    if hasattr(output, "print_list"):
+                        install_commands = [
+                            f"pip install {pkg}" for pkg in missing_pkgs
+                        ]
+                        output.print_list("Install Commands", install_commands)
+                    else:
+                        output.info(f"  pip install {' '.join(missing_pkgs)}")
+            else:
+                self.print_status()
+        else:
+            self.print_status()
 
-def check_dependencies(tool_name: str, dependencies: List[str]) -> Dict[str, bool]:
-    """
-    Helper function to check dependencies for a tool.
 
-    Args:
-        tool_name: Name of the tool
-        dependencies: List of dependency names to check
+# def check_dependencies(tool_name: str, dependencies: List[str]) -> Dict[str, bool]:
+#     """
+#     Helper function to check dependencies for a tool.
 
-    Returns:
-        Dictionary of dependency names to availability
-    """
-    loader = EnhancementLoader(tool_name)
-    for dep in dependencies:
-        loader.check_dependency(dep)
-    return loader.dependencies
+#     Args:
+#         tool_name: Name of the tool
+#         dependencies: List of dependency names to check
+
+#     Returns:
+#         Dictionary of dependency names to availability
+#     """
+#     loader = EnhancementLoader(tool_name)
+#     for dep in dependencies:
+#         loader.check_dependency(dep)
+#     return loader.dependencies

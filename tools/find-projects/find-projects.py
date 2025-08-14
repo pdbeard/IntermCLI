@@ -22,9 +22,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, NamedTuple, Optional
 
-# Version
-__version__ = "1.0.0"
-
 # Ensure shared utilities are available
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 try:
@@ -40,10 +37,13 @@ except ImportError:
 # Import shared utilities
 from shared.arg_parser import ArgumentParser
 from shared.config_loader import ConfigLoader
+from shared.enhancement_loader import EnhancementLoader
 from shared.error_handler import ErrorHandler
 from shared.output import Output, setup_tool_output
 
-# We'll use the shared ConfigLoader which already handles TOML dependencies
+# Version
+__version__ = "1.0.0"
+TOOL_NAME = "find-projects"
 
 
 @dataclass
@@ -1094,7 +1094,72 @@ Configuration:
     return parser
 
 
+def check_dependencies(output=None):
+    dep_map = {
+        "Colorized output": "rich",
+    }
+    enhancer = EnhancementLoader(TOOL_NAME)
+    enhancer.check_and_report_dependencies(dep_map, output)
+
+
 def main():
+    # Parse arguments first
+    parser = create_argument_parser()
+    args = parser.parser.parse_args()
+
+    # First create a basic output handler for initial setup
+    initial_output = Output("find-projects")
+
+    # Check dependencies if requested
+    if hasattr(args, "check_deps") and args.check_deps:
+        check_dependencies(initial_output)
+        return
+
+    # Create config manager with output handler
+    config_manager = ConfigManager(initial_output)
+    loaded_config = config_manager.load_config()
+
+    # Override logging settings from command line arguments if provided
+    log_level = (
+        args.log_level
+        if hasattr(args, "log_level") and args.log_level
+        else loaded_config.log_level
+    )
+    log_to_file = (
+        args.log_file
+        if hasattr(args, "log_file") and args.log_file
+        else loaded_config.log_to_file
+    )
+    log_file_path = (
+        args.log_file_path
+        if hasattr(args, "log_file_path") and args.log_file_path
+        else loaded_config.log_file_path
+    )
+
+    # Configure output based on loaded config and command-line args
+    output = setup_tool_output(
+        tool_name="find-projects",
+        log_level=log_level,
+        log_to_file=log_to_file,
+        log_file_path=log_file_path,
+        output_dir=loaded_config.output_dir,
+        use_rich=not args.no_color if hasattr(args, "no_color") else True,
+    )
+
+    # Display tool banner
+    output.banner(
+        "find-projects",
+        __version__,
+        {"Description": "Interactive development project discovery and navigation"},
+    )
+
+    # Initialize app with configured output
+    app = FindProjectsApp(output)
+    # Use the loaded config directly
+    app.config = loaded_config.config
+    app.config_manager = config_manager
+    app.scanner = ProjectScanner(loaded_config.config, output)
+    app.run(args)
     """Main entry point"""
     parser = create_argument_parser()
     args = parser.parser.parse_args()

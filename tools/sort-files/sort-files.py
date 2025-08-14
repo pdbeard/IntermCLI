@@ -322,13 +322,13 @@ def sort_files(
 
 
 # --- Dependency checking ---
-def check_dependencies():
-    """Check status of optional dependencies"""
+def check_dependencies(output=None):
     enhancer = EnhancementLoader(TOOL_NAME)
-    enhancer.check_dependency("rich", "Rich output formatting")
-    enhancer.check_dependency("tomllib", "TOML configuration support")
-    enhancer.check_dependency("tomli", "TOML support for Python < 3.11")
-    enhancer.print_status()
+    dep_map = {
+        "Colorized output": "rich",
+        "YAML support": "yaml",
+    }
+    enhancer.check_and_report_dependencies(dep_map, output)
 
 
 # --- CLI ---
@@ -396,11 +396,6 @@ def main():
 
     args = arg_parser.parser.parse_args()
 
-    # Check dependencies if requested
-    if args.check_deps:
-        check_dependencies()
-        return
-
     # Initialize output handling using shared Output
     output = setup_tool_output(
         tool_name=TOOL_NAME,
@@ -408,6 +403,11 @@ def main():
         use_rich=True,
         log_to_file=False,
     )
+
+    # Check dependencies if requested
+    if args.check_deps:
+        check_dependencies(output)
+        return
 
     # Display tool banner
     output.banner(
