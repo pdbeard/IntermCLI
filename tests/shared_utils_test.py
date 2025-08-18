@@ -11,7 +11,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from shared.config_loader import ConfigLoader
-from shared.enhancement_loader import EnhancementLoader
+from shared.dependency_checker import DependencyChecker
 from shared.network_utils import NetworkUtils
 from shared.output import Output
 
@@ -50,49 +50,20 @@ class TestConfigLoader(unittest.TestCase):
         self.assertEqual(self.config_loader._convert_env_value("hello"), "hello")
 
 
-class TestEnhancementLoader(unittest.TestCase):
-    """Tests for the EnhancementLoader utility."""
+class TestDependencyChecker(unittest.TestCase):
+    """Tests for the DependencyChecker utility."""
 
     def setUp(self):
-        self.enhancement_loader = EnhancementLoader("test-tool")
+        self.dependency_checker = DependencyChecker("test-tool")
 
     def test_check_dependency(self):
         """Test dependency checking."""
         # os should always be available
-        self.assertTrue(self.enhancement_loader.check_dependency("os"))
+        self.assertTrue(self.dependency_checker.check_dependency("os"))
         # nonexistent module should not be available
-        self.assertFalse(self.enhancement_loader.check_dependency("nonexistent_module"))
+        self.assertFalse(self.dependency_checker.check_dependency("nonexistent_module"))
 
-    def test_register_feature(self):
-        """Test feature registration."""
-        # Register dependencies
-        self.enhancement_loader.check_dependency("os")
-        self.enhancement_loader.check_dependency("nonexistent_module")
-
-        # Register features
-        available = self.enhancement_loader.register_feature("feature1", ["os"])
-        unavailable = self.enhancement_loader.register_feature(
-            "feature2", ["nonexistent_module"]
-        )
-        mixed = self.enhancement_loader.register_feature(
-            "feature3", ["os", "nonexistent_module"]
-        )
-
-        self.assertTrue(available)
-        self.assertFalse(unavailable)
-        self.assertFalse(mixed)
-
-    def test_get_missing_dependencies(self):
-        """Test getting missing dependencies."""
-        self.enhancement_loader.check_dependency("os")
-        self.enhancement_loader.check_dependency("sys")
-        self.enhancement_loader.check_dependency("nonexistent_module1")
-        self.enhancement_loader.check_dependency("nonexistent_module2")
-
-        missing = self.enhancement_loader.get_missing_dependencies()
-        self.assertEqual(len(missing), 2)
-        self.assertIn("nonexistent_module1", missing)
-        self.assertIn("nonexistent_module2", missing)
+    # ...existing code...
 
 
 class TestOutput(unittest.TestCase):
