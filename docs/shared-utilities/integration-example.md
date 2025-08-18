@@ -40,7 +40,7 @@ except ImportError:
 # Import shared utilities
 from shared.config_loader import ConfigLoader
 from shared.output import Output
-from shared.enhancement_loader import EnhancementLoader
+from shared.dependency_checker import DependencyChecker
 from shared.arg_parser import ArgumentParser
 from shared.tool_metadata import ToolMetadata
 from shared.network_utils import NetworkUtils
@@ -103,7 +103,7 @@ def process_input(input_file: str, config: dict, output: Output) -> dict:
 # --- Dependency checking ---
 def check_dependencies():
     """Check status of optional dependencies"""
-    enhancer = EnhancementLoader(TOOL_NAME)
+    checker = DependencyChecker(TOOL_NAME)
     enhancer.check_dependency("rich", "Rich output formatting")
     enhancer.check_dependency("requests", "Enhanced HTTP support")
     enhancer.check_dependency("jsonschema", "JSON validation")

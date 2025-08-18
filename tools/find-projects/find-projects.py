@@ -37,7 +37,7 @@ except ImportError:
 # Import shared utilities
 from shared.arg_parser import ArgumentParser
 from shared.config_loader import ConfigLoader
-from shared.enhancement_loader import EnhancementLoader
+from shared.dependency_checker import DependencyChecker
 from shared.error_handler import ErrorHandler
 from shared.output import Output, setup_tool_output
 
@@ -1095,11 +1095,9 @@ Configuration:
 
 
 def check_dependencies(output=None):
-    dep_map = {
-        "Colorized output": "rich",
-    }
-    enhancer = EnhancementLoader(TOOL_NAME)
-    enhancer.check_and_report_dependencies(dep_map, output)
+    enhancer = DependencyChecker(TOOL_NAME)
+    dep_keys = ["rich"]
+    enhancer.check_and_report_dependencies(dep_keys, output)
 
 
 def main():

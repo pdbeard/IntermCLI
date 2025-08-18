@@ -38,7 +38,7 @@ from shared.arg_parser import ArgumentParser
 
 # Import shared utilities
 from shared.config_loader import ConfigLoader
-from shared.enhancement_loader import EnhancementLoader
+from shared.dependency_checker import DependencyChecker
 from shared.error_handler import ErrorHandler
 from shared.output import Output, setup_tool_output
 
@@ -323,12 +323,9 @@ def sort_files(
 
 # --- Dependency checking ---
 def check_dependencies(output=None):
-    enhancer = EnhancementLoader(TOOL_NAME)
-    dep_map = {
-        "Colorized output": "rich",
-        "YAML support": "yaml",
-    }
-    enhancer.check_and_report_dependencies(dep_map, output)
+    enhancer = DependencyChecker(TOOL_NAME)
+    dep_keys = ["rich", "pyyaml"]
+    enhancer.check_and_report_dependencies(dep_keys, output)
 
 
 # --- CLI ---

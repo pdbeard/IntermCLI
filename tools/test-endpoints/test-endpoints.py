@@ -37,7 +37,7 @@ except ImportError:
 # Import shared utilities
 from shared.arg_parser import ArgumentParser
 from shared.config_loader import ConfigLoader
-from shared.enhancement_loader import EnhancementLoader
+from shared.dependency_checker import DependencyChecker
 from shared.error_handler import ErrorHandler
 from shared.network_utils import NetworkUtils
 from shared.output import setup_tool_output
@@ -597,14 +597,9 @@ def substitute_variables(text, variables):
 
 def check_dependencies(output=None):
     """Check status of optional dependencies using shared EnhancementLoader"""
-    enhancer = EnhancementLoader(TOOL_NAME)
-    dep_map = {
-        "Enhanced HTTP features": "requests",
-        "Colorized output": "rich",
-        "YAML support": "yaml",
-    }
-
-    enhancer.check_and_report_dependencies(dep_map, output)
+    enhancer = DependencyChecker(TOOL_NAME)
+    dep_keys = ["requests", "rich", "pyyaml"]
+    enhancer.check_and_report_dependencies(dep_keys, output)
 
 
 def main():

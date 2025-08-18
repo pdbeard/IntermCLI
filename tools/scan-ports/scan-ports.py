@@ -35,7 +35,7 @@ except ImportError:
 # Import shared utilities
 from shared.arg_parser import ArgumentParser
 from shared.config_loader import ConfigLoader
-from shared.enhancement_loader import EnhancementLoader
+from shared.dependency_checker import DependencyChecker
 from shared.error_handler import ErrorHandler
 from shared.network_utils import create_network_utils
 from shared.output import setup_tool_output
@@ -75,11 +75,9 @@ network_utils = None
 
 
 def check_dependencies(output=None):
-    enhancer = EnhancementLoader(TOOL_NAME)
-    dep_map = {
-        "Colorized output": "rich",
-    }
-    enhancer.check_and_report_dependencies(dep_map, output)
+    enhancer = DependencyChecker(TOOL_NAME)
+    dep_keys = ["rich"]
+    enhancer.check_and_report_dependencies(dep_keys, output)
 
 
 def load_port_config() -> Dict[str, Any]:

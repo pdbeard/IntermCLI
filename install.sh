@@ -22,7 +22,7 @@ fi
 NON_INTERACTIVE=false
 OPTIONAL_MISSING=()
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TOOLS_MANIFEST="$SCRIPT_ROOT/tools_manifest.toml"
+TOOLS_MANIFEST="$SCRIPT_ROOT/config/tools_manifest.toml"
 
 
 # Add function to parse [logging] section from config.toml
@@ -521,7 +521,7 @@ install_tool_config "config.toml" "$SCRIPT_ROOT/config/defaults.toml"
 # Add more tool configs here
 
 # Always overwrite manifest/internal configs
-cp "$SCRIPT_ROOT/tools_manifest.toml" "$CONFIG_DIR/tools_manifest.toml"
+cp "$SCRIPT_ROOT/config/tools_manifest.toml" "$CONFIG_DIR/tools_manifest.toml"
 echo -e "${GREEN}  ✅ tools_manifest.toml updated${NC}"
 
 

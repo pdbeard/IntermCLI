@@ -81,7 +81,9 @@ def get_tools_from_manifest():
     """
     Load and parse the tools manifest. Raises ManifestError if missing or malformed.
     """
-    manifest_path = Path.home() / ".config" / "intermcli" / "tools_manifest.toml"
+    manifest_path = (
+        Path(__file__).resolve().parents[2] / "config" / "tools_manifest.toml"
+    )
     if not manifest_path.exists():
         logger.error(f"tools_manifest.toml not found at {manifest_path}")
         raise ManifestError(f"tools_manifest.toml not found at {manifest_path}")

@@ -4,9 +4,14 @@ This will also require moving the dep_map (desciption, package to try) and insta
 
 Need both dep map and install map because of packages like pyyaml. Where the package is pyyaml but the package import name is yaml.
 
+dependency manifest descriptions can be overridden.
+
 tool_name is used multiple times and can be refactored
 
 Clear path from the tool manifest (or another config file) into the tools. Needs a simple map of of the depency required, a description, and off to the races.
+
+Rename, and remove enhacement features as they are not used,
+Possibly in the future add a feature management system where users can disable the usage of certain deps through flags/ fallback to og code.
 
 
 Make rich text support more consistent color mapping and styling (add to 2.0 release after coming up with new styles)

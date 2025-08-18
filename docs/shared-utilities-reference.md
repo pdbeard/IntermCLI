@@ -109,14 +109,14 @@ except Exception as e:
 - Debug mode support
 - Exit code handling
 
-## Enhancement Loader (`enhancement_loader.py`)
+## Dependency Checker (`dependency_checker.py`)
 
 The enhancement loader enables graceful handling of optional dependencies:
 
 ```python
-from shared.enhancement_loader import EnhancementLoader
+from shared.dependency_checker import DependencyChecker
 
-enhancements = EnhancementLoader("my-tool")
+checker = DependencyChecker("my-tool")
 has_rich = enhancements.check_dependency("rich")
 
 if has_rich:

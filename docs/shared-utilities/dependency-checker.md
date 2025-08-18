@@ -1,13 +1,13 @@
-# Enhancement Loader
+# Dependency Checker
 
-The Enhancement Loader utility (`shared/enhancement_loader.py`) handles detection of optional dependencies and provides consistent information about available enhancements, enabling "progressive enhancement" in IntermCLI tools.
+The Dependency Checker utility (`shared/dependency_checker.py`) handles detection and reporting of optional dependencies, enabling robust dependency management in IntermCLI tools.
 
 ## Purpose
 
-IntermCLI tools are designed to work with minimal dependencies (Python standard library), but can provide enhanced functionality when optional dependencies are available. The Enhancement Loader makes it easy to:
+IntermCLI tools are designed to work with minimal dependencies (Python standard library), but can provide enhanced functionality when optional dependencies are available. The Dependency Checker makes it easy to:
 
 1. Check if optional dependencies are installed
-2. Register features that depend on these dependencies
+2. Report missing dependencies to the user
 3. Provide users with information about available enhancements
 4. Fallback gracefully when dependencies are not available
 
@@ -16,88 +16,72 @@ IntermCLI tools are designed to work with minimal dependencies (Python standard 
 ### Basic Usage
 
 ```python
-from shared.enhancement_loader import EnhancementLoader
+from shared.dependency_checker import DependencyChecker
 
 # Initialize with tool name
-enhancements = EnhancementLoader("scan-ports")
+checker = DependencyChecker("scan-ports")
 
 # Check for dependencies
-has_requests = enhancements.check_dependency("requests")
-has_rich = enhancements.check_dependency("rich")
+has_requests = checker.check_dependency("requests")
+has_rich = checker.check_dependency("rich")
 
 # Use conditional logic based on available dependencies
 if has_requests:
-    # Use requests library for HTTP requests
     import requests
     response = requests.get("https://example.com")
 else:
-    # Fallback to standard library
     import urllib.request
     response = urllib.request.urlopen("https://example.com")
 ```
 
-### Registering Features
+### Reporting Dependencies
 
 ```python
-from shared.enhancement_loader import EnhancementLoader
+from shared.dependency_checker import DependencyChecker
 
 # Initialize with tool name
-enhancements = EnhancementLoader("scan-ports")
+checker = DependencyChecker("scan-ports")
 
 # Check for dependencies
-enhancements.check_dependency("requests")
-enhancements.check_dependency("rich")
-enhancements.check_dependency("cryptography")
+checker.check_dependency("requests")
+checker.check_dependency("rich")
+checker.check_dependency("cryptography")
 
-# Register features that depend on these dependencies
-enhancements.register_feature("enhanced_http", ["requests"])
-enhancements.register_feature("rich_output", ["rich"])
-enhancements.register_feature("secure_connections", ["cryptography", "requests"])
-
-# Check if a feature is available
-if enhancements.is_feature_available("rich_output"):
-    # Use rich for enhanced output
-    from rich.console import Console
-    console = Console()
-    console.print("Enhanced output enabled")
+# Print status (example)
+for dep in ["requests", "rich", "cryptography"]:
+    status = "Available" if checker.dependencies.get(dep) else "Missing"
+    print(f"{dep}: {status}")
 ```
 
 ### Printing Status
 
 ```python
-from shared.enhancement_loader import EnhancementLoader
+from shared.dependency_checker import DependencyChecker
 
 # Initialize with tool name
-enhancements = EnhancementLoader("scan-ports")
+checker = DependencyChecker("scan-ports")
 
 # Check for dependencies
-enhancements.check_dependency("requests", "HTTP Client")
-enhancements.check_dependency("rich", "Rich Output")
-enhancements.check_dependency("cryptography", "Secure Connections")
+checker.check_dependency("requests")
+checker.check_dependency("rich")
+checker.check_dependency("cryptography")
 
 # Print status
-enhancements.print_status()
-```
-
-This will produce output like:
-
-```
-Optional Dependencies:
-✅ HTTP Client (requests): Available
-❌ Rich Output (rich): Not available
-✅ Secure Connections (cryptography): Available
+for dep in ["requests", "rich", "cryptography"]:
+    status = "Available" if checker.dependencies.get(dep) else "Missing"
+    print(f"{dep}: {status}")
 ```
 
 ### Checking for Missing Dependencies
 
 ```python
-from shared.enhancement_loader import EnhancementLoader
+from shared.dependency_checker import DependencyChecker
 
 # Initialize with tool name
-enhancements = EnhancementLoader("scan-ports")
+checker = DependencyChecker("scan-ports")
 
 # Check for dependencies
-enhancements.check_dependency("requests")
+checker.check_dependency("requests")
 enhancements.check_dependency("rich")
 
 # Get missing dependencies
