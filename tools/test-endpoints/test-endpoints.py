@@ -603,6 +603,30 @@ def check_dependencies(output=None):
 
 
 def main():
+
+    # Setup argument parser using the shared utility
+    parser = ArgumentParser(
+        TOOL_NAME,
+        "Command-line API testing tool - fast, scriptable alternative to Postman",
+        epilog="Example: test-endpoints GET https://httpbin.org/json",
+        version=__version__,
+    )
+
+    # Basic request arguments
+    parser.add_positional_argument(
+        "method_or_url",
+        "HTTP method or URL (if method not specified, defaults to GET)",
+        nargs="?",
+    )
+    parser.add_positional_argument("url", "URL to request", nargs="?")
+
+    # Add common arguments
+    parser.add_common_arguments()
+
+    # Minimal config loading using ConfigLoader
+    config_loader = ConfigLoader(TOOL_NAME)
+    config = config_loader.load_config()
+
     # Initialize shared output utility
     output = setup_tool_output(tool_name=TOOL_NAME, log_level="INFO", use_rich=True)
     error_handler = ErrorHandler(output)
@@ -620,21 +644,6 @@ def main():
     config = load_config(output=output)
     general_config = config.get("general", {})
     default_headers = config.get("default_headers", {})
-
-    # Setup argument parser using the shared utility
-    parser = ArgumentParser(
-        TOOL_NAME,
-        "Command-line API testing tool - fast, scriptable alternative to Postman",
-        epilog="Example: test-endpoints GET https://httpbin.org/json",
-        version=__version__,
-    )
-
-    # Add common arguments
-    parser.add_common_arguments()
-
-    # Minimal config loading using ConfigLoader
-    config_loader = ConfigLoader(TOOL_NAME)
-    config = config_loader.load_config()
 
     parser.parser.add_argument(
         "-X", "--method", help="HTTP method (GET, POST, PUT, DELETE, etc.)"
