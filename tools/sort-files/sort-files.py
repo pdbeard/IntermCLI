@@ -406,15 +406,9 @@ def main():
         check_dependencies(output)
         return
 
-    # Display tool banner
-    output.banner(
-        TOOL_NAME,
-        __version__,
-        {"Description": "Organize and declutter directories by sorting files"},
-    )
-
-    # Load configuration
-    config = load_config(args.config, output)
+    # Minimal config loading using ConfigLoader
+    config_loader = ConfigLoader(TOOL_NAME)
+    config = config_loader.load_config()
 
     if not config:
         output.error(

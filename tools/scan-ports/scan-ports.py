@@ -82,49 +82,49 @@ def check_dependencies(output=None):
 
 def load_port_config() -> Dict[str, Any]:
     """Load port configuration from TOML file"""
-    script_dir = Path(__file__).parent
-    default_config_path = script_dir / "config" / "ports.toml"
-
-    # Default fallback config
-    default_config = {
-        "port_lists": {
-            "common": {
-                "description": "Basic common ports",
-                "ports": {
-                    "22": "SSH",
-                    "80": "HTTP",
-                    "443": "HTTPS",
-                    "3000": "Node.js Dev",
-                    "5432": "PostgreSQL",
-                },
-            }
-        }
-    }
-
+    # Use new ConfigLoader logic for config discovery
     try:
-        # Set the default configuration
-        config_loader.config = default_config
-
-        # Add the specific ports.toml file to the config loader
-        if default_config_path.exists():
-            config_loader.add_config_file(default_config_path)
-
-        # Load configuration through shared ConfigLoader
         config = config_loader.load_config()
-
-        # If no port lists found in config, use default
+        # If no port lists found in config, use built-in default
         if "port_lists" not in config:
-            output.warning("No port configuration found, using default port list.")
-            return default_config
-
+            output.warning(
+                "No port configuration found, using built-in default port list."
+            )
+            return {
+                "port_lists": {
+                    "common": {
+                        "description": "Basic common ports",
+                        "ports": {
+                            "22": "SSH",
+                            "80": "HTTP",
+                            "443": "HTTPS",
+                            "3000": "Node.js Dev",
+                            "5432": "PostgreSQL",
+                        },
+                    }
+                }
+            }
         return config
     except Exception as e:
         error_msg, error_code = error_handler.handle_config_error(
             "loading port configuration", e
         )
         output.warning(f"Error {error_code}: {error_msg}")
-        output.info("Using default port list")
-        return default_config
+        output.info("Using built-in default port list")
+        return {
+            "port_lists": {
+                "common": {
+                    "description": "Basic common ports",
+                    "ports": {
+                        "22": "SSH",
+                        "80": "HTTP",
+                        "443": "HTTPS",
+                        "3000": "Node.js Dev",
+                        "5432": "PostgreSQL",
+                    },
+                }
+            }
+        }
 
 
 def log_separator(length: int = 60) -> None:

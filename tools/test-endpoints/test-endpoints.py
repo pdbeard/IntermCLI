@@ -632,15 +632,10 @@ def main():
     # Add common arguments
     parser.add_common_arguments()
 
-    # Basic request arguments
-    parser.add_positional_argument(
-        "method_or_url",
-        "HTTP method or URL (if method not specified, defaults to GET)",
-        nargs="?",
-    )
-    parser.add_positional_argument("url", "URL to request", nargs="?")
+    # Minimal config loading using ConfigLoader
+    config_loader = ConfigLoader(TOOL_NAME)
+    config = config_loader.load_config()
 
-    # Request options
     parser.parser.add_argument(
         "-X", "--method", help="HTTP method (GET, POST, PUT, DELETE, etc.)"
     )

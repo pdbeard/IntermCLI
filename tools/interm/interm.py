@@ -9,6 +9,20 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Ensure shared utilities are available (same as scan-ports.py)
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+try:
+    from shared.path_utils import require_shared_utilities
+
+    require_shared_utilities()
+except ImportError:
+    print("Error: IntermCLI shared utilities not found.")
+    print("Please make sure the IntermCLI suite is properly installed.")
+    sys.exit(1)
+
+# Import shared utilities
+from shared.config_loader import ConfigLoader
+
 
 # Custom exception for manifest errors
 class ManifestError(Exception):
@@ -81,43 +95,34 @@ def get_tools_from_manifest():
     """
     Load and parse the tools manifest. Raises ManifestError if missing or malformed.
     """
-    manifest_path = (
-        Path(__file__).resolve().parents[2] / "config" / "tools_manifest.toml"
-    )
-    if not manifest_path.exists():
-        logger.error(f"tools_manifest.toml not found at {manifest_path}")
-        raise ManifestError(f"tools_manifest.toml not found at {manifest_path}")
-    if not toml_loader:
-        logger.error(
-            "No TOML parser found. Supported: Python 3.11+ (tomllib), 'tomli', or 'toml'."
-        )
-        raise ManifestError(
-            "No TOML parser found. Supported: Python 3.11+ (tomllib), 'tomli', or 'toml'.\n"
-            "Install with: 'pip3 install tomli' (recommended for Python <3.11) or 'pip3 install toml'."
-        )
-    try:
-        if toml_loader_name in ["tomllib (builtin)", "tomli (external)"]:
-            with open(manifest_path, "rb") as f:
-                manifest = toml_loader.load(f)
-        else:
-            manifest = toml_loader.load(manifest_path)
-        # Support both [[tool]] (list) and [tool.<name>] (dict)
-        if "tool" in manifest:
-            if isinstance(manifest["tool"], list):
-                return manifest["tool"]
-            elif isinstance(manifest["tool"], dict):
-                return [v | {"name": k} for k, v in manifest["tool"].items()]
-        tool_tables = []
-        for k, v in manifest.items():
-            if isinstance(v, dict) and "description" in v:
-                entry = v.copy()
-                entry["name"] = k
-                tool_tables.append(entry)
-        if tool_tables:
-            return tool_tables
-        raise ManifestError("No valid tool entries found in manifest.")
-    except Exception as e:
-        raise ManifestError(f"Error loading tools_manifest.toml: {e}")
+    # Use ConfigLoader to find and load the manifest file automatically
+    # Minimal config/manifest loading using ConfigLoader
+    config_loader = ConfigLoader("interm", logger)
+    config = config_loader.load_config()
+    manifest = None
+    # Look for manifest in loaded config (merged from all sources)
+    if "tools_manifest" in config:
+        manifest = config["tools_manifest"]
+    elif "tool" in config:
+        manifest = config
+    # If manifest is not found, raise error
+    if manifest is None:
+        logger.error("tools_manifest.toml not found in any config location.")
+        raise ManifestError("tools_manifest.toml not found.")
+    if "tool" in manifest:
+        if isinstance(manifest["tool"], list):
+            return manifest["tool"]
+        elif isinstance(manifest["tool"], dict):
+            return [v | {"name": k} for k, v in manifest["tool"].items()]
+    tool_tables = []
+    for k, v in manifest.items():
+        if isinstance(v, dict) and "description" in v:
+            entry = v.copy()
+            entry["name"] = k
+            tool_tables.append(entry)
+    if tool_tables:
+        return tool_tables
+    raise ManifestError("No valid tool entries found in manifest.")
 
 
 # CLI help

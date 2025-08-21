@@ -60,7 +60,7 @@ get_install_log_path() {
 validate_environment() {
     # Check if running as root (usually not desired for user tools)
     if [ "$EUID" -eq 0 ] && [ "$INSTALL_SCOPE" = "user" ]; then
-        echo -e "${YELLOW}⚠️  Running as root but installing to user directory${NC}"
+        echo -e "${YELLOW}[WARN]  Running as root but installing to user directory${NC}"
         if ! ask_yes_no "Continue anyway?" "n"; then
             exit 1
         fi
@@ -68,7 +68,7 @@ validate_environment() {
 
     # Validate write permissions
     if [ "$INSTALL_SCOPE" = "user" ] && [ ! -w "$(dirname "$USER_INSTALL_DIR")" ]; then
-        echo -e "${RED}❌ Cannot write to $USER_INSTALL_DIR${NC}"
+        echo -e "${RED}[FAIL] Cannot write to $USER_INSTALL_DIR${NC}"
         exit 1
     fi
 }
@@ -89,7 +89,7 @@ detect_shell_profile() {
 
 
 if [ ! -f "$TOOLS_MANIFEST" ]; then
-    echo -e "${RED}❌ tools_manifest.toml not found at $TOOLS_MANIFEST${NC}"
+    echo -e "${RED}[FAIL] tools_manifest.toml not found at $TOOLS_MANIFEST${NC}"
     exit 1
 fi
 
@@ -112,33 +112,33 @@ except Exception as e:
 }
 
 verify_installation() {
-    echo -e "${BLUE}🔍 Verifying installation...${NC}"
+    echo -e "${BLUE}Verifying installation...${NC}"
     parse_tools | while IFS="|" read -r tool_name _ _; do
         if [ -f "$INSTALL_DIR/$tool_name" ] && [ -x "$INSTALL_DIR/$tool_name" ]; then
-            echo -e "${GREEN}  ✅ $tool_name installed and executable${NC}"
+            echo -e "${GREEN}  [OK] $tool_name installed and executable${NC}"
         else
-            echo -e "${RED}  ❌ $tool_name installation failed${NC}"
+            echo -e "${RED}  [FAIL] $tool_name installation failed${NC}"
             return 1
         fi
 
         if command -v "$tool_name" >/dev/null 2>&1; then
-            echo -e "${GREEN}  ✅ $tool_name is in PATH${NC}"
+            echo -e "${GREEN}  [OK] $tool_name is in PATH${NC}"
         else
-            echo -e "${YELLOW}  ⚠️  $tool_name not in PATH${NC}"
+            echo -e "${YELLOW}  [WARN]  $tool_name not in PATH${NC}"
         fi
     done
 
     # Test basic functionality
     if command -v python3 >/dev/null && python3 -c "import sys; print('Python', sys.version)" >/dev/null 2>&1; then
-        echo -e "${GREEN}  ✅ Python environment working${NC}"
+        echo -e "${GREEN}  [OK] Python environment working${NC}"
     fi
 
     # Verify shared utilities
-    echo -e "${BLUE}  Checking shared utilities...${NC}"
-    if python3 -c "import sys; sys.path.insert(0, '$SCRIPT_ROOT'); from shared.output import Output; from shared.error_handler import ErrorHandler; print('  ✅ Shared utilities can be imported'); test_handler = ErrorHandler(Output('test')); print('  ✅ Error handler initialized correctly')" 2>/dev/null; then
-        echo -e "${GREEN}  ✅ Shared utilities verified${NC}"
+    echo -e "${BLUE}Checking shared utilities...${NC}"
+    if python3 -c "import sys; sys.path.insert(0, '$SCRIPT_ROOT'); from shared.output import Output; from shared.error_handler import ErrorHandler; print('  [OK] Shared utilities can be imported'); test_handler = ErrorHandler(Output('test')); print('  [OK] Error handler initialized correctly')" 2>/dev/null; then
+        echo -e "${GREEN}  [OK] Shared utilities verified${NC}"
     else
-        echo -e "${YELLOW}  ⚠️  Some shared utilities may not be working correctly${NC}"
+        echo -e "${YELLOW}  [WARN]  Some shared utilities may not be working correctly${NC}"
         echo -e "${YELLOW}     You may need to reinstall or check the Python environment${NC}"
     fi
 }
@@ -239,24 +239,24 @@ done
 
 # Check for pip3
 if ! command -v pip3 &> /dev/null; then
-    echo -e "${RED}❌ pip3 not found${NC}"
+    echo -e "${RED}[FAIL] pip3 not found${NC}"
     exit 1
 fi
 
 # Uninstall section: remove all tools from manifest
 if [ $# -ge 1 ] && [ "$1" = "--uninstall" ]; then
-    echo -e "${BLUE}🗑️  Uninstalling IntermCLI...${NC}"
+    echo -e "${BLUE}Uninstalling IntermCLI...${NC}"
     if ask_yes_no "Remove installed tools?" "y"; then
         parse_tools | while IFS="|" read -r tool_name _ _; do
             rm -f "$HOME/.local/bin/$tool_name"
-            echo -e "${GREEN}  ✅ $tool_name removed${NC}"
+            echo -e "${GREEN}  [OK] $tool_name removed${NC}"
         done
     fi
     if ask_yes_no "Remove configuration?" "n"; then
         rm -rf "$HOME/.config/intermcli"
-        echo -e "${GREEN}  ✅ Configuration removed${NC}"
+        echo -e "${GREEN}  [OK] Configuration removed${NC}"
     fi
-    echo -e "${GREEN}✅ Uninstall complete${NC}"
+    echo -e "${GREEN}[OK] Uninstall complete${NC}"
     echo -e "${YELLOW}Note: Shared utilities in $SCRIPT_ROOT/shared/ have not been removed${NC}"
     exit 0
 fi
@@ -274,7 +274,7 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
 elif [[ "$OSTYPE" == "darwin"* ]]; then
     PLATFORM="macOS"
 else
-    echo -e "${RED}❌ Unsupported platform: $OSTYPE${NC}"
+    echo -e "${RED}[FAIL] Unsupported platform: $OSTYPE${NC}"
     exit 1
 fi
 
@@ -294,7 +294,7 @@ log() {
 
 log_error() {
     echo "$(date): ERROR: $1" >> "$LOG_FILE"
-    echo -e "${RED}❌ $1${NC}" >&2
+    echo -e "${RED}[FAIL] $1${NC}" >&2
 }
 
 cleanup_on_failure() {
@@ -331,16 +331,16 @@ cleanup_on_exit() {
 trap cleanup_on_exit ERR INT TERM
 
 # Welcome message
-echo -e "${BLUE}🔧 IntermCLI Interactive Installation${NC}"
+echo -e "${BLUE}IntermCLI Interactive Installation${NC}"
 echo -e "${BLUE}   Installing on $PLATFORM${NC}"
 echo ""
 
 log "Starting installation on $PLATFORM"
 
 # Check Python version and TOML support
-echo -e "${BLUE}🐍 Checking Python compatibility...${NC}"
+echo -e "${BLUE}Checking Python compatibility...${NC}"
 if ! command -v python3 &> /dev/null; then
-    echo -e "${RED}❌ Python 3 not found${NC}"
+    echo -e "${RED}[FAIL] Python 3 not found${NC}"
     echo -e "${YELLOW}   Please install Python 3.11+ to use IntermCLI${NC}"
     exit 1
 fi
@@ -349,7 +349,7 @@ PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.v
 PYTHON_MAJOR=$(python3 -c "import sys; print(sys.version_info.major)")
 PYTHON_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
 
-echo -e "${GREEN}  ✅ Python $PYTHON_VERSION found${NC}"
+echo -e "${GREEN}  [OK] Python $PYTHON_VERSION found${NC}"
 
 # Check TOML support
 TOML_SUPPORT=$(python3 -c "
@@ -365,18 +365,18 @@ except ImportError:
 ")
 
 if [ "$TOML_SUPPORT" = "builtin" ]; then
-    echo -e "${GREEN}  ✅ Built-in TOML support (Python 3.11+)${NC}"
+    echo -e "${GREEN}  [OK] Built-in TOML support (Python 3.11+)${NC}"
     NEEDS_TOMLI=false
 elif [ "$TOML_SUPPORT" = "tomli" ]; then
-    echo -e "${GREEN}  ✅ TOML support via tomli package${NC}"
+    echo -e "${GREEN}  [OK] TOML support via tomli package${NC}"
     NEEDS_TOMLI=false
 else
-    echo -e "${YELLOW}  ⚠️  No TOML support found${NC}"
+    echo -e "${YELLOW}  [WARN]  No TOML support found${NC}"
     if [ $PYTHON_MAJOR -eq 3 ] && [ $PYTHON_MINOR -ge 8 ]; then
         echo -e "${YELLOW}     Python $PYTHON_VERSION can use tomli package${NC}"
         NEEDS_TOMLI=true
     else
-        echo -e "${RED}❌ Python 3.8+ required for IntermCLI${NC}"
+        echo -e "${RED}[FAIL] Python 3.8+ required for IntermCLI${NC}"
         exit 1
     fi
 fi
@@ -384,7 +384,7 @@ fi
 echo ""
 
 # Check dependencies using requirements.txt
-echo -e "${BLUE}📦 Checking dependencies...${NC}"
+echo -e "${BLUE}Checking dependencies...${NC}"
 
 
 OPTIONAL_MISSING=()
@@ -429,22 +429,22 @@ for line in lines:
         missing_deps.append(pkg_name)
 
 for pkg in available_deps:
-    print(f'  ✅ {pkg}')
+    print(f'  [OK] {pkg}')
 for pkg in missing_deps:
-    print(f'  ⚪ {pkg} - optional')
+    print(f'  [OPTIONAL] {pkg} - optional')
 "
 else
-    echo -e "${YELLOW}  ⚠️  requirements.txt not found${NC}"
+    echo -e "${YELLOW}  [WARN]  requirements.txt not found${NC}"
 fi
 
 
 # Installation scope logic
 echo ""
-echo -e "${BLUE}🎯 Installation Scope:${NC}"
+echo -e "${BLUE}Installation Scope:${NC}"
 echo -e "  ${GREEN}User installation:${NC} $USER_INSTALL_DIR (recommended for terminal tools)"
 echo -e "  ${YELLOW}Global installation:${NC} $GLOBAL_INSTALL_DIR (system-wide, requires sudo)"
 echo ""
-echo -e "${BLUE}ℹ️  User installation is recommended for terminal utilities${NC}"
+echo -e "${BLUE}User installation is recommended for terminal utilities${NC}"
 echo -e "   Tools will be available in your terminal after adding to PATH${NC}"
 
 if [ -n "$INSTALL_DIR" ]; then
@@ -452,14 +452,14 @@ if [ -n "$INSTALL_DIR" ]; then
     if [ -z "$INSTALL_SCOPE" ]; then
         INSTALL_SCOPE="user"
     fi
-    echo -e "${YELLOW}  ⚠️  Using custom install directory: $INSTALL_DIR${NC}"
+    echo -e "${YELLOW}  [WARN]  Using custom install directory: $INSTALL_DIR${NC}"
 else
     if [ -n "$INSTALL_SCOPE" ]; then
         if [ "$INSTALL_SCOPE" = "user" ]; then
             INSTALL_DIR="$USER_INSTALL_DIR"
         else
             INSTALL_DIR="$GLOBAL_INSTALL_DIR"
-            echo -e "${YELLOW}  ⚠️  Global installation requires administrator privileges${NC}"
+            echo -e "${YELLOW}  [WARN]  Global installation requires administrator privileges${NC}"
         fi
     else
         if ask_yes_no "Use user installation (recommended)?" "y"; then
@@ -468,7 +468,7 @@ else
         else
             INSTALL_DIR="$GLOBAL_INSTALL_DIR"
             INSTALL_SCOPE="global"
-            echo -e "${YELLOW}  ⚠️  Global installation requires administrator privileges${NC}"
+            echo -e "${YELLOW}  [WARN]  Global installation requires administrator privileges${NC}"
         fi
     fi
 fi
@@ -479,11 +479,11 @@ validate_environment
 
 # Config directory setup
 echo ""
-echo -e "${BLUE}⚙️  Configuration Setup:${NC}"
+echo -e "${BLUE}Configuration Setup:${NC}"
 CONFIG_DIR="$HOME/.config/intermcli"
 
 if [ -d "$CONFIG_DIR" ]; then
-    echo -e "${GREEN}  ✅ Config directory exists: $CONFIG_DIR${NC}"
+    echo -e "${GREEN}  [OK] Config directory exists: $CONFIG_DIR${NC}"
 else
     echo -e "${BLUE}  📁 Creating config directory: $CONFIG_DIR${NC}"
     mkdir -p "$CONFIG_DIR"
@@ -496,17 +496,17 @@ install_tool_config() {
     local dest_config="$CONFIG_DIR/$config_name"
     # Always default to N for overwrite prompt
     if [ -f "$dest_config" ]; then
-        echo -e "${YELLOW}  ⚠️  Existing config found: $dest_config${NC}"
+        echo -e "${YELLOW}  [WARN]  Existing config found: $dest_config${NC}"
         if ask_yes_no "Overwrite $config_name config file?" "n"; then
             cp "$dest_config" "$dest_config.backup"
             cp "$source_config" "$dest_config"
-            echo -e "${GREEN}  ✅ $config_name config updated (backup saved)${NC}"
+            echo -e "${GREEN}  [OK] $config_name config updated (backup saved)${NC}"
         else
             echo -e "${YELLOW}  Keeping existing $config_name config${NC}"
         fi
     else
         cp "$source_config" "$dest_config"
-        echo -e "${GREEN}  ✅ $config_name config installed${NC}"
+        echo -e "${GREEN}  [OK] $config_name config installed${NC}"
     fi
 }
 
@@ -516,18 +516,19 @@ install_tool_config "find-projects.toml" "$SCRIPT_ROOT/tools/find-projects/confi
 install_tool_config "scan-ports.toml" "$SCRIPT_ROOT/tools/scan-ports/config/ports.toml"
 install_tool_config "sort-files.toml" "$SCRIPT_ROOT/tools/sort-files/config/defaults.toml"
 install_tool_config "test-endpoints.toml" "$SCRIPT_ROOT/tools/test-endpoints/config/defaults.toml"
-install_tool_config "error-handler.toml" "$SCRIPT_ROOT/config/error-handler.toml" 2>/dev/null || echo -e "${YELLOW}  ⚠️  No error-handler.toml found, using defaults${NC}"
+install_tool_config "error-handler.toml" "$SCRIPT_ROOT/config/error-handler.toml" 2>/dev/null || echo -e "${YELLOW}  [WARN]  No error-handler.toml found, using defaults${NC}"
 install_tool_config "config.toml" "$SCRIPT_ROOT/config/defaults.toml"
+install_tool_config "dependency_manifest.toml" "$SCRIPT_ROOT/config/dependency_manifest.toml"
 # Add more tool configs here
 
 # Always overwrite manifest/internal configs
 cp "$SCRIPT_ROOT/config/tools_manifest.toml" "$CONFIG_DIR/tools_manifest.toml"
-echo -e "${GREEN}  ✅ tools_manifest.toml updated${NC}"
+echo -e "${GREEN}  [OK] tools_manifest.toml updated${NC}"
 
 
 # Installation summary
 echo ""
-echo -e "${BLUE}📋 Installation Summary:${NC}"
+echo -e "${BLUE}Installation Summary:${NC}"
 echo -e "  Platform: $PLATFORM"
 echo -e "  Python: $PYTHON_VERSION"
 echo -e "  Install to: $INSTALL_DIR"
@@ -543,7 +544,7 @@ fi
 
 # Start installation
 echo ""
-echo -e "${BLUE}🚀 Starting installation...${NC}"
+echo -e "${BLUE}Starting installation...${NC}"
 
 # Create install directory
 if [ "$INSTALL_SCOPE" = "global" ]; then
@@ -558,7 +559,7 @@ create_tool_wrapper() {
     local tool_script="$2"
 
     if [ ! -f "$SCRIPT_ROOT/$tool_script" ]; then
-        echo -e "${YELLOW}  ⚠️  $tool_name not found at $SCRIPT_ROOT/$tool_script, skipping${NC}"
+        echo -e "${YELLOW}  [WARN]  $tool_name not found at $SCRIPT_ROOT/$tool_script, skipping${NC}"
         return
     fi
 
@@ -570,7 +571,7 @@ TOOL_PATH=\"\$SCRIPT_ROOT/$tool_script\"
 if [ -f \"\$TOOL_PATH\" ]; then
     python3 \"\$TOOL_PATH\" \"\$@\"
 else
-    echo \"❌ $tool_name tool not found at \$TOOL_PATH\"
+    echo \"[FAIL] $tool_name tool not found at \$TOOL_PATH\"
     exit 1
 fi"
 
@@ -583,11 +584,11 @@ fi"
     fi
 
     INSTALLED_FILES+=("$INSTALL_DIR/$tool_name")
-    echo -e "${GREEN}  ✅ $tool_name${NC}"
+    echo -e "${GREEN}  [OK] $tool_name${NC}"
 }
 
 # Install tools
-echo -e "${BLUE}🔧 Installing tools...${NC}"
+echo -e "${BLUE}Installing tools...${NC}"
 parse_tools | while IFS="|" read -r tool_name tool_script install_flag; do
     # Only install tools with install=true
     if [ "$(echo "$install_flag" | tr '[:upper:]' '[:lower:]')" = "true" ]; then
@@ -600,9 +601,9 @@ parse_tools | while IFS="|" read -r tool_name tool_script install_flag; do
                 chmod +x "$INSTALL_DIR/$tool_name"
             fi
             INSTALLED_FILES+=("$INSTALL_DIR/$tool_name")
-            echo -e "${GREEN}  ✅ $tool_name (suite entry point)${NC}"
+            echo -e "${GREEN}  [OK] $tool_name installed${NC}"
         else
-            echo -e "${YELLOW}  ⚠️  $tool_name not found at $SCRIPT_ROOT/$tool_script, skipping${NC}"
+            echo -e "${YELLOW}  [WARN]  $tool_name not found at $SCRIPT_ROOT/$tool_script, skipping${NC}"
         fi
     fi
 done
@@ -611,15 +612,15 @@ if [ -d "$INSTALL_DIR/shared" ]; then
     rm -rf "$INSTALL_DIR/shared"
 fi
 cp -r "$SCRIPT_ROOT/shared" "$INSTALL_DIR/shared"
-echo -e "${GREEN}  ✅ shared utilities installed to $INSTALL_DIR/shared${NC}"
+echo -e "${GREEN}  [OK] shared utilities installed to $INSTALL_DIR/shared${NC}"
 
 # PATH check (improved)
 echo ""
-echo -e "${BLUE}🛤️  Checking PATH configuration...${NC}"
+echo -e "${BLUE}Checking PATH configuration...${NC}"
 if [[ ":$PATH:" == *":$INSTALL_DIR:"* ]]; then
-    echo -e "${GREEN}  ✅ $INSTALL_DIR is in PATH${NC}"
+    echo -e "${GREEN}  [OK] $INSTALL_DIR is in PATH${NC}"
 else
-    echo -e "${YELLOW}  ⚠️  $INSTALL_DIR is not in PATH${NC}"
+    echo -e "${YELLOW}  [WARN]  $INSTALL_DIR is not in PATH${NC}"
     echo -e "${YELLOW}     Add this to your shell profile (~/.bashrc, ~/.zshrc, etc.):${NC}"
     echo -e "${BLUE}     export PATH=\"$INSTALL_DIR:\$PATH\"${NC}"
 
@@ -630,13 +631,13 @@ else
                 echo "" >> "$SHELL_RC"
                 echo "# IntermCLI PATH" >> "$SHELL_RC"
                 echo "export PATH=\"$INSTALL_DIR:\$PATH\"" >> "$SHELL_RC"
-                echo -e "${GREEN}  ✅ Added to $SHELL_RC${NC}"
+                echo -e "${GREEN}  [OK] Added to $SHELL_RC${NC}"
                 echo -e "${YELLOW}     Restart your terminal or run: source $SHELL_RC${NC}"
             else
-                echo -e "${YELLOW}  ⚠️  PATH already set in $SHELL_RC${NC}"
+                echo -e "${YELLOW}  [WARN]  PATH already set in $SHELL_RC${NC}"
             fi
         else
-            echo -e "${YELLOW}  ⚠️  Cannot detect shell, please add manually${NC}"
+            echo -e "${YELLOW}  [WARN]  Cannot detect shell, please add manually${NC}"
         fi
     fi
 fi
@@ -646,21 +647,21 @@ verify_installation
 
 # Installation complete
 echo ""
-echo -e "${GREEN}✅ IntermCLI installation complete!${NC}"
+echo -e "${GREEN}---  IntermCLI installation complete! ---${NC}"
 echo ""
-echo -e "${BLUE}📝 Install log: $LOG_FILE${NC}"
+echo -e "${BLUE}Install log: $LOG_FILE${NC}"
 echo ""
-echo -e "${BLUE}🚀 Quick start:${NC}"
+echo -e "${BLUE}Quick start:${NC}"
 echo -e "  ${GREEN}scan-ports localhost${NC}        # Scan local ports"
 echo -e "  ${GREEN}find-projects${NC}               # Find development projects"
 echo -e "  ${GREEN}find-projects --config${NC}      # View configuration"
 echo ""
-echo -e "${BLUE}⚙️  Configuration:${NC}"
+echo -e "${BLUE}Configuration:${NC}"
 echo -e "  ${GREEN}$CONFIG_DIR/config.toml${NC}"
 echo ""
-echo -e "${BLUE}📚 Documentation:${NC}"
+echo -e "${BLUE}Documentation:${NC}"
 echo -e "  ${GREEN}$SCRIPT_ROOT/docs/shared-utilities/index.md${NC}  # Shared utility documentation"
 echo -e "  ${GREEN}$SCRIPT_ROOT/docs/output-style-guide.md${NC}      # Output styling guide"
 echo ""
-echo -e "${BLUE}🗑️  To uninstall:${NC}"
+echo -e "${BLUE}To uninstall:${NC}"
 echo -e "  ${GREEN}$0 --uninstall${NC}"

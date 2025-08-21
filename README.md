@@ -10,9 +10,9 @@
 | **staging**  | [![CI dev](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/pdbeard/intermcli/actions?query=branch%3Adev) | [![Coverage Status](https://coveralls.io/repos/github/pdbeard/IntermCLI/badge.svg?branch=dev)](https://coveralls.io/github/pdbeard/IntermCLI?branch=dev) |
 
 
-# 🖥️ IntermCLI
+# IntermCLI
 
-A cohesive ecosystem of interactive CLI tools for developers and system administrators. IntermCLI combines modular design with a shared foundation to deliver powerful utilities for common tasks.
+Interactive CLI tools for developers and system administrators. IntermCLI combines modular design with a shared foundation to deliver powerful utilities for common tasks.
 
 ## Features
 - Integrated ecosystem of CLI tools for developers and system administrators

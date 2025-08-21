@@ -90,13 +90,14 @@ class ConfigLoader:
         return config
 
     def _get_config_files(self) -> List[Tuple[Path, str]]:
-        """Get config files in precedence order (lowest to highest)."""
+        """Get config files in precedence order (lowest to highest), including local project fallback."""
         home_dir = Path.home()
         config_dir = home_dir / ".config" / "intermcli"
         script_path = Path(sys.argv[0]).resolve()
 
         # Find the tool directory by scanning for the expected structure
         base_dir = script_path.parent
+        project_root = None
         if base_dir.name == self.tool_name:
             tool_dir = base_dir
         else:
@@ -110,12 +111,35 @@ class ConfigLoader:
                 # Fall back to relative from script
                 tool_dir = script_path.parent
 
-        return [
+        # Always include user config directory
+        home_dir = Path.home()
+        config_dir = home_dir / ".config" / "intermcli"
+
+        # Local project config directory (for manifests/configs before install)
+        local_config_dir = None
+        if project_root:
+            local_config_dir = project_root / "config"
+        else:
+            candidate = Path.cwd() / "config"
+            if candidate.exists():
+                local_config_dir = candidate
+
+        config_files = [
             (tool_dir / "config" / "defaults.toml", "Tool defaults"),
             (config_dir / "config.toml", "User global config"),
             (config_dir / f"{self.tool_name}.toml", "User tool-specific config"),
+            (config_dir / "tools_manifest.toml", "User tool manifest"),
             (Path.cwd() / ".intermcli.toml", "Project config"),
         ]
+
+        # Add local config directory files if present
+        if local_config_dir and local_config_dir.exists():
+            for toml_file in sorted(local_config_dir.glob("*.toml")):
+                config_files.append(
+                    (toml_file, f"Local project config: {toml_file.name}")
+                )
+
+        return config_files
 
     def _find_project_root(self, start_path: Path) -> Optional[Path]:
         """Find the project root by looking for markers like shared/ directory."""

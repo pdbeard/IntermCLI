@@ -8,6 +8,14 @@ dependency manifest descriptions can be overridden.
 
 tool_name is used multiple times and can be refactored
 
+Do I even want error_handler?
+
+staging branch points to dev branch for CI status in read me. Think coverage is the same for both
+
+
+Look deeply into the config loader and if its working as intended
+
+
 Clear path from the tool manifest (or another config file) into the tools. Needs a simple map of of the depency required, a description, and off to the races.
 
 Rename, and remove enhacement features as they are not used,
