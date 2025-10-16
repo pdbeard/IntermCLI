@@ -135,7 +135,7 @@ verify_installation() {
 
     # Verify shared utilities
     echo -e "${BLUE}Checking shared utilities...${NC}"
-    if python3 -c "import sys; sys.path.insert(0, '$SCRIPT_ROOT'); from shared.output import Output; from shared.error_handler import ErrorHandler; print('  [OK] Shared utilities can be imported'); test_handler = ErrorHandler(Output('test')); print('  [OK] Error handler initialized correctly')" 2>/dev/null; then
+    if python3 -c "import sys, os; sys.path.insert(0, '$SCRIPT_ROOT'); shared_dir = os.path.join('$SCRIPT_ROOT', 'shared'); modules = [f[:-3] for f in os.listdir(shared_dir) if f.endswith('.py') and not f.startswith('__') and f != '__init__.py']; failed = []; [(__import__(f'shared.{mod}') if not failed else None) or (failed.append(mod) if failed is not None else None) for mod in modules]; print('  [OK] All shared utilities can be imported' if not failed else f'  [WARN] Failed to import: {', '.join(failed)}')" 2>/dev/null; then
         echo -e "${GREEN}  [OK] Shared utilities verified${NC}"
     else
         echo -e "${YELLOW}  [WARN]  Some shared utilities may not be working correctly${NC}"
@@ -387,13 +387,13 @@ echo ""
 echo -e "${BLUE}Checking dependencies...${NC}"
 
 
+
 OPTIONAL_MISSING=()
 if [ "$NEEDS_TOMLI" = true ]; then
     OPTIONAL_MISSING+=("tomli")
 fi
 
 if [ -f "$SCRIPT_ROOT/requirements.txt" ]; then
-    echo -e "${BLUE}  Reading requirements.txt...${NC}"
     "$PYTHON_BIN" -c "
 import sys
 import re
@@ -429,9 +429,14 @@ for line in lines:
         missing_deps.append(pkg_name)
 
 for pkg in available_deps:
-    print(f'  [OK] {pkg}')
+    print(f'  [${GREEN}INSTALLED${NC}] {pkg} - optional')
 for pkg in missing_deps:
-    print(f'  [OPTIONAL] {pkg} - optional')
+    print(f'  [${YELLOW}NOT INSTALLED${NC}] {pkg} - optional')
+
+if missing_deps:
+    print('\n[INFO] Optional dependencies are NOT installed by this script.')
+    print('      For enhanced features, install them manually:')
+    print('      python3 -m pip install ' + ' '.join(missing_deps))
 "
 else
     echo -e "${YELLOW}  [WARN]  requirements.txt not found${NC}"
@@ -445,7 +450,7 @@ echo -e "  ${GREEN}User installation:${NC} $USER_INSTALL_DIR (recommended for te
 echo -e "  ${YELLOW}Global installation:${NC} $GLOBAL_INSTALL_DIR (system-wide, requires sudo)"
 echo ""
 echo -e "${BLUE}User installation is recommended for terminal utilities${NC}"
-echo -e "   Tools will be available in your terminal after adding to PATH${NC}"
+echo -e "Tools will be available in your terminal after adding to PATH${NC}"
 
 if [ -n "$INSTALL_DIR" ]; then
     # Prefix overrides everything
@@ -510,13 +515,12 @@ install_tool_config() {
     fi
 }
 
-
 # Install tool configs (add more as needed)
 install_tool_config "find-projects.toml" "$SCRIPT_ROOT/tools/find-projects/config/defaults.toml"
 install_tool_config "scan-ports.toml" "$SCRIPT_ROOT/tools/scan-ports/config/ports.toml"
 install_tool_config "sort-files.toml" "$SCRIPT_ROOT/tools/sort-files/config/defaults.toml"
 install_tool_config "test-endpoints.toml" "$SCRIPT_ROOT/tools/test-endpoints/config/defaults.toml"
-install_tool_config "error-handler.toml" "$SCRIPT_ROOT/config/error-handler.toml" 2>/dev/null || echo -e "${YELLOW}  [WARN]  No error-handler.toml found, using defaults${NC}"
+install_tool_config "error-handler.toml" "$SCRIPT_ROOT/config/error-handler.toml" || echo -e "${YELLOW}  [WARN]  No error-handler.toml found, using defaults${NC}"
 install_tool_config "config.toml" "$SCRIPT_ROOT/config/defaults.toml"
 install_tool_config "dependency_manifest.toml" "$SCRIPT_ROOT/config/dependency_manifest.toml"
 # Add more tool configs here
@@ -533,7 +537,7 @@ echo -e "  Platform: $PLATFORM"
 echo -e "  Python: $PYTHON_VERSION"
 echo -e "  Install to: $INSTALL_DIR"
 echo -e "  Config: $CONFIG_DIR"
-echo -e "  Shared utilities: Output, ErrorHandler, ConfigLoader, etc."
+echo -e "  Shared utilities: $(ls "$SCRIPT_ROOT/shared" | grep -E '\.py$' | grep -v '^__init__\.py$' | grep -v '^__pycache__$' | sed 's/\.py$//g' | tr '\n' ', ' | sed 's/, $//')"
 
 echo ""
 

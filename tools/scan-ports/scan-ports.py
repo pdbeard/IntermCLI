@@ -42,9 +42,9 @@ from shared.output import setup_tool_output
 
 # Check for optional dependencies (test compatibility)
 HAS_RICH = False
-HAS_REQUESTS = False
-HAS_URLLIB3 = False
-HAS_SSL = False
+# HAS_REQUESTS = False
+# HAS_URLLIB3 = False
+# HAS_SSL = False
 
 
 # Optional dependencies are checked in shared.network_utils, so these imports are not needed here.
@@ -957,7 +957,9 @@ def main() -> None:
         output.info(
             f"TOML Support: {'Available' if config_loader.has_toml else 'Missing'}"
         )
-        output.info(f"Service Detection Available: {HAS_REQUESTS and HAS_URLLIB3}")
+        output.info(
+            f"Service Detection Available: {network_utils.has_requests and network_utils.has_urllib3}"
+        )
         # Show the config that will be used
         config = load_port_config()
         output.info(f"Number of Port Lists: {len(config.get('port_lists', {}))}")
