@@ -12,7 +12,7 @@
 
 # IntermCLI
 
-Interactive CLI tools for developers and system administrators. IntermCLI combines modular design with a shared foundation to deliver powerful utilities for common tasks.
+Suite of interactive CLI tools for developers and system administrators. IntermCLI combines modular design with a shared foundation to deliver powerful utilities for common tasks.
 
 ## Features
 - Integrated ecosystem of CLI tools for developers and system administrators
