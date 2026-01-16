@@ -36,9 +36,6 @@ sort-files --config ~/.config/intermcli/sort-files.toml ~/Downloads
 | `--show-skipped` | `false` | Display files that were skipped |
 | `--verbose` | `false` | Show detailed information during processing |
 
-## Advanced Usage
-
-For custom sorting rules and file type mapping, see the [comprehensive documentation](../docs/tools/sort-files.md).
 
 ## Features
 
@@ -63,6 +60,12 @@ by_size = false
 images = [".jpg", ".jpeg", ".png", ".gif"]
 documents = [".pdf", ".docx", ".txt"]
 archives = [".zip", ".tar", ".gz"]
+
+# Custom rules: move files matching these patterns to specific folders
+[rules.custom]
+"*-receipt.pdf" = "Receipts"
+"*-bill.pdf" = "Bills"
+
 ```
 
 ### Customizing
