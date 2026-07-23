@@ -198,12 +198,26 @@ def get_ports_from_lists(
     return ports
 
 
+# Cache of NetworkUtils instances keyed by timeout. Service-detection helpers run
+# in worker threads (see comprehensive_service_detection); giving each timeout its
+# own instance avoids mutating one shared instance's .timeout across threads, which
+# was a data race.
+_network_utils_by_timeout: Dict[float, Any] = {}
+
+
+def _network_utils_for(timeout: float) -> Any:
+    """Return a NetworkUtils configured for `timeout`, without mutating shared state."""
+    nu = _network_utils_by_timeout.get(timeout)
+    if nu is None:
+        nu = create_network_utils(timeout=timeout, logger=output.logger)
+        _network_utils_by_timeout[timeout] = nu
+    return nu
+
+
 def check_port(host: str, port: int, timeout: float = 3) -> bool:
     """Check if a specific port is open using NetworkUtils"""
     try:
-        # Use shared NetworkUtils
-        network_utils.timeout = timeout
-        return network_utils.check_port(host, port)
+        return _network_utils_for(timeout).check_port(host, port)
     except Exception as e:
         output.debug(f"Error checking port {port}: {e}")
         return False
@@ -212,9 +226,7 @@ def check_port(host: str, port: int, timeout: float = 3) -> bool:
 def detect_service_banner(host: str, port: int, timeout: float = 3) -> Optional[str]:
     """Detect service banner using NetworkUtils"""
     try:
-        # Use shared NetworkUtils
-        network_utils.timeout = timeout
-        return network_utils.detect_service_banner(host, port)
+        return _network_utils_for(timeout).detect_service_banner(host, port)
     except Exception as e:
         output.debug(f"Error detecting banner on port {port}: {e}")
         return None
@@ -225,9 +237,7 @@ def detect_http_service(
 ) -> Optional[Dict[str, Any]]:
     """Detect HTTP service using NetworkUtils"""
     try:
-        # Use shared NetworkUtils
-        network_utils.timeout = timeout
-        result = network_utils.detect_http_service(host, port)
+        result = _network_utils_for(timeout).detect_http_service(host, port)
 
         if result:
             # Extract common fields to ensure consistent return format
@@ -687,7 +697,7 @@ def scan_all_configured_ports(
     # Display results
     output.blank()
     output.separator(char="=", length=90)
-    if HAS_RICH and console:
+    if output.rich_console:
         print_scan_results_rich(
             open_ports,
             closed_ports,

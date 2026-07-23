@@ -58,6 +58,11 @@ except ImportError:
 # Suite version
 SUITE_VERSION = "1.0.0"
 
+# Module-level logger. Defined at import time so helper functions
+# (get_tools_from_manifest, delegate_to_tool, ...) can log even when the module
+# is imported rather than run as __main__. setup_logging() adjusts its level.
+logger = logging.getLogger("intermcli")
+
 
 # Logging setup
 def get_global_config():
@@ -87,7 +92,8 @@ def setup_logging():
     log_level = config.get("log_level", "INFO").upper()
     numeric_level = getattr(logging, log_level, logging.INFO)
     logging.basicConfig(level=numeric_level, format="[%(levelname)s] %(message)s")
-    return logging.getLogger("intermcli")
+    logger.setLevel(numeric_level)
+    return logger
 
 
 # Manifest loader
@@ -250,11 +256,24 @@ def main():
     command = sys.argv[1]
     if command in ["list", "version", "about", "status"]:
         handle_suite_command(command, sys.argv[2:])
-    else:
+    elif command in ("-h", "--help", "help"):
         show_suite_help()
+    else:
+        # Treat the command as a tool name and delegate to it.
+        try:
+            tools = get_tools_from_manifest()
+            tool_names = {t.get("name") for t in tools}
+        except ManifestError:
+            tool_names = set()
+
+        if command in tool_names:
+            delegate_to_tool(command, sys.argv[2:])
+        else:
+            logger.error(f"Unknown command or tool: {command}")
+            show_suite_help()
 
 
 if __name__ == "__main__":
 
-    logger = setup_logging()
+    setup_logging()
     main()

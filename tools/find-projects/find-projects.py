@@ -123,8 +123,14 @@ class SecurityValidator:
 
             for base_dir in allowed_dirs:
                 base_resolved = Path(base_dir).resolve()
-                if str(resolved_target).startswith(str(base_resolved)):
+                # Use path-component containment, not string prefix matching, so
+                # that e.g. "/home/u/dev-evil" is NOT treated as inside
+                # "/home/u/dev".
+                try:
+                    resolved_target.relative_to(base_resolved)
                     return True
+                except ValueError:
+                    continue
 
             return False
         except (OSError, RuntimeError, ValueError):
@@ -416,9 +422,10 @@ class ProjectScanner:
 
         try:
             for root, dirs, files in os.walk(dev_dir, followlinks=False):
-                if not self.rate_limiter.check_rate_limit("file_scan"):
-                    time.sleep(0.1)
-                    continue
+                # Throttle if we're scanning too fast, but never drop a directory
+                # (the old `continue` silently skipped it, losing projects).
+                while not self.rate_limiter.check_rate_limit("file_scan"):
+                    time.sleep(0.05)
 
                 # Security checks
                 self._filter_unsafe_symlinks(root, dirs)
@@ -431,8 +438,16 @@ class ProjectScanner:
                 # Skip configured directories
                 dirs[:] = [d for d in dirs if d not in self.config.skip_dirs]
 
-                # Check for git repository
-                if ".git" in os.listdir(root):
+                # Check for git repository. Guard listdir so a single unreadable
+                # directory is skipped rather than aborting the whole scan.
+                try:
+                    entries = os.listdir(root)
+                except OSError as e:
+                    self.output.warning(f"Skipping unreadable directory {root}: {e}")
+                    dirs.clear()
+                    continue
+
+                if ".git" in entries:
                     project = self._create_project(root, dev_dir)
                     if project:
                         projects.append(project)
@@ -629,17 +644,19 @@ class ProjectOpener:
     ) -> bool:
         """Open project in specified editor"""
         try:
-            original_cwd = os.getcwd()
-            os.chdir(project_path)
-
             # Use task_start to indicate the opening process
             self.output.task_start("Opening project", f"{project_name} in {editor}")
 
+            # Run the editor with the project as its working directory. Using
+            # cwd= avoids os.chdir(), which would leave the process in the wrong
+            # directory if the call raised before we could change back.
             result = subprocess.run(
-                [editor, "."], check=False, capture_output=False, text=True
+                [editor, "."],
+                check=False,
+                capture_output=False,
+                text=True,
+                cwd=project_path,
             )
-
-            os.chdir(original_cwd)
 
             if result.returncode == 0:
                 # Display project information using print_key_value_section
@@ -817,8 +834,8 @@ class FindProjectsApp:
         if self.config.development_dirs:
             # Use the print_list method for cleaner list output
             self.output.print_list(
-                self.config.development_dirs,
                 title="Tip: Make sure you have git repositories in one of these directories:",
+                items=self.config.development_dirs,
             )
         else:
             self.output.info("No development directories configured.")

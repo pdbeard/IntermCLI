@@ -10,7 +10,6 @@ Example usage:
     test-endpoints https://api.github.com/users/octocat
     test-endpoints POST https://httpbin.org/post --json '{"name": "test"}'
     test-endpoints GET https://api.example.com/data --header "Authorization: Bearer token123"
-    test-endpoints --collection my-api --request "Get Users" --env dev
 """
 
 import json
@@ -39,7 +38,6 @@ from shared.arg_parser import ArgumentParser
 from shared.config_loader import ConfigLoader
 from shared.dependency_checker import DependencyChecker
 from shared.error_handler import ErrorHandler
-from shared.network_utils import NetworkUtils
 from shared.output import setup_tool_output
 
 # Version
@@ -178,7 +176,7 @@ def make_request(
     error_handler=None,
 ):
     """
-    Make an HTTP request using the best available method (NetworkUtils, requests, or urllib)
+    Make an HTTP request using the best available method (requests or urllib)
 
     Args:
         method: HTTP method (GET, POST, etc.)
@@ -194,33 +192,10 @@ def make_request(
     Returns:
         Response object with status_code, headers, text, and elapsed properties
     """
-    # Try to use shared NetworkUtils first (if available)
-    try:
-        # Initialize a NetworkUtils instance with our timeout
-        network_utils = NetworkUtils(timeout=timeout)
-
-        if hasattr(network_utils, "http_request"):
-            if output:
-                output.debug(f"Using shared NetworkUtils for {method} request to {url}")
-
-            # Convert parameters to NetworkUtils format
-            kwargs = {"headers": headers or {}, "verify": verify_ssl}
-
-            if json_data:
-                kwargs["json"] = json_data
-            elif data:
-                kwargs["data"] = data
-
-            start_time = time.time()
-            response = network_utils.http_request(method, url, **kwargs)
-            response.elapsed = time.time() - start_time
-            return response
-    except (ImportError, AttributeError) as e:
-        # Fall back to direct requests or urllib
-        if output:
-            output.debug(f"Falling back to direct request methods: {e}")
-
-    # Fall back to requests or urllib
+    # Use requests when available, otherwise fall back to stdlib urllib. Both
+    # return a response *object* (with .status_code/.text/.elapsed) that the
+    # printers below rely on. The shared NetworkUtils.make_http_request returns a
+    # plain dict, so it is intentionally not used here.
     if HAS_REQUESTS:
         return make_request_enhanced(
             method,
@@ -551,39 +526,6 @@ def load_config(config_path=None, output=None) -> Dict[str, Any]:
         return default_config
 
 
-def load_collection(collection_path=None, output=None):
-    """
-    Load a collection configuration file using the shared ConfigLoader.
-
-    Args:
-        collection_path (str or Path, optional): Path to a collection file
-        output (Output, optional): Output utility for error handling
-
-    Returns:
-        dict: Collection configuration or None if not found
-    """
-    # Create a separate config loader for collections
-    collection_loader = ConfigLoader(TOOL_NAME, section_name="collections")
-
-    # Add the specific collection file if provided
-    if collection_path:
-        collection_loader.add_config_file(collection_path)
-
-    try:
-        collection_config = collection_loader.load_config()
-        if output:
-            output.info("Loaded collection configuration")
-        return collection_config
-    except Exception as e:
-        if output:
-            error_handler = ErrorHandler(output)
-            msg, code = error_handler.handle_config_error(
-                collection_path or "default collection", e
-            )
-            output.warning("No collection config found, using defaults if any.")
-        return None
-
-
 def substitute_variables(text, variables):
     """Simple variable substitution using {{variable}} syntax"""
     if not isinstance(text, str):
@@ -687,17 +629,6 @@ def main():
     )
     request_group.add_argument("--follow", action="store_true", help="Follow redirects")
 
-    # Collections and environments
-    collection_group = parser.parser.add_argument_group("Collections")
-    collection_group.add_argument(
-        "--collection", help="Collection name or path to TOML file"
-    )
-    collection_group.add_argument("--request", help="Request name from collection")
-    collection_group.add_argument("--env", help="Environment name")
-    collection_group.add_argument(
-        "--set", action="append", help="Set variable (format: 'key=value')"
-    )
-
     # The --config argument is already added by add_common_arguments()
 
     # Utility
@@ -745,14 +676,17 @@ def main():
                 key, value = header.split(":", 1)
                 headers[key.strip()] = value.strip()
 
-    # Parse query parameters
+    # Parse query parameters (URL-encoded so values with spaces/&/= are safe)
     if args.param:
         params = []
         for param in args.param:
             if "=" in param:
-                params.append(param)
+                key, value = param.split("=", 1)
+                params.append(
+                    f"{urllib.parse.quote(key, safe='')}="
+                    f"{urllib.parse.quote(value, safe='')}"
+                )
         if params:
-
             separator = "&" if "?" in url else "?"
             url += separator + "&".join(params)
 

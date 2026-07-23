@@ -60,21 +60,22 @@ def load_config(config_path=None, output=None) -> Dict[str, Any]:
     # Use the shared ConfigLoader
     config_loader = ConfigLoader(TOOL_NAME)
 
-    # Add the specific config file if provided
-    if config_path:
-        config_loader.add_config_file(config_path)
-
-    # Add default configuration file for this tool
+    # Seed this tool's baked defaults as the base file layer.
     default_config_path = Path(__file__).resolve().parent / "config" / "defaults.toml"
     if default_config_path.exists():
         config_loader.add_config_file(str(default_config_path))
-    else:
-        if output:
-            output.warning(f"Default config file not found at {default_config_path}")
+    elif output:
+        output.warning(f"Default config file not found at {default_config_path}")
 
     # Load the configuration with proper precedence
     try:
         config = config_loader.load_config()
+
+        # An explicitly provided --config file is a deliberate user override, so
+        # apply it last so it wins over discovered defaults.
+        if config_path:
+            config_loader.add_config_file(config_path)
+            config = config_loader.config
 
         # Validate minimum required configuration
         if "type_folders" not in config and output:
@@ -98,8 +99,8 @@ def load_config(config_path=None, output=None) -> Dict[str, Any]:
             )
             # This will exit if exit_on_critical is True and the error is critical
             error_handler.exit_if_critical(code)
-            # Otherwise return an empty config
-            return {}
+        # Always return a dict so callers never get None back
+        return {}
 
 
 # --- Core logic ---
@@ -171,7 +172,11 @@ DEFAULT_MEDIUM_SIZE = 1024 * 1024  # 1 MB
 
 # --- Destination folder logic ---
 def get_destination_folder(
-    entry: Path, target_dir: Path, rules: dict, type_folders: dict
+    entry: Path,
+    target_dir: Path,
+    rules: dict,
+    type_folders: dict,
+    size_thresholds: Optional[Dict[str, int]] = None,
 ) -> Path:
     custom_rules = rules.get("custom", {})
     custom_folder = match_custom_rule(entry.name, custom_rules)
@@ -184,26 +189,12 @@ def get_destination_folder(
         return target_dir / mtime.strftime("%Y-%m")
     if rules.get("by_size", False):
         size = entry.stat().st_size
-        # Get thresholds from config (attached to entry's parent config)
-        # Assume config is globally available or pass as needed
-        from inspect import currentframe, getouterframes
-
-        # Find the config in the call stack (from main or sort_files)
-        config = None
-        for frameinfo in getouterframes(currentframe()):
-            local_vars = frameinfo.frame.f_locals
-            if "config" in local_vars:
-                config = local_vars["config"]
-                break
-        if config is None:
-            # Fallback to defaults if config not found
-            huge = DEFAULT_HUGE_SIZE
-            large = DEFAULT_LARGE_SIZE
-            medium = DEFAULT_MEDIUM_SIZE
-        else:
-            huge = config.get("huge_size", DEFAULT_HUGE_SIZE)
-            large = config.get("large_size", DEFAULT_LARGE_SIZE)
-            medium = config.get("medium_size", DEFAULT_MEDIUM_SIZE)
+        # Thresholds are passed in explicitly (from the loaded config) rather
+        # than discovered by walking the call stack.
+        size_thresholds = size_thresholds or {}
+        huge = size_thresholds.get("huge", DEFAULT_HUGE_SIZE)
+        large = size_thresholds.get("large", DEFAULT_LARGE_SIZE)
+        medium = size_thresholds.get("medium", DEFAULT_MEDIUM_SIZE)
         size_categories = [
             (huge, "huge"),
             (large, "large"),
@@ -227,6 +218,7 @@ def sort_files(
     copy_mode: bool = False,
     recursive: bool = False,
     output: Output = None,
+    size_thresholds: Optional[Dict[str, int]] = None,
 ) -> Tuple[List[Tuple[Path, Path]], List[Tuple[Path, str]]]:
     """
     Sort files in a directory according to rules and type folders.
@@ -241,6 +233,8 @@ def sort_files(
         copy_mode (bool): If True, copy files instead of moving them.
         recursive (bool): If True, process subdirectories recursively.
         output: Output utility for display
+        size_thresholds (dict): Optional huge/large/medium byte thresholds for
+            --by size mode. Defaults are used when not provided.
     Returns:
         tuple: (moved, skipped) lists of (entry, dest_dir) and (entry, reason).
     """
@@ -276,6 +270,7 @@ def sort_files(
                     copy_mode,
                     recursive,
                     output,
+                    size_thresholds,
                 )
                 moved.extend(sub_moved)
                 skipped.extend(sub_skipped)
@@ -283,7 +278,9 @@ def sort_files(
         if skip_hidden and entry.name.startswith("."):
             continue
 
-        dest_dir = get_destination_folder(entry, target_dir, rules, type_folders)
+        dest_dir = get_destination_folder(
+            entry, target_dir, rules, type_folders, size_thresholds
+        )
         dest = dest_dir / entry.name
         if safe and dest.exists():
             skipped.append((entry, "exists"))
@@ -406,9 +403,9 @@ def main():
         check_dependencies(output)
         return
 
-    # Minimal config loading using ConfigLoader
-    config_loader = ConfigLoader(TOOL_NAME)
-    config = config_loader.load_config()
+    # Load config via the module helper so that a --config path is honored and
+    # the size thresholds (huge/large/medium) are computed.
+    config = load_config(config_path=args.config, output=output)
 
     if not config:
         output.error(
@@ -479,6 +476,12 @@ def main():
     # Start sorting task
     output.task_start("Sorting files", f"{total_files} files in {target_dir}")
 
+    size_thresholds = {
+        "huge": config.get("huge_size", DEFAULT_HUGE_SIZE),
+        "large": config.get("large_size", DEFAULT_LARGE_SIZE),
+        "medium": config.get("medium_size", DEFAULT_MEDIUM_SIZE),
+    }
+
     moved, skipped = sort_files(
         target_dir,
         config["rules"],
@@ -490,6 +493,7 @@ def main():
         output=output,
         copy_mode=config.get("copy", False),
         recursive=config.get("recursive", False),
+        size_thresholds=size_thresholds,
     )
 
     # --- Summary Table ---
