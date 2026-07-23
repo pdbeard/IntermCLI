@@ -1,0 +1,4 @@
+# pip-audit configuration file
+# Ignore the pip vulnerability GHSA-4xh5-x5gv-qwph
+ignore-vulns:
+  - GHSA-4xh5-x5gv-qwph

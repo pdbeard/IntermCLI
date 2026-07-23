@@ -184,6 +184,15 @@ class Output:
         """
         self.tool_name = tool_name
         self.logger = logging.getLogger(tool_name)
+        self.logger.propagate = False  # Prevent double logging and root logger format
+        # Ensure at least one handler with plain format (no [INFO] tag)
+        if not self.logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter("%(message)s"))
+            self.logger.addHandler(handler)
+        else:
+            for handler in self.logger.handlers:
+                handler.setFormatter(logging.Formatter("%(message)s"))
         self.verbose = verbose
 
         # Check if we're in a terminal that supports color
@@ -467,7 +476,7 @@ class Output:
         return SimpleTableAdapter(title, headers)
 
     def print_list(
-        self, items: List[str], numbered: bool = False, title: Optional[str] = None
+        self, title: Optional[str], items: List[str], numbered: bool = False
     ) -> None:
         """
         Print a formatted list of items.
@@ -621,13 +630,12 @@ class Output:
         """
         Print a section header with optional rich formatting.
 
+        Alias for :meth:`header` kept for call-site readability.
+
         Args:
             name: Section name
         """
-        if self.rich_console:
-            self.rich_console.print(f"\n[bold cyan]== {name} ==[/bold cyan]")
-        else:
-            self.logger.info(f"\n== {name} ==")
+        self.header(name)
 
     def item(self, key: str, value: str) -> None:
         """

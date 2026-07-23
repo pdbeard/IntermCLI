@@ -2,7 +2,7 @@
 
 ## Core Philosophy: An Integrated CLI Ecosystem
 
-IntermCLI is a cohesive ecosystem of interoperable CLI utilities. While maintaining modularity, the tools share a common foundation that enables consistent user experience, simplified maintenance, and enhanced capabilities.
+IntermCLI is a cohesive ecosystem CLI utilities. While maintaining modularity, the tools share a common foundation that enables consistent user experience, simplified maintenance, and enhanced capabilities.
 
 ## Design Principles
 

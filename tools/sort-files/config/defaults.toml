@@ -25,9 +25,7 @@ video = [".mp4", ".mkv", ".mov", ".avi", ".wmv", ".webm"]
 code = [".py", ".js", ".ts", ".java", ".c", ".cpp", ".go", ".rb", ".php", ".sh", ".rs"]
 
 
-# Example for future expansion:
-# [size_ranges]
-# huge = 104857600      # >100MB
-# large = 10485760      # >10MB
-# medium = 1048576      # >1MB
-# small = 0             # <=1MB
+[size_thresholds]
+huge = 104857600   # 100 MB
+large = 10485760   # 10 MB
+medium = 1048576   # 1 MB

@@ -1,203 +1,27 @@
-## IntermCLI 1.0 Release Checklist
+refactor check_dependency function in tools into ehancement_loader, so you can just pass a dep map into a oneliner.
 
-1. Documentation
-- [ ] Ensure every tool has a complete doc: usage, config, troubleshooting, feature list.
-- [ ] Update suite-level docs (README.md, architecture, contributing, design).
-- [ ] Add naming conventions and enhancement descriptions.
-- [ ] Document branching strategy (even if PRs aren't enforced yet).
-- [ ] Update or finalize CHANGELOG.md (or rely on Release Drafter).
-- [ ] Add "Quick Start" guides for new users to get immediate value
-- [ ] Create troubleshooting section for common issues in each tool's documentation
-- [ ] Expand workflow examples to show how to chain tools together effectively
+This will also require moving the dep_map (desciption, package to try) and install_map (package to try, actual package name to install ) into a seperate config file for easy changes.
 
-2. Testing
-- [ ] Confirm all tools and features have unit/integration tests.
-- [ ] Add tests for error handling and config overrides.
-- [ ] Ensure CI passes for all supported Python versions/OSes.
-- [ ] Consider adding property-based testing for complex functionality
-- [ ] Add performance benchmarks for tools that process large datasets
-- [ ] Implement specific cross-platform tests for filesystem and network operations
+Need both dep map and install map because of packages like pyyaml. Where the package is pyyaml but the package import name is yaml.
 
-3. CI/CD & Automation
-- [ ] Confirm CI workflow covers lint, format, audit, docs build, and dependency caching.
-- [ ] Ensure release automation and changelog automation are working.
-- [ ] (Optional) Add artifact build/upload if relevant.
-- [ ] Consider adding a development feedback loop (e.g., automatic PR quality checks)
-- [ ] Implement standardized error reporting in CI outputs
+dependency manifest descriptions can be overridden.
 
-4. Features & Polish
-- [ ] Finalize local config support for tools.
-- [ ] Review and update tools_manifest.toml and suite-level docs.
-- [ ] Decide on any last features or polish from your TODO list.
-- [ ] Implement a unified configuration system for global defaults with tool-specific overrides
-- [ ] Consider adding command history/favorites feature
-- [ ] Add support for task automation by chaining tools with a simple workflow syntax
+tool_name is used multiple times and can be refactored
 
-5. Project Management
-- [ ] Add actionable TODOs for each tool/folder.
-- [ ] Clean up and organize enhancement descriptions.
-- [ ] Consider implementing a tool generator template for easier creation of new tools
-- [ ] Standardize error codes and messages across all tools
-- [ ] Add developer documentation for contribution workflow and tool development
+Do I even want error_handler?
+
+staging branch points to dev branch for CI status in read me. Think coverage is the same for both
 
 
-6. Alignment with project goals
-  - Add additional enhancedments into tools with optional dependencies
-    - Create stucture for dep management (clear organization of what tool needs what dependecy, or 'global' deps like rich. skip deps for certain tools)
-    - Implement some TUI through rich for interaction
-  - Consider a plugin architecture to make it easier for users to add their own tools
-  - Implement a consistent logging strategy across all tools with configurable verbosity
-  - Add progressive disclosure of advanced features to keep basic usage simple
-
-7. User Experience & Accessibility
-  - [ ] Review tools for consistency in CLI interface and output formatting
-  - [ ] Consider accessibility requirements for TUI/rich interfaces
-  - [ ] Implement a unified help system across all tools
-  - [ ] Ensure tools provide meaningful error messages and suggestions
-
-8. Security & Compliance
-  - [ ] Add a security review checklist for tools that interact with external systems
-  - [ ] Consider privacy implications for tools that might handle sensitive data
-  - [ ] Add option to disable any telemetry/analytics in all tools
-  - [ ] Audit tools for handling of secrets and credentials
-
-9. Release & Distribution
-  - [ ] Consider packaging options (pip, homebrew, etc.) for easier installation
-  - [ ] Add versioning strategy for individual tools and the suite as a whole
-  - [ ] Implement feature flags for experimental features
-  - [ ] Create release verification checklist
+Look deeply into the config loader and if its working as intended
 
 
-## Hardcoded Values Refactor Checklist
+Clear path from the tool manifest (or another config file) into the tools. Needs a simple map of of the depency required, a description, and off to the races.
 
-- [ ] Move all default values (ports, directories, editors, timeouts, etc.) to TOML config files for each tool
-- [ ] Ensure all file paths are configurable via environment variables or CLI arguments
-- [ ] Replace hardcoded port numbers and service names with config-driven lists
-- [ ] Document all overridable settings in each tool's README
-- [ ] Allow CLI arguments and environment variables to override any config value
-- [ ] Remove hardcoded extensions/types; use config for file type rules
-- [ ] Refactor test code to use config-driven values where possible
-- [ ] Audit for any remaining hardcoded strings, numbers, or paths in Python code
-- [ ] Add tests to confirm config overrides work as expected
-- [ ] Update documentation to reflect new dynamic configuration approach
+Rename, and remove enhacement features as they are not used,
+Possibly in the future add a feature management system where users can disable the usage of certain deps through flags/ fallback to og code.
 
 
-
-## Optional Dependencies Enhancement Checklist
-
-- [ ] Detect and use rich for colorized output, tables, and panels
-- [ ] Use requests for enhanced HTTP features (timeouts, SSL, redirects)
-- [ ] Use click for improved CLI parsing and help output
-- [ ] Use python-nmap for advanced port scanning (scan-ports)
-- [ ] Use pyyaml for YAML config support if needed
-- [ ] Use gitpython for advanced git operations (find-projects)
-- [ ] Add enhanced error messages and suggestions when optional deps are missing
-- [ ] Add a --check-deps or --status command to show enhancement status
-- [ ] Document which features are unlocked by each optional dependency in README
-- [ ] Add tests for enhanced features and fallback behavior
-- [ ] Ensure graceful fallback to stdlib-only features if optional deps are not installed
-- [ ] Add config options to enable/disable enhanced features
-- [ ] Show a summary of available enhancements at tool startup
-
-Other Ideas/TODOS
-
-# CI/Automation
-- set up branch protection rules/ Mandate PR for changes to main to help with release automation
-- Add MkDocs documentation build
-- Add macOS/Windows runners
-- Release automation
-- Cache dependencies
-- Build and upload artifacts
-- Custom test markers
-- Discord alerts for fun
-
-# Tool Config/Enhancements
-- Local config files for tool customization
-  - find-projects: run custom commands when opening projects
-  - sort-files: custom rule sets per directory (for automation)
-
-# Project Management
-- Determine GitHub branching strategy
-- Update docs with new strategy
-- Add TODOs for each tool/folder
-- Write clear descriptions for enhancements (e.g., reduced flickering)
-- Add naming convention documentation
-
-# Tool Ideas
-## Scripty things
-- Renaming scripts, backup scripts, webserver utilities
-- Aliases for common tasks (e.g., docker mass quit)
-
-## Service/Monitoring
-- Check common services (custom list, active monitoring)
-
-## Logging/Analysis
-- Good logging scripts (multifile support, filtering, highlighting)
-- Analyze logs (how to approach?)
-
-## User Management
-- User/group info scripts
-- Last logins, fast enable/disable/create
-
-## Disk/Backup
-- Find large files
-- Backups for config files
-
-## General Maintenance
-- General update script (pull info from APIs, list community security warnings)
-- Rotate log scripts
-- Rotate keys (SSH, API)
-- More individualized process monitor (watch specific processes)
-- Find suid/sgid files
-
-# Web Dev Scripts
-- Check SSL
-- Test endpoints (Postman style)
-- Lint configs
-- Find secrets
-- Deploy static sites
-- Monitor uptime
-- Check CORS
-- Analyze dependencies
-- Generate env files
-- Check accessibility
-- Test webhooks
-- Generate sitemap
-- Check redirects
-- Generate favicons
-- Check headers
-- Test CSP headers
-- Generate JSON templates
-
-# General Utilities
-- Terminal color schemes
-- Find open PRs
-- Sync dotfiles
-- Check DNS
-- Test SMTP
-- Generate password
-- Ripgrep/grep wrapper
-- Encrypt/decrypt files
-- Better pop/popd (like Z)
-- Download manager/watcher
-- Clipboard manager
-- Firewall scripts
-- Install/configure favorite tools (fail2ban, security settings, SSH)
-- Find duplicates
-- Color picker and profiles (from terminal)
-
-# Developer Experience
-- Create a sandbox environment for testing tools in isolation
-- Add local development containers for consistent development environments
-- Implement tool profiling for performance optimization
-- Add static analysis tools beyond basic linting (security, complexity)
-- Create debugging guides for each tool
-
-# Community & Adoption
-- Plan for community contributions and governance
-- Consider creating a project website or documentation portal
-- Add examples of integrating tools with other common developer workflows
-- Create sharable configuration presets for different use cases
-- Consider adding a community showcase section in docs
-
----
+Make rich text support more consistent color mapping and styling (add to 2.0 release after coming up with new styles)
+ - ie, green for "available", or successful messages
+ - colors for path (purply)

@@ -1,6 +1,6 @@
 # find-projects
 
-Interactive development project discovery and navigation tool for efficiently finding and opening projects.
+Interactive navigation tool for efficiently finding and opening development projects.
 
 ## Usage
 

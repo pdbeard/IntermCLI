@@ -95,7 +95,7 @@ except ImportError:
 # Now safely import other shared modules
 from shared.config_loader import ConfigLoader
 from shared.output import Output
-from shared.enhancement_loader import EnhancementLoader
+from shared.dependency_checker import DependencyChecker
 from shared.arg_parser import ArgumentParser
 
 # Rest of the tool...

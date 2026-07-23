@@ -257,13 +257,17 @@ test_key = "test_value"
                     config_files = self.config_loader._get_config_files()
 
                     # Check that all config files were found
-                    self.assertEqual(len(config_files), 4)
+                    self.assertEqual(len(config_files), 5)
                     paths = [path for path, _ in config_files]
 
-                    # Only check for paths that aren't dependent on the _find_project_root logic
+                    # Check for expected config files
                     self.assertIn(global_config, paths)
                     self.assertIn(tool_config, paths)
                     self.assertIn(project_config, paths)
+                    # Check for manifest file
+                    manifest_path = config_dir / "tools_manifest.toml"
+                    # The manifest may not exist, but should be in the search paths
+                    self.assertIn(manifest_path, paths)
 
     def test_load_config(self):
         """Test loading the full configuration."""

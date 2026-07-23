@@ -58,8 +58,13 @@ class ConfigLoader:
             self.logger.info("Install tomli for Python < 3.11: pip3 install tomli")
             return self._get_default_config()
 
-        # Start with built-in defaults
+        # Start with built-in defaults, then layer any tool-supplied defaults
+        # that a caller assigned to ``self.config`` before calling load_config()
+        # (e.g. via ``loader.config = {...}`` or ``add_config_file``). These sit
+        # below file/env/cmd overrides so precedence is preserved.
         config = self._get_default_config()
+        if self.config:
+            self._deep_update(config, self.config)
 
         # Try loading from files in precedence order (low to high)
         config_files = self._get_config_files()
@@ -90,13 +95,14 @@ class ConfigLoader:
         return config
 
     def _get_config_files(self) -> List[Tuple[Path, str]]:
-        """Get config files in precedence order (lowest to highest)."""
+        """Get config files in precedence order (lowest to highest), including local project fallback."""
         home_dir = Path.home()
         config_dir = home_dir / ".config" / "intermcli"
         script_path = Path(sys.argv[0]).resolve()
 
         # Find the tool directory by scanning for the expected structure
         base_dir = script_path.parent
+        project_root = None
         if base_dir.name == self.tool_name:
             tool_dir = base_dir
         else:
@@ -110,12 +116,49 @@ class ConfigLoader:
                 # Fall back to relative from script
                 tool_dir = script_path.parent
 
-        return [
+        # Always include user config directory
+        home_dir = Path.home()
+        config_dir = home_dir / ".config" / "intermcli"
+
+        # Local project config directory (for manifests/configs before install)
+        local_config_dir = None
+        if project_root:
+            local_config_dir = project_root / "config"
+        else:
+            candidate = Path.cwd() / "config"
+            if candidate.exists():
+                local_config_dir = candidate
+
+        config_files = [
             (tool_dir / "config" / "defaults.toml", "Tool defaults"),
             (config_dir / "config.toml", "User global config"),
             (config_dir / f"{self.tool_name}.toml", "User tool-specific config"),
+            (config_dir / "tools_manifest.toml", "User tool manifest"),
             (Path.cwd() / ".intermcli.toml", "Project config"),
         ]
+
+        # Add local config directory files if present, scoped to files relevant
+        # to this tool. Globbing every *.toml here caused cross-tool config bleed
+        # (one tool silently ingesting another tool's config, and manifests
+        # overriding user settings). Only the suite-wide defaults, this tool's own
+        # config, and the shared manifests are loaded.
+        if local_config_dir and local_config_dir.exists():
+            # Ordered low-to-high precedence: shared manifests first, then the
+            # suite defaults, then this tool's own config last so it wins.
+            allowed_local = [
+                "dependency_manifest.toml",
+                "tools_manifest.toml",
+                "defaults.toml",
+                f"{self.tool_name}.toml",
+            ]
+            for name in allowed_local:
+                toml_file = local_config_dir / name
+                if toml_file.exists():
+                    config_files.append(
+                        (toml_file, f"Local project config: {toml_file.name}")
+                    )
+
+        return config_files
 
     def _find_project_root(self, start_path: Path) -> Optional[Path]:
         """Find the project root by looking for markers like shared/ directory."""
@@ -243,10 +286,12 @@ class ConfigLoader:
 
     def _convert_env_value(self, value: str) -> Union[str, int, float, bool]:
         """Convert environment variable string to appropriate type."""
-        # Handle boolean values
-        if value.lower() in ("true", "yes", "1"):
+        # Handle boolean values. Note: "1"/"0" are deliberately NOT treated as
+        # booleans so that numeric settings (e.g. a timeout of 1) survive as ints
+        # rather than becoming True/False.
+        if value.lower() in ("true", "yes"):
             return True
-        if value.lower() in ("false", "no", "0"):
+        if value.lower() in ("false", "no"):
             return False
 
         # Handle numeric values

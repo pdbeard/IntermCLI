@@ -220,4 +220,4 @@ For detailed guidance on output styling and patterns, refer to the [Output Style
 ## See Also
 
 - [Output Style Guide](../output-style-guide.md) - Comprehensive guide to output styling
-- [Enhancement Loader](enhancement-loader.md) - For checking rich dependency
+- [Dependency Checker](dependency-checker.md) - For checking rich dependency

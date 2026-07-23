@@ -146,10 +146,10 @@ The Network Utilities module uses progressive enhancement:
 To check for dependencies, use the Enhancement Loader:
 
 ```python
-from shared.enhancement_loader import EnhancementLoader
+from shared.dependency_checker import DependencyChecker
 
 # Check for network-related dependencies
-enhancements = EnhancementLoader("my-tool")
+checker = DependencyChecker("my-tool")
 has_requests = enhancements.check_dependency("requests")
 ```
 
@@ -163,5 +163,5 @@ has_requests = enhancements.check_dependency("requests")
 
 ## See Also
 
-- [Enhancement Loader](enhancement-loader.md) - For checking network-related dependencies
+- [Dependency Checker](dependency-checker.md) - For checking network-related dependencies
 - [Output Handler](output-handler.md) - For displaying network operation results

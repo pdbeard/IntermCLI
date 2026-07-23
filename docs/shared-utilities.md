@@ -7,7 +7,7 @@ IntermCLI provides a set of shared utilities that can be used across all tools i
 | Utility | Description | File |
 |---------|-------------|------|
 | Config Loader | Handles TOML configuration loading with proper precedence | `shared/config_loader.py` |
-| Enhancement Loader | Handles detection of optional dependencies | `shared/enhancement_loader.py` |
+| Dependency Checker | Handles detection of optional dependencies | `shared/dependency_checker.py` |
 | Output Handler | Provides consistent output formatting | `shared/output.py` |
 | Error Handler | Provides standardized error handling | `shared/error_handler.py` |
 | Network Utilities | Provides common network operations | `shared/network_utils.py` |
@@ -168,7 +168,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from shared.arg_parser import ArgumentParser
 from shared.config_loader import ConfigLoader
-from shared.enhancement_loader import EnhancementLoader
+from shared.dependency_checker import DependencyChecker
 from shared.output import Output
 from shared.network_utils import NetworkUtils
 
@@ -192,7 +192,7 @@ def main():
     args = parser.parse_args_as_dict()
 
     # Check dependencies
-    enhancements = EnhancementLoader("my-tool")
+    checker = DependencyChecker("my-tool")
     enhancements.check_dependency("requests")
     enhancements.check_dependency("rich")
 

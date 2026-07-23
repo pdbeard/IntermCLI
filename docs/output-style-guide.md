@@ -15,27 +15,29 @@ This guide defines the standard formatting conventions for all IntermCLI tools. 
 All tools use the shared output utility (`shared/output.py`) for consistent formatting:
 
 ```python
-from shared.output import banner, header, info, success, warning, error
+from shared.output import Output
+
+output = Output("Find Projects")
 
 # Tool identification
-banner("Find Projects", "1.0.0", {
+output.banner("Find Projects", "1.0.0", {
     "Description": "Interactive project discovery tool"
 })
 
 # Section header
-header("Search Results")
+output.header("Search Results")
 
 # Informational message
-info("Scanning directories...")
+output.info("Scanning directories...")
 
 # Success message
-success("Found 12 projects")
+output.success("Found 12 projects")
 
 # Warning message
-warning("Some directories were skipped due to permissions")
+output.warning("Some directories were skipped due to permissions")
 
 # Error message
-error("Unable to access network resources")
+output.error("Unable to access network resources")
 ```
 
 ## Message Types
@@ -67,36 +69,30 @@ output.item("Location", "/path/to/directory")
 
 ## Interactive Elements
 
-For interactive elements, use the following patterns:
+For progress indication, use:
 
 ```python
-# User prompt
-response = output.prompt("Enter search path")
-
-# Confirmation
-if output.confirm("Delete 5 files?"):
-    # proceed with deletion
-
-# Selection from options
-option = output.select("Sort by", ["name", "date", "size"])
-
-# Progress indication
 with output.create_progress_bar(total=len(files), description="Processing") as progress:
     for file in files:
         process_file(file)
         progress.update(1)
 ```
 
+**Note:** Methods like `prompt`, `confirm`, and `select` are not currently implemented in `Output`.
+
 ## Rich Formatting Support
 
-When the `rich` package is available, enhanced formatting will be used automatically:
+---
 
-- Syntax highlighting for code blocks
-- Tables for structured data
-- Progress bars for long-running operations
-- Hyperlinks for URLs and file paths
+## Notes
 
-Plain text alternatives are always provided when rich formatting is unavailable.
+- When the `rich` package is available, enhanced formatting will be used automatically:
+  - Syntax highlighting for code blocks
+  - Tables for structured data
+  - Progress bars for long-running operations
+  - Hyperlinks for URLs and file paths
+- Plain text alternatives are always provided when rich formatting is unavailable.
+- Only the methods shown in the examples above are implemented in the `Output` class. For complete implementation details, see the [Shared Utilities Reference](./shared-utilities-reference.md#output-handler-outputpy).
 
 ## Implementation
 

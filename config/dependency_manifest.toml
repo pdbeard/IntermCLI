@@ -1,0 +1,6 @@
+[dependencies]
+rich = { description = "Colorized output", import = "rich", package = "rich", optional = true }
+pyyaml = { description = "YAML config support", import = "yaml", package = "pyyaml", optional = true }
+requests = { description = "HTTP requests", import = "requests", package = "requests", optional = true }
+urllib3 = { description = "Advanced HTTP support", import = "urllib3", package = "urllib3", optional = true }
+toml = { description = "TOML config support", import = "toml", package = "toml", optional = true }

@@ -38,7 +38,7 @@ from shared.arg_parser import ArgumentParser
 
 # Import shared utilities
 from shared.config_loader import ConfigLoader
-from shared.enhancement_loader import EnhancementLoader
+from shared.dependency_checker import DependencyChecker
 from shared.error_handler import ErrorHandler
 from shared.output import Output, setup_tool_output
 
@@ -60,21 +60,22 @@ def load_config(config_path=None, output=None) -> Dict[str, Any]:
     # Use the shared ConfigLoader
     config_loader = ConfigLoader(TOOL_NAME)
 
-    # Add the specific config file if provided
-    if config_path:
-        config_loader.add_config_file(config_path)
-
-    # Add default configuration file for this tool
+    # Seed this tool's baked defaults as the base file layer.
     default_config_path = Path(__file__).resolve().parent / "config" / "defaults.toml"
     if default_config_path.exists():
         config_loader.add_config_file(str(default_config_path))
-    else:
-        if output:
-            output.warning(f"Default config file not found at {default_config_path}")
+    elif output:
+        output.warning(f"Default config file not found at {default_config_path}")
 
     # Load the configuration with proper precedence
     try:
         config = config_loader.load_config()
+
+        # An explicitly provided --config file is a deliberate user override, so
+        # apply it last so it wins over discovered defaults.
+        if config_path:
+            config_loader.add_config_file(config_path)
+            config = config_loader.config
 
         # Validate minimum required configuration
         if "type_folders" not in config and output:
@@ -82,6 +83,12 @@ def load_config(config_path=None, output=None) -> Dict[str, Any]:
                 "No type_folders configuration found. File type sorting may not work correctly."
             )
             config["type_folders"] = {}
+
+        # Set default size thresholds, allow override from config
+        size_cfg = config.get("size_thresholds", {})
+        config["huge_size"] = int(size_cfg.get("huge", DEFAULT_HUGE_SIZE))
+        config["large_size"] = int(size_cfg.get("large", DEFAULT_LARGE_SIZE))
+        config["medium_size"] = int(size_cfg.get("medium", DEFAULT_MEDIUM_SIZE))
 
         return config
     except Exception as e:
@@ -92,8 +99,8 @@ def load_config(config_path=None, output=None) -> Dict[str, Any]:
             )
             # This will exit if exit_on_critical is True and the error is critical
             error_handler.exit_if_critical(code)
-            # Otherwise return an empty config
-            return {}
+        # Always return a dict so callers never get None back
+        return {}
 
 
 # --- Core logic ---
@@ -157,6 +164,49 @@ def handle_file_operation_error(
     return msg, reason
 
 
+# --- Default size thresholds (can be overridden in config) ---
+DEFAULT_HUGE_SIZE = 1024 * 1024 * 100  # 100 MB
+DEFAULT_LARGE_SIZE = 1024 * 1024 * 10  # 10 MB
+DEFAULT_MEDIUM_SIZE = 1024 * 1024  # 1 MB
+
+
+# --- Destination folder logic ---
+def get_destination_folder(
+    entry: Path,
+    target_dir: Path,
+    rules: dict,
+    type_folders: dict,
+    size_thresholds: Optional[Dict[str, int]] = None,
+) -> Path:
+    custom_rules = rules.get("custom", {})
+    custom_folder = match_custom_rule(entry.name, custom_rules)
+    if custom_folder:
+        return target_dir / custom_folder
+    if rules.get("by_type", True):
+        return target_dir / get_file_type(entry, type_folders)
+    if rules.get("by_date", False):
+        mtime = datetime.fromtimestamp(entry.stat().st_mtime)
+        return target_dir / mtime.strftime("%Y-%m")
+    if rules.get("by_size", False):
+        size = entry.stat().st_size
+        # Thresholds are passed in explicitly (from the loaded config) rather
+        # than discovered by walking the call stack.
+        size_thresholds = size_thresholds or {}
+        huge = size_thresholds.get("huge", DEFAULT_HUGE_SIZE)
+        large = size_thresholds.get("large", DEFAULT_LARGE_SIZE)
+        medium = size_thresholds.get("medium", DEFAULT_MEDIUM_SIZE)
+        size_categories = [
+            (huge, "huge"),
+            (large, "large"),
+            (medium, "medium"),
+        ]
+        for threshold, label in size_categories:
+            if size > threshold:
+                return target_dir / label
+        return target_dir / "small"
+    return target_dir / "other"
+
+
 def sort_files(
     target_dir: Path,
     rules: Dict[str, Any],
@@ -168,6 +218,7 @@ def sort_files(
     copy_mode: bool = False,
     recursive: bool = False,
     output: Output = None,
+    size_thresholds: Optional[Dict[str, int]] = None,
 ) -> Tuple[List[Tuple[Path, Path]], List[Tuple[Path, str]]]:
     """
     Sort files in a directory according to rules and type folders.
@@ -182,6 +233,8 @@ def sort_files(
         copy_mode (bool): If True, copy files instead of moving them.
         recursive (bool): If True, process subdirectories recursively.
         output: Output utility for display
+        size_thresholds (dict): Optional huge/large/medium byte thresholds for
+            --by size mode. Defaults are used when not provided.
     Returns:
         tuple: (moved, skipped) lists of (entry, dest_dir) and (entry, reason).
     """
@@ -199,19 +252,13 @@ def sort_files(
         if entry.is_dir():
             if entry.name in skip_dirs or (skip_hidden and entry.name.startswith(".")):
                 continue
-            # Process subdirectories if recursive mode is enabled
             if recursive:
-                # Skip folders that might be destination folders to avoid infinite recursion
-                is_destination_folder = False
-                for _, dest_dir in moved:
-                    if entry.name == dest_dir.name:
-                        is_destination_folder = True
-                        break
-
+                # Avoid infinite recursion by skipping destination folders
+                is_destination_folder = any(
+                    entry.name == dest_dir.name for _, dest_dir in moved
+                )
                 if is_destination_folder:
                     continue
-
-                # Recursively process subdirectory
                 sub_moved, sub_skipped = sort_files(
                     entry,
                     rules,
@@ -223,6 +270,7 @@ def sort_files(
                     copy_mode,
                     recursive,
                     output,
+                    size_thresholds,
                 )
                 moved.extend(sub_moved)
                 skipped.extend(sub_skipped)
@@ -230,35 +278,9 @@ def sort_files(
         if skip_hidden and entry.name.startswith("."):
             continue
 
-        # --- Custom rules first ---
-        custom_rules = rules.get("custom", {})
-        custom_folder = match_custom_rule(entry.name, custom_rules)
-        if custom_folder:
-            dest_dir = target_dir / custom_folder
-        # --- By type ---
-        elif rules.get("by_type", True):
-            folder = get_file_type(entry, type_folders)
-            dest_dir = target_dir / folder
-        # --- By date ---
-        elif rules.get("by_date", False):
-            mtime = datetime.fromtimestamp(entry.stat().st_mtime)
-            folder = mtime.strftime("%Y-%m")
-            dest_dir = target_dir / folder
-        # --- By size ---
-        elif rules.get("by_size", False):
-            size = entry.stat().st_size
-            if size > 1024 * 1024 * 100:
-                folder = "huge"
-            elif size > 1024 * 1024 * 10:
-                folder = "large"
-            elif size > 1024 * 1024:
-                folder = "medium"
-            else:
-                folder = "small"
-            dest_dir = target_dir / folder
-        else:
-            dest_dir = target_dir / "other"
-
+        dest_dir = get_destination_folder(
+            entry, target_dir, rules, type_folders, size_thresholds
+        )
         dest = dest_dir / entry.name
         if safe and dest.exists():
             skipped.append((entry, "exists"))
@@ -266,18 +288,13 @@ def sort_files(
 
         if dry_run:
             operation = "copy" if copy_mode else "move"
-            if (
-                output.verbose
-                or "show_extensions" in rules
-                and rules["show_extensions"]
-            ):
+            if output.verbose or rules.get("show_extensions", False):
                 ext = entry.suffix.lower()
                 msg = f"Would {operation}: {entry.name} → {dest_dir.name}/ [{ext or 'no extension'}]"
             else:
                 msg = f"Would {operation}: {entry.name} → {dest_dir.name}/"
             output.info(msg)
         else:
-            # Create destination directory with error handling
             try:
                 dest_dir.mkdir(parents=True, exist_ok=True)
             except Exception as e:
@@ -289,13 +306,11 @@ def sort_files(
                     (entry, reason.split(":", 1)[1] if ":" in reason else reason)
                 )
                 continue
-
-            # Move or copy the file based on the option
             try:
                 if copy_mode:
-                    shutil.copy2(str(entry), str(dest))
+                    shutil.copy2(entry, dest)
                 else:
-                    shutil.move(str(entry), str(dest))
+                    shutil.move(entry, dest)
                 moved.append((entry, dest_dir))
             except Exception as e:
                 _, reason = handle_file_operation_error(entry, e, output)
@@ -304,13 +319,10 @@ def sort_files(
 
 
 # --- Dependency checking ---
-def check_dependencies():
-    """Check status of optional dependencies"""
-    enhancer = EnhancementLoader(TOOL_NAME)
-    enhancer.check_dependency("rich", "Rich output formatting")
-    enhancer.check_dependency("tomllib", "TOML configuration support")
-    enhancer.check_dependency("tomli", "TOML support for Python < 3.11")
-    enhancer.print_status()
+def check_dependencies(output=None):
+    enhancer = DependencyChecker(TOOL_NAME)
+    dep_keys = ["rich", "pyyaml"]
+    enhancer.check_and_report_dependencies(dep_keys, output)
 
 
 # --- CLI ---
@@ -378,11 +390,6 @@ def main():
 
     args = arg_parser.parser.parse_args()
 
-    # Check dependencies if requested
-    if args.check_deps:
-        check_dependencies()
-        return
-
     # Initialize output handling using shared Output
     output = setup_tool_output(
         tool_name=TOOL_NAME,
@@ -391,15 +398,14 @@ def main():
         log_to_file=False,
     )
 
-    # Display tool banner
-    output.banner(
-        TOOL_NAME,
-        __version__,
-        {"Description": "Organize and declutter directories by sorting files"},
-    )
+    # Check dependencies if requested
+    if args.check_deps:
+        check_dependencies(output)
+        return
 
-    # Load configuration
-    config = load_config(args.config, output)
+    # Load config via the module helper so that a --config path is honored and
+    # the size thresholds (huge/large/medium) are computed.
+    config = load_config(config_path=args.config, output=output)
 
     if not config:
         output.error(
@@ -470,6 +476,12 @@ def main():
     # Start sorting task
     output.task_start("Sorting files", f"{total_files} files in {target_dir}")
 
+    size_thresholds = {
+        "huge": config.get("huge_size", DEFAULT_HUGE_SIZE),
+        "large": config.get("large_size", DEFAULT_LARGE_SIZE),
+        "medium": config.get("medium_size", DEFAULT_MEDIUM_SIZE),
+    }
+
     moved, skipped = sort_files(
         target_dir,
         config["rules"],
@@ -481,6 +493,7 @@ def main():
         output=output,
         copy_mode=config.get("copy", False),
         recursive=config.get("recursive", False),
+        size_thresholds=size_thresholds,
     )
 
     # --- Summary Table ---

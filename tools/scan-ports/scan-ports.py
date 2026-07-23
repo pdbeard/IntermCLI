@@ -18,7 +18,7 @@ import argparse  # Still needed for type annotations
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TypeVar
+from typing import Any, Dict, List, Optional, TypeVar
 
 # Ensure shared utilities are available
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -35,15 +35,16 @@ except ImportError:
 # Import shared utilities
 from shared.arg_parser import ArgumentParser
 from shared.config_loader import ConfigLoader
+from shared.dependency_checker import DependencyChecker
 from shared.error_handler import ErrorHandler
 from shared.network_utils import create_network_utils
 from shared.output import setup_tool_output
 
 # Check for optional dependencies (test compatibility)
 HAS_RICH = False
-HAS_REQUESTS = False
-HAS_URLLIB3 = False
-HAS_SSL = False
+# HAS_REQUESTS = False
+# HAS_URLLIB3 = False
+# HAS_SSL = False
 
 
 # Optional dependencies are checked in shared.network_utils, so these imports are not needed here.
@@ -73,104 +74,57 @@ config_loader = None
 network_utils = None
 
 
-def check_optional_dependencies() -> Tuple[Dict[str, bool], List[str]]:
-    """Check which optional dependencies are available"""
-    global HAS_REQUESTS, HAS_URLLIB3, HAS_SSL, HAS_RICH
-
-    # Make sure network_utils is initialized
-    if network_utils is None:
-        return {
-            "requests": False,
-            "urllib3": False,
-            "ssl": False,
-            "rich": HAS_RICH,
-            "tomllib": False,
-        }, ["requests", "urllib3", "ssl", "tomllib"]
-
-    # Update global flags based on network_utils
-    HAS_REQUESTS = network_utils.has_requests
-    HAS_URLLIB3 = network_utils.has_urllib3
-    HAS_SSL = network_utils.has_ssl
-
-    # Use network_utils dependency checking plus rich
-    deps = {
-        "requests": HAS_REQUESTS,
-        "urllib3": HAS_URLLIB3,
-        "ssl": HAS_SSL,
-        "rich": HAS_RICH,
-        "tomllib": config_loader.has_toml if config_loader else False,
-    }
-
-    missing = [name for name, available in deps.items() if not available]
-    return deps, missing
-
-
-def print_dependency_status(verbose: bool = False) -> None:
-    """Print status of optional dependencies"""
-    deps, missing = check_optional_dependencies()
-
-    if verbose:
-        output.info("Optional Dependencies Status:")
-        for name, available in deps.items():
-            status = "✅ Available" if available else "❌ Missing"
-            output.info(f"{name:10}: {status}")
-
-        if missing:
-            if "tomllib" in missing:
-                output.info("For TOML support on Python < 3.11: pip3 install tomli")
-            other_missing = [m for m in missing if m != "tomllib"]
-            if other_missing:
-                output.info(
-                    f"To enable enhanced service detection: pip3 install {' '.join(other_missing)}"
-                )
-        output.blank()
+def check_dependencies(output=None):
+    enhancer = DependencyChecker(TOOL_NAME)
+    dep_keys = ["rich"]
+    enhancer.check_and_report_dependencies(dep_keys, output)
 
 
 def load_port_config() -> Dict[str, Any]:
     """Load port configuration from TOML file"""
-    script_dir = Path(__file__).parent
-    default_config_path = script_dir / "config" / "ports.toml"
-
-    # Default fallback config
-    default_config = {
-        "port_lists": {
-            "common": {
-                "description": "Basic common ports",
-                "ports": {
-                    "22": "SSH",
-                    "80": "HTTP",
-                    "443": "HTTPS",
-                    "3000": "Node.js Dev",
-                    "5432": "PostgreSQL",
-                },
-            }
-        }
-    }
-
+    # Use new ConfigLoader logic for config discovery
     try:
-        # Set the default configuration
-        config_loader.config = default_config
-
-        # Add the specific ports.toml file to the config loader
-        if default_config_path.exists():
-            config_loader.add_config_file(default_config_path)
-
-        # Load configuration through shared ConfigLoader
         config = config_loader.load_config()
-
-        # If no port lists found in config, use default
+        # If no port lists found in config, use built-in default
         if "port_lists" not in config:
-            output.warning("No port configuration found, using default port list.")
-            return default_config
-
+            output.warning(
+                "No port configuration found, using built-in default port list."
+            )
+            return {
+                "port_lists": {
+                    "common": {
+                        "description": "Basic common ports",
+                        "ports": {
+                            "22": "SSH",
+                            "80": "HTTP",
+                            "443": "HTTPS",
+                            "3000": "Node.js Dev",
+                            "5432": "PostgreSQL",
+                        },
+                    }
+                }
+            }
         return config
     except Exception as e:
         error_msg, error_code = error_handler.handle_config_error(
             "loading port configuration", e
         )
         output.warning(f"Error {error_code}: {error_msg}")
-        output.info("Using default port list")
-        return default_config
+        output.info("Using built-in default port list")
+        return {
+            "port_lists": {
+                "common": {
+                    "description": "Basic common ports",
+                    "ports": {
+                        "22": "SSH",
+                        "80": "HTTP",
+                        "443": "HTTPS",
+                        "3000": "Node.js Dev",
+                        "5432": "PostgreSQL",
+                    },
+                }
+            }
+        }
 
 
 def log_separator(length: int = 60) -> None:
@@ -244,12 +198,26 @@ def get_ports_from_lists(
     return ports
 
 
+# Cache of NetworkUtils instances keyed by timeout. Service-detection helpers run
+# in worker threads (see comprehensive_service_detection); giving each timeout its
+# own instance avoids mutating one shared instance's .timeout across threads, which
+# was a data race.
+_network_utils_by_timeout: Dict[float, Any] = {}
+
+
+def _network_utils_for(timeout: float) -> Any:
+    """Return a NetworkUtils configured for `timeout`, without mutating shared state."""
+    nu = _network_utils_by_timeout.get(timeout)
+    if nu is None:
+        nu = create_network_utils(timeout=timeout, logger=output.logger)
+        _network_utils_by_timeout[timeout] = nu
+    return nu
+
+
 def check_port(host: str, port: int, timeout: float = 3) -> bool:
     """Check if a specific port is open using NetworkUtils"""
     try:
-        # Use shared NetworkUtils
-        network_utils.timeout = timeout
-        return network_utils.check_port(host, port)
+        return _network_utils_for(timeout).check_port(host, port)
     except Exception as e:
         output.debug(f"Error checking port {port}: {e}")
         return False
@@ -258,9 +226,7 @@ def check_port(host: str, port: int, timeout: float = 3) -> bool:
 def detect_service_banner(host: str, port: int, timeout: float = 3) -> Optional[str]:
     """Detect service banner using NetworkUtils"""
     try:
-        # Use shared NetworkUtils
-        network_utils.timeout = timeout
-        return network_utils.detect_service_banner(host, port)
+        return _network_utils_for(timeout).detect_service_banner(host, port)
     except Exception as e:
         output.debug(f"Error detecting banner on port {port}: {e}")
         return None
@@ -271,9 +237,7 @@ def detect_http_service(
 ) -> Optional[Dict[str, Any]]:
     """Detect HTTP service using NetworkUtils"""
     try:
-        # Use shared NetworkUtils
-        network_utils.timeout = timeout
-        result = network_utils.detect_http_service(host, port)
+        result = _network_utils_for(timeout).detect_http_service(host, port)
 
         if result:
             # Extract common fields to ensure consistent return format
@@ -677,12 +641,9 @@ def scan_all_configured_ports(
     output.info(f"Scanning ALL configured ports ({len(all_ports)} total) on {host}")
     output.info(f"Using {threads} threads for parallel scanning")
     if detect_services:
-        deps, missing = check_optional_dependencies()
         enhanced = network_utils.has_requests
         method = "enhanced" if enhanced else "basic"
         output.info(f"Service detection enabled ({method} mode)")
-        if missing and not enhanced:
-            output.info(f"Install {', '.join(missing)} for enhanced detection")
     output.info(f"Port lists included: {', '.join(config['port_lists'].keys())}")
     output.separator(char="=", length=90)
 
@@ -736,7 +697,7 @@ def scan_all_configured_ports(
     # Display results
     output.blank()
     output.separator(char="=", length=90)
-    if HAS_RICH and console:
+    if output.rich_console:
         print_scan_results_rich(
             open_ports,
             closed_ports,
@@ -995,20 +956,20 @@ def main() -> None:
     output.info(f"Timeout: {args.timeout}s")
     output.info(f"Threads: {args.threads}")
     output.info(f"Service Detection: {'Enabled' if detect_services else 'Disabled'}")
-    if detect_services:
-        print_dependency_status(verbose=False)
     output.blank()
 
     # Handle special commands first
     if args.check_deps:
-        print_dependency_status(verbose=True)
+        check_dependencies(output)
         return
 
     if args.show_config:
         output.info(
             f"TOML Support: {'Available' if config_loader.has_toml else 'Missing'}"
         )
-        output.info(f"Service Detection Available: {HAS_REQUESTS and HAS_URLLIB3}")
+        output.info(
+            f"Service Detection Available: {network_utils.has_requests and network_utils.has_urllib3}"
+        )
         # Show the config that will be used
         config = load_port_config()
         output.info(f"Number of Port Lists: {len(config.get('port_lists', {}))}")
