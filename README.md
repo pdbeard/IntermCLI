@@ -6,8 +6,8 @@
 <!-- CI Status -->
 | Branch | CI Status | Coverage |
 |--------|-----------|----------|
-| **main** | [![CI main](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/pdbeard/intermcli/actions?query=branch%3Amain) | [![Coverage Status](https://coveralls.io/repos/github/pdbeard/IntermCLI/badge.svg?branch=dev)](https://coveralls.io/github/pdbeard/IntermCLI?branch=dev) |
-| **staging**  | [![CI dev](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/pdbeard/intermcli/actions?query=branch%3Adev) | [![Coverage Status](https://coveralls.io/repos/github/pdbeard/IntermCLI/badge.svg?branch=dev)](https://coveralls.io/github/pdbeard/IntermCLI?branch=dev) |
+| **main** | [![CI main](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/pdbeard/intermcli/actions?query=branch%3Amain) | [![Coverage Status](https://coveralls.io/repos/github/pdbeard/IntermCLI/badge.svg?branch=main)](https://coveralls.io/github/pdbeard/IntermCLI?branch=main) |
+| **staging**  | [![CI staging](https://github.com/pdbeard/intermcli/actions/workflows/ci.yml/badge.svg?branch=staging)](https://github.com/pdbeard/intermcli/actions?query=branch%3Astaging) | [![Coverage Status](https://coveralls.io/repos/github/pdbeard/IntermCLI/badge.svg?branch=staging)](https://coveralls.io/github/pdbeard/IntermCLI?branch=staging) |
 
 
 # IntermCLI
