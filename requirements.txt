@@ -1,9 +1,6 @@
 # TOML support for Python < 3.11
 tomli>=2.0.0; python_version < "3.11"
 
-# Security: ensure safe setuptools version (patched for CVE-2025-47273)
-setuptools>=78.1.1
-
 
 # Optional dependencies for enhanced functionality
 # All tools work without these but unlock additional features when available
