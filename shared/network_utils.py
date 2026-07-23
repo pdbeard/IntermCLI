@@ -308,6 +308,7 @@ class NetworkUtils:
         data: Optional[Union[Dict, str, bytes]] = None,
         json_data: Optional[Dict] = None,
         timeout: Optional[float] = None,
+        verify: bool = True,
     ) -> Dict[str, Any]:
         """
         Make HTTP request with fallback between requests and urllib.
@@ -319,15 +320,18 @@ class NetworkUtils:
             data: Optional request data (form data or raw)
             json_data: Optional JSON data (will set Content-Type)
             timeout: Optional timeout (overrides default)
+            verify: Whether to verify TLS certificates (default: True)
 
         Returns:
             Dictionary with response details
         """
         if self.has_requests:
             return self._make_request_enhanced(
-                url, method, headers, data, json_data, timeout
+                url, method, headers, data, json_data, timeout, verify
             )
-        return self._make_request_basic(url, method, headers, data, json_data, timeout)
+        return self._make_request_basic(
+            url, method, headers, data, json_data, timeout, verify
+        )
 
     def _make_request_basic(
         self,
@@ -337,6 +341,7 @@ class NetworkUtils:
         data: Optional[Union[Dict, str, bytes]] = None,
         json_data: Optional[Dict] = None,
         timeout: Optional[float] = None,
+        verify: bool = True,
     ) -> Dict[str, Any]:
         """
         Make HTTP request using urllib (stdlib only).
@@ -387,6 +392,9 @@ class NetworkUtils:
                 import ssl
 
                 ctx = ssl.create_default_context()
+                if not verify:
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
                 response = urllib.request.urlopen(req, timeout=timeout, context=ctx)
             else:
                 response = urllib.request.urlopen(req, timeout=timeout)
@@ -460,6 +468,7 @@ class NetworkUtils:
         data: Optional[Union[Dict, str, bytes]] = None,
         json_data: Optional[Dict] = None,
         timeout: Optional[float] = None,
+        verify: bool = True,
     ) -> Dict[str, Any]:
         """
         Make HTTP request using requests library.
@@ -480,8 +489,8 @@ class NetworkUtils:
         timeout = timeout or self.timeout
         headers = headers or {}
 
-        # Disable insecure request warnings
-        if self.has_urllib3:
+        # Disable insecure request warnings only when verification is off
+        if not verify and self.has_urllib3:
             import urllib3
 
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -494,7 +503,7 @@ class NetworkUtils:
                 data=data,
                 json=json_data,
                 timeout=timeout,
-                verify=False,
+                verify=verify,
             )
 
             json_response = None

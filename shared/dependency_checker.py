@@ -85,13 +85,6 @@ class DependencyChecker:
                 self.logger.info(
                     f"To enable all features, install: pip install {' '.join(pkgs)}"
                 )
-            if missing:
-                pkgs = [
-                    self.manifest.get(dep, {}).get("package", dep) for dep in missing
-                ]
-                self.logger.info(
-                    f"To enable all features, install: pip install {' '.join(pkgs)}"
-                )
 
 
 # def check_dependencies(tool_name: str, dependencies: List[str]) -> Dict[str, bool]:

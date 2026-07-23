@@ -263,6 +263,43 @@ class ErrorHandler:
         self.output.error(msg)
         return msg, code
 
+    def handle_value_error(
+        self, value_desc: str, exception: Exception, operation: str = "process"
+    ) -> Tuple[str, str]:
+        """
+        Handle errors caused by invalid values (bad JSON, malformed input, etc.).
+
+        Args:
+            value_desc: Description of the value that was invalid (e.g. "JSON data")
+            exception: The exception that was raised
+            operation: The operation being performed (parse, validate, etc.)
+
+        Returns:
+            Tuple containing (error_message, error_code)
+        """
+        msg = f"Failed to {operation} {value_desc}: {exception}"
+        code = f"value:{type(exception).__name__}"
+        self.output.error(msg)
+        return msg, code
+
+    def handle_error(
+        self, exception: Exception, context: str = "An error occurred"
+    ) -> Tuple[str, str]:
+        """
+        Handle an arbitrary error with a descriptive context.
+
+        This is the catch-all used by tools that don't have a more specific
+        handler for the failure they hit.
+
+        Args:
+            exception: The exception that was raised
+            context: Description of what was being attempted
+
+        Returns:
+            Tuple containing (error_message, error_code)
+        """
+        return self._handle_generic(context, exception)
+
     def exit_if_critical(self, error_code: str, exit_code: int = 1) -> None:
         """
         Exit the program if the error is critical and exit_on_critical is True.

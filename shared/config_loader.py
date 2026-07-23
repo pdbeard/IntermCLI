@@ -58,8 +58,13 @@ class ConfigLoader:
             self.logger.info("Install tomli for Python < 3.11: pip3 install tomli")
             return self._get_default_config()
 
-        # Start with built-in defaults
+        # Start with built-in defaults, then layer any tool-supplied defaults
+        # that a caller assigned to ``self.config`` before calling load_config()
+        # (e.g. via ``loader.config = {...}`` or ``add_config_file``). These sit
+        # below file/env/cmd overrides so precedence is preserved.
         config = self._get_default_config()
+        if self.config:
+            self._deep_update(config, self.config)
 
         # Try loading from files in precedence order (low to high)
         config_files = self._get_config_files()
@@ -132,12 +137,26 @@ class ConfigLoader:
             (Path.cwd() / ".intermcli.toml", "Project config"),
         ]
 
-        # Add local config directory files if present
+        # Add local config directory files if present, scoped to files relevant
+        # to this tool. Globbing every *.toml here caused cross-tool config bleed
+        # (one tool silently ingesting another tool's config, and manifests
+        # overriding user settings). Only the suite-wide defaults, this tool's own
+        # config, and the shared manifests are loaded.
         if local_config_dir and local_config_dir.exists():
-            for toml_file in sorted(local_config_dir.glob("*.toml")):
-                config_files.append(
-                    (toml_file, f"Local project config: {toml_file.name}")
-                )
+            # Ordered low-to-high precedence: shared manifests first, then the
+            # suite defaults, then this tool's own config last so it wins.
+            allowed_local = [
+                "dependency_manifest.toml",
+                "tools_manifest.toml",
+                "defaults.toml",
+                f"{self.tool_name}.toml",
+            ]
+            for name in allowed_local:
+                toml_file = local_config_dir / name
+                if toml_file.exists():
+                    config_files.append(
+                        (toml_file, f"Local project config: {toml_file.name}")
+                    )
 
         return config_files
 
@@ -267,10 +286,12 @@ class ConfigLoader:
 
     def _convert_env_value(self, value: str) -> Union[str, int, float, bool]:
         """Convert environment variable string to appropriate type."""
-        # Handle boolean values
-        if value.lower() in ("true", "yes", "1"):
+        # Handle boolean values. Note: "1"/"0" are deliberately NOT treated as
+        # booleans so that numeric settings (e.g. a timeout of 1) survive as ints
+        # rather than becoming True/False.
+        if value.lower() in ("true", "yes"):
             return True
-        if value.lower() in ("false", "no", "0"):
+        if value.lower() in ("false", "no"):
             return False
 
         # Handle numeric values

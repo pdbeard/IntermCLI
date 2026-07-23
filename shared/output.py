@@ -630,13 +630,12 @@ class Output:
         """
         Print a section header with optional rich formatting.
 
+        Alias for :meth:`header` kept for call-site readability.
+
         Args:
             name: Section name
         """
-        if self.rich_console:
-            self.rich_console.print(f"\n[bold cyan]== {name} ==[/bold cyan]")
-        else:
-            self.logger.info(f"\n== {name} ==")
+        self.header(name)
 
     def item(self, key: str, value: str) -> None:
         """
