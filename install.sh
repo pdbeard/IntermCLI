@@ -34,13 +34,34 @@ get_install_log_path() {
     local log_file_name="install.log"
     local log_path="$default_log_dir/$log_file_name"
     local output_dir=""
+    # Read [logging].output_dir from a TOML config file (stdin script avoids the
+    # quoting pitfalls of a single-line `python3 -c` with try/except).
+    read_output_dir() {
+        python3 - "$1" 2>/dev/null <<'PYEOF'
+import sys
+try:
+    import tomllib
+except ImportError:
+    try:
+        import tomli as tomllib
+    except ImportError:
+        print("")
+        sys.exit(0)
+try:
+    with open(sys.argv[1], "rb") as f:
+        data = tomllib.load(f)
+    print(data.get("logging", {}).get("output_dir", ""))
+except Exception:
+    print("")
+PYEOF
+    }
     # Check user config for [logging].output_dir
     if [ -f "$user_config" ]; then
-        output_dir=$(python3 -c "import sys; import os; try:\n import tomllib\n except ImportError:\n import tomli as tomllib\n with open('$user_config','rb') as f:\n t=tomllib.load(f)\n print(t.get('logging', {}).get('output_dir', '')) if 'logging' in t else print('')" 2>/dev/null)
+        output_dir=$(read_output_dir "$user_config")
     fi
     # If not found, check root config
     if [ -z "$output_dir" ] && [ -f "$root_config" ]; then
-        output_dir=$(python3 -c "import sys; import os; try:\n import tomllib\n except ImportError:\n import tomli as tomllib\n with open('$root_config','rb') as f:\n t=tomllib.load(f)\n print(t.get('logging', {}).get('output_dir', '')) if 'logging' in t else print('')" 2>/dev/null)
+        output_dir=$(read_output_dir "$root_config")
     fi
     # Use output_dir if set
     if [ -n "$output_dir" ]; then
@@ -113,7 +134,9 @@ except Exception as e:
 
 verify_installation() {
     echo -e "${BLUE}Verifying installation...${NC}"
-    parse_tools | while IFS="|" read -r tool_name _ _; do
+    # Process substitution (not a pipe) so `return 1` returns from this function
+    # rather than from a subshell where it would be lost.
+    while IFS="|" read -r tool_name _ _; do
         if [ -f "$INSTALL_DIR/$tool_name" ] && [ -x "$INSTALL_DIR/$tool_name" ]; then
             echo -e "${GREEN}  [OK] $tool_name installed and executable${NC}"
         else
@@ -126,7 +149,7 @@ verify_installation() {
         else
             echo -e "${YELLOW}  [WARN]  $tool_name not in PATH${NC}"
         fi
-    done
+    done < <(parse_tools)
 
     # Test basic functionality
     if command -v python3 >/dev/null && python3 -c "import sys; print('Python', sys.version)" >/dev/null 2>&1; then
@@ -237,27 +260,32 @@ while [ $idx -lt ${#ARGS[@]} ]; do
     idx=$((idx+1))
 done
 
-# Check for pip3
+# pip3 is not required by this script (it installs no packages), but note if it
+# is missing so users know how to add optional dependencies later.
 if ! command -v pip3 &> /dev/null; then
-    echo -e "${RED}[FAIL] pip3 not found${NC}"
-    exit 1
+    echo -e "${YELLOW}[WARN]  pip3 not found — optional dependencies will need to be installed another way${NC}"
 fi
 
 # Uninstall section: remove all tools from manifest
 if [ $# -ge 1 ] && [ "$1" = "--uninstall" ]; then
     echo -e "${BLUE}Uninstalling IntermCLI...${NC}"
     if ask_yes_no "Remove installed tools?" "y"; then
-        parse_tools | while IFS="|" read -r tool_name _ _; do
+        while IFS="|" read -r tool_name _ _; do
             rm -f "$HOME/.local/bin/$tool_name"
             echo -e "${GREEN}  [OK] $tool_name removed${NC}"
-        done
+        done < <(parse_tools)
+        # Remove the installed copy of the shared utilities as well.
+        if [ -d "$HOME/.local/bin/shared" ]; then
+            rm -rf "$HOME/.local/bin/shared"
+            echo -e "${GREEN}  [OK] shared utilities removed${NC}"
+        fi
     fi
     if ask_yes_no "Remove configuration?" "n"; then
         rm -rf "$HOME/.config/intermcli"
         echo -e "${GREEN}  [OK] Configuration removed${NC}"
     fi
     echo -e "${GREEN}[OK] Uninstall complete${NC}"
-    echo -e "${YELLOW}Note: Shared utilities in $SCRIPT_ROOT/shared/ have not been removed${NC}"
+    echo -e "${YELLOW}Note: the source repository at $SCRIPT_ROOT has not been removed${NC}"
     exit 0
 fi
 
@@ -341,7 +369,7 @@ log "Starting installation on $PLATFORM"
 echo -e "${BLUE}Checking Python compatibility...${NC}"
 if ! command -v python3 &> /dev/null; then
     echo -e "${RED}[FAIL] Python 3 not found${NC}"
-    echo -e "${YELLOW}   Please install Python 3.11+ to use IntermCLI${NC}"
+    echo -e "${YELLOW}   Please install Python 3.9+ to use IntermCLI${NC}"
     exit 1
 fi
 
@@ -372,11 +400,11 @@ elif [ "$TOML_SUPPORT" = "tomli" ]; then
     NEEDS_TOMLI=false
 else
     echo -e "${YELLOW}  [WARN]  No TOML support found${NC}"
-    if [ $PYTHON_MAJOR -eq 3 ] && [ $PYTHON_MINOR -ge 8 ]; then
+    if [ $PYTHON_MAJOR -eq 3 ] && [ $PYTHON_MINOR -ge 9 ]; then
         echo -e "${YELLOW}     Python $PYTHON_VERSION can use tomli package${NC}"
         NEEDS_TOMLI=true
     else
-        echo -e "${RED}[FAIL] Python 3.8+ required for IntermCLI${NC}"
+        echo -e "${RED}[FAIL] Python 3.9+ required for IntermCLI${NC}"
         exit 1
     fi
 fi
@@ -557,43 +585,12 @@ else
     mkdir -p "$INSTALL_DIR"
 fi
 
-# Create tool wrapper function
-create_tool_wrapper() {
-    local tool_name="$1"
-    local tool_script="$2"
-
-    if [ ! -f "$SCRIPT_ROOT/$tool_script" ]; then
-        echo -e "${YELLOW}  [WARN]  $tool_name not found at $SCRIPT_ROOT/$tool_script, skipping${NC}"
-        return
-    fi
-
-    local wrapper_content="#!/bin/bash
-# IntermCLI $tool_name wrapper
-SCRIPT_ROOT=\"$SCRIPT_ROOT\"
-TOOL_PATH=\"\$SCRIPT_ROOT/$tool_script\"
-
-if [ -f \"\$TOOL_PATH\" ]; then
-    python3 \"\$TOOL_PATH\" \"\$@\"
-else
-    echo \"[FAIL] $tool_name tool not found at \$TOOL_PATH\"
-    exit 1
-fi"
-
-    if [ "$INSTALL_SCOPE" = "global" ]; then
-        echo "$wrapper_content" | sudo tee "$INSTALL_DIR/$tool_name" > /dev/null
-        sudo chmod +x "$INSTALL_DIR/$tool_name"
-    else
-        echo "$wrapper_content" > "$INSTALL_DIR/$tool_name"
-        chmod +x "$INSTALL_DIR/$tool_name"
-    fi
-
-    INSTALLED_FILES+=("$INSTALL_DIR/$tool_name")
-    echo -e "${GREEN}  [OK] $tool_name${NC}"
-}
-
-# Install tools
+# Install tools.
+# NOTE: this loop must NOT run in a pipeline subshell, or INSTALLED_FILES
+# mutations would be lost and cleanup_on_failure could not remove anything.
+# Process substitution keeps the loop in the current shell.
 echo -e "${BLUE}Installing tools...${NC}"
-parse_tools | while IFS="|" read -r tool_name tool_script install_flag; do
+while IFS="|" read -r tool_name tool_script install_flag; do
     # Only install tools with install=true
     if [ "$(echo "$install_flag" | tr '[:upper:]' '[:lower:]')" = "true" ]; then
         if [ -f "$SCRIPT_ROOT/$tool_script" ]; then
@@ -610,7 +607,7 @@ parse_tools | while IFS="|" read -r tool_name tool_script install_flag; do
             echo -e "${YELLOW}  [WARN]  $tool_name not found at $SCRIPT_ROOT/$tool_script, skipping${NC}"
         fi
     fi
-done
+done < <(parse_tools)
 # Always copy shared libraries to install dir
 if [ -d "$INSTALL_DIR/shared" ]; then
     rm -rf "$INSTALL_DIR/shared"

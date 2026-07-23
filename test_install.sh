@@ -30,14 +30,14 @@ run_test() {
     if eval "$command"; then
         if eval "$check_func"; then
             echo -e "${GREEN}✓ $test_name passed${NC}"
-            ((PASSED++))
+            PASSED=$((PASSED + 1))
         else
             echo -e "${RED}✗ $test_name failed: post-check failed${NC}"
-            ((FAILED++))
+            FAILED=$((FAILED + 1))
         fi
     else
         echo -e "${RED}✗ $test_name failed: install command failed${NC}"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
     echo "----------------------------------------"
 }
@@ -56,7 +56,7 @@ run_test "Shared directory present" \
     ":" \
     "[ -d '$INSTALL_DIR/shared' ] && [ -f '$INSTALL_DIR/shared/output.py' ]"
 
-# Print summary
+# Print summaryp
 echo "=========================================="
 echo "Install Script Test Summary"
 echo "=========================================="
