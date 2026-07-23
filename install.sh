@@ -369,7 +369,7 @@ log "Starting installation on $PLATFORM"
 echo -e "${BLUE}Checking Python compatibility...${NC}"
 if ! command -v python3 &> /dev/null; then
     echo -e "${RED}[FAIL] Python 3 not found${NC}"
-    echo -e "${YELLOW}   Please install Python 3.9+ to use IntermCLI${NC}"
+    echo -e "${YELLOW}   Please install Python 3.11+ to use IntermCLI${NC}"
     exit 1
 fi
 
@@ -400,11 +400,11 @@ elif [ "$TOML_SUPPORT" = "tomli" ]; then
     NEEDS_TOMLI=false
 else
     echo -e "${YELLOW}  [WARN]  No TOML support found${NC}"
-    if [ $PYTHON_MAJOR -eq 3 ] && [ $PYTHON_MINOR -ge 9 ]; then
+    if [ $PYTHON_MAJOR -eq 3 ] && [ $PYTHON_MINOR -ge 11 ]; then
         echo -e "${YELLOW}     Python $PYTHON_VERSION can use tomli package${NC}"
         NEEDS_TOMLI=true
     else
-        echo -e "${RED}[FAIL] Python 3.9+ required for IntermCLI${NC}"
+        echo -e "${RED}[FAIL] Python 3.11+ required for IntermCLI${NC}"
         exit 1
     fi
 fi
