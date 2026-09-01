@@ -513,7 +513,7 @@ def main():
             )
             for folder, count in sorted(folder_counts.items()):
                 table.add_row(folder, str(count))
-            output.print_table(table)
+            output.print_table_obj(table)
         else:
             for folder, count in sorted(folder_counts.items()):
                 output.item(folder, f"{count} file{'s' if count != 1 else ''}")
