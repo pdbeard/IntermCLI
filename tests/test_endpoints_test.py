@@ -65,7 +65,6 @@ def import_test_endpoints(patch_output=True, **mocks):
         "shared.config_loader",
         "shared.enhancement_loader",
         "shared.error_handler",
-        "shared.network_utils",
         "shared.output",
     ]:
         sys.modules[module_name] = MagicMock()

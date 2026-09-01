@@ -272,8 +272,10 @@ if [ $# -ge 1 ] && [ "$1" = "--uninstall" ]; then
     if ask_yes_no "Remove installed tools?" "y"; then
         while IFS="|" read -r tool_name _ _; do
             rm -f "$HOME/.local/bin/$tool_name"
+            rm -rf "$HOME/.local/bin/tool_libs/$tool_name"
             echo -e "${GREEN}  [OK] $tool_name removed${NC}"
         done < <(parse_tools)
+        rmdir "$HOME/.local/bin/tool_libs" 2>/dev/null || true
         # Remove the installed copy of the shared utilities as well.
         if [ -d "$HOME/.local/bin/shared" ]; then
             rm -rf "$HOME/.local/bin/shared"
@@ -329,7 +331,7 @@ cleanup_on_failure() {
     echo -e "${RED}Installation failed, cleaning up...${NC}"
     log_error "Installation failed, cleaning up..."
     for file in "${INSTALLED_FILES[@]}"; do
-        rm -f "$file" 2>/dev/null && echo -e "${YELLOW}  Removed: $file${NC}"
+        rm -rf "$file" 2>/dev/null && echo -e "${YELLOW}  Removed: $file${NC}"
     done
     for dir in "${INSTALLED_DIRS[@]}"; do
         rmdir "$dir" 2>/dev/null && echo -e "${YELLOW}  Removed: $dir${NC}"
@@ -346,7 +348,7 @@ cleanup_on_exit() {
         echo -e "\n${RED}Installation failed, cleaning up...${NC}"
         log_error "Installation failed with exit code $exit_code, cleaning up..."
         for file in "${INSTALLED_FILES[@]}"; do
-            rm -f "$file" 2>/dev/null && echo -e "${YELLOW}  Removed: $file${NC}"
+            rm -rf "$file" 2>/dev/null && echo -e "${YELLOW}  Removed: $file${NC}"
         done
         for dir in "${INSTALLED_DIRS[@]}"; do
             rmdir "$dir" 2>/dev/null && echo -e "${YELLOW}  Removed: $dir${NC}"
@@ -603,6 +605,24 @@ while IFS="|" read -r tool_name tool_script install_flag; do
             fi
             INSTALLED_FILES+=("$INSTALL_DIR/$tool_name")
             echo -e "${GREEN}  [OK] $tool_name installed${NC}"
+
+            # Tools may ship their own lib/ directory. Install it alongside the
+            # script, namespaced by tool so two tools cannot collide.
+            tool_lib_src="$SCRIPT_ROOT/$(dirname "$tool_script")/lib"
+            if [ -d "$tool_lib_src" ]; then
+                tool_lib_dest="$INSTALL_DIR/tool_libs/$tool_name"
+                if [ "$INSTALL_SCOPE" = "global" ]; then
+                    sudo rm -rf "$tool_lib_dest"
+                    sudo mkdir -p "$INSTALL_DIR/tool_libs"
+                    sudo cp -r "$tool_lib_src" "$tool_lib_dest"
+                else
+                    rm -rf "$tool_lib_dest"
+                    mkdir -p "$INSTALL_DIR/tool_libs"
+                    cp -r "$tool_lib_src" "$tool_lib_dest"
+                fi
+                INSTALLED_FILES+=("$tool_lib_dest")
+                echo -e "${GREEN}  [OK] $tool_name libraries installed to $tool_lib_dest${NC}"
+            fi
         else
             echo -e "${YELLOW}  [WARN]  $tool_name not found at $SCRIPT_ROOT/$tool_script, skipping${NC}"
         fi

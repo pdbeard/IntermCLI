@@ -43,7 +43,6 @@ from shared.output import Output
 from shared.dependency_checker import DependencyChecker
 from shared.arg_parser import ArgumentParser
 from shared.tool_metadata import ToolMetadata
-from shared.network_utils import NetworkUtils
 
 # Tool metadata
 __version__ = "1.0.0"
@@ -79,17 +78,6 @@ def process_input(input_file: str, config: dict, output: Output) -> dict:
             data = {"content": content, "lines": len(content.splitlines())}
         else:
             data = {"content": content}
-
-        # Apply network operations if requested
-        if config.get("network", {}).get("enabled", False):
-            output.subheader("Network Operations")
-            network = NetworkUtils(timeout=config.get("network", {}).get("timeout", 3.0))
-
-            # Process URLs in data
-            if "url" in data:
-                output.info(f"Fetching URL: {data['url']}")
-                response = network.make_http_request(data["url"])
-                data["http_response"] = response
 
         # Task complete
         output.task_complete("Processing input", f"Processed {input_file}")

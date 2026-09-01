@@ -55,8 +55,14 @@ This naming convention provides:
   - Output formatting and color support
   - Error handling and logging
   - Argument parsing and validation
-  - Network and file system utilities
+  - File system utilities
 - **Tool-Specific Logic**: Individual tools focus on their unique functionality
+- **Tool-Private Modules**: Code with a single consumer lives in that tool's
+  `lib/` directory, not in `shared/`. A module earns a place in `shared/` when a
+  second tool needs it. Load tool-private modules with
+  `shared.path_utils.load_tool_lib_module()`, which resolves both the source
+  checkout (`tools/<tool>/lib/`) and installed (`<install dir>/tool_libs/<tool>/`)
+  layouts.
 
 ### 4. Progressive Enhancement Architecture
 
@@ -94,6 +100,7 @@ intermcli/
 │   ├── scan-ports/      # Port scanner tool
 │   │   ├── scan-ports.py # Main executable
 │   │   ├── config/      # Tool-specific configuration
+│   │   ├── lib/         # Modules private to this tool
 │   │   └── README.md    # Tool documentation
 │   ├── find-projects/   # Project discovery tool
 │   ├── sort-files/      # File organizer tool
@@ -102,8 +109,7 @@ intermcli/
 │   ├── config_loader.py # Configuration management
 │   ├── output.py        # Consistent output formatting
 │   ├── error_handler.py # Error handling utilities
-│   ├── path_utils.py    # File system operations
-│   └── network_utils.py # Network utilities
+│   └── path_utils.py    # File system operations
 ├── bin/                 # Executable wrappers for CLI tools
 ├── requirements*.txt    # Dependencies (main/dev)
 ├── install.sh           # Installer script

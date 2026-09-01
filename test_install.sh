@@ -56,6 +56,16 @@ run_test "Shared directory present" \
     ":" \
     "[ -d '$INSTALL_DIR/shared' ] && [ -f '$INSTALL_DIR/shared/output.py' ]"
 
+# Test 4: Tool-private lib directories are installed alongside the tool
+run_test "Tool lib directory installed" \
+    ":" \
+    "[ -f '$INSTALL_DIR/tool_libs/scan-ports/network_utils.py' ]"
+
+# Test 5: An installed tool can load its own lib module
+run_test "Installed tool loads its lib module" \
+    ":" \
+    "$INSTALL_DIR/scan-ports --check-deps > /dev/null 2>&1"
+
 # Print summaryp
 echo "=========================================="
 echo "Install Script Test Summary"

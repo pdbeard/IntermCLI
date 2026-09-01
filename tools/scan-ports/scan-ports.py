@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional, TypeVar
 # Ensure shared utilities are available
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 try:
-    from shared.path_utils import require_shared_utilities
+    from shared.path_utils import load_tool_lib_module, require_shared_utilities
 
     require_shared_utilities()
 except ImportError:
@@ -37,8 +37,12 @@ from shared.arg_parser import ArgumentParser
 from shared.config_loader import ConfigLoader
 from shared.dependency_checker import DependencyChecker
 from shared.error_handler import ErrorHandler
-from shared.network_utils import create_network_utils
 from shared.output import setup_tool_output
+
+# Import this tool's own library modules
+create_network_utils = load_tool_lib_module(
+    __file__, "scan-ports", "network_utils"
+).create_network_utils
 
 # Check for optional dependencies (test compatibility)
 HAS_RICH = False
@@ -47,7 +51,7 @@ HAS_RICH = False
 # HAS_SSL = False
 
 
-# Optional dependencies are checked in shared.network_utils, so these imports are not needed here.
+# Optional dependencies are checked in the tool's network_utils, so these imports are not needed here.
 
 # Optional rich-specific imports
 try:

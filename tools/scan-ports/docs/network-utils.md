@@ -1,6 +1,22 @@
 # Network Utilities
 
-The Network Utilities module (`shared/network_utils.py`) provides common network operations with optional enhanced functionality. It handles network tasks like port scanning, service detection, and HTTP requests with graceful fallbacks.
+The Network Utilities module (`tools/scan-ports/lib/network_utils.py`) provides common network operations with optional enhanced functionality. It handles network tasks like port scanning, service detection, and HTTP requests with graceful fallbacks.
+
+## Importing
+
+This module is private to `scan-ports`; it is not part of `shared/`. The tool
+loads it by file path so the same code works from a source checkout
+(`tools/scan-ports/lib/`) and from an install (`<install dir>/tool_libs/scan-ports/`):
+
+```python
+from shared.path_utils import load_tool_lib_module
+
+create_network_utils = load_tool_lib_module(
+    __file__, "scan-ports", "network_utils"
+).create_network_utils
+```
+
+The examples below write `from network_utils import ...` for brevity.
 
 ## Key Features
 
@@ -15,7 +31,7 @@ The Network Utilities module (`shared/network_utils.py`) provides common network
 ### Basic Usage
 
 ```python
-from shared.network_utils import NetworkUtils
+from network_utils import NetworkUtils
 
 # Initialize with default timeout
 network = NetworkUtils()
@@ -28,7 +44,7 @@ print(f"Port 8080 is {'open' if is_open else 'closed'}")
 ### Port Scanning
 
 ```python
-from shared.network_utils import NetworkUtils
+from network_utils import NetworkUtils
 
 # Initialize with custom timeout
 network = NetworkUtils(timeout=1.0)
@@ -45,7 +61,7 @@ for port in open_ports:
 ### Service Detection
 
 ```python
-from shared.network_utils import NetworkUtils
+from network_utils import NetworkUtils
 
 # Initialize network utilities
 network = NetworkUtils()
@@ -60,7 +76,7 @@ print(f"Service on {host}:{port} - {banner}")
 ### HTTP Requests
 
 ```python
-from shared.network_utils import NetworkUtils
+from network_utils import NetworkUtils
 
 # Initialize network utilities
 network = NetworkUtils(timeout=5.0)
@@ -79,7 +95,7 @@ else:
 ### Enhanced HTTP with JSON
 
 ```python
-from shared.network_utils import NetworkUtils
+from network_utils import NetworkUtils
 
 # Initialize network utilities
 network = NetworkUtils()
@@ -105,7 +121,7 @@ if response.get("success"):
 ### DNS Resolution
 
 ```python
-from shared.network_utils import NetworkUtils
+from network_utils import NetworkUtils
 
 # Initialize network utilities
 network = NetworkUtils()

@@ -67,6 +67,23 @@ from shared.config_loader import ConfigLoader
 from shared.output import Output
 ```
 
+### `load_tool_lib_module(tool_file, tool_name, module_name)`
+
+Imports a module from a tool's own `lib/` directory. Tool libraries live at
+`tools/<tool>/lib/` in a source checkout and at `<install dir>/tool_libs/<tool>/`
+once `install.sh` has copied them next to the installed scripts. Modules are
+loaded by file path, so libraries belonging to different tools cannot collide on
+a top-level package name. Raises `ImportError` (listing the paths it tried) if
+the module is not found.
+
+```python
+from shared.path_utils import load_tool_lib_module
+
+create_network_utils = load_tool_lib_module(
+    __file__, "scan-ports", "network_utils"
+).create_network_utils
+```
+
 ## Usage in Tools
 
 The typical usage pattern in an IntermCLI tool is:

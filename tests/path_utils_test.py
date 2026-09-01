@@ -11,9 +11,12 @@ from unittest.mock import MagicMock, patch
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import tempfile
+
 from shared.path_utils import (
     add_shared_path,
     ensure_shared_imports,
+    load_tool_lib_module,
     require_shared_utilities,
 )
 
@@ -141,6 +144,40 @@ class TestPathUtils(unittest.TestCase):
         self.assertTrue(mock_print.called)
         # Check that exit was called with status 1
         mock_exit.assert_called_once_with(1)
+
+
+class TestLoadToolLibModule(unittest.TestCase):
+    """Tests for loading a tool's own lib/ modules."""
+
+    def _write_lib(self, root, lib_relpath):
+        lib_dir = Path(root) / lib_relpath
+        lib_dir.mkdir(parents=True)
+        (lib_dir / "widget.py").write_text("VALUE = 42\n")
+        tool_file = Path(root) / "demo-tool.py"
+        tool_file.write_text("")
+        return str(tool_file)
+
+    def test_loads_from_checkout_layout(self):
+        """A tool in a source checkout finds lib/ next to the script."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tool_file = self._write_lib(tmp, "lib")
+            module = load_tool_lib_module(tool_file, "demo-tool", "widget")
+            self.assertEqual(module.VALUE, 42)
+
+    def test_loads_from_installed_layout(self):
+        """An installed tool finds tool_libs/<tool>/ next to the script."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tool_file = self._write_lib(tmp, "tool_libs/other-tool")
+            module = load_tool_lib_module(tool_file, "other-tool", "widget")
+            self.assertEqual(module.VALUE, 42)
+
+    def test_missing_module_raises_import_error(self):
+        """A missing lib module reports where it looked."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tool_file = str(Path(tmp) / "demo-tool.py")
+            with self.assertRaises(ImportError) as ctx:
+                load_tool_lib_module(tool_file, "demo-tool", "nope")
+            self.assertIn("nope", str(ctx.exception))
 
 
 if __name__ == "__main__":

@@ -131,35 +131,6 @@ else:
 - User-friendly installation suggestions
 - No hard dependencies on optional packages
 
-## Network Utilities (`network_utils.py`)
-download_file("https://example.com/file.zip", "file.zip")
-
-The network utilities module provides common network operations:
-
-```python
-from shared.network_utils import NetworkUtils
-
-network = NetworkUtils(timeout=3.0)
-
-# Check if port is open
-is_open = network.check_port("example.com", 80)
-
-# Scan multiple ports
-open_ports = network.scan_ports("example.com", [80, 443, 8080])
-
-# Detect service on a port
-banner = network.detect_service_banner("localhost", 22)
-
-# Make HTTP request (with fallback between requests and urllib)
-response = network.make_http_request("https://api.example.com/data")
-```
-
-### Key Features:
-- Consistent error handling
-- Progress reporting
-- Timeout management
-- Proxy support
-
 ## Path Utilities (`path_utils.py`)
 data_dir = ensure_dir_exists(f"{root}/data")
 temp_dir = get_temp_dir()

@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 """
-Tests for the shared network_utils module.
+Tests for scan-ports' network_utils library module.
 """
 import logging
 import socket
 import unittest
+from pathlib import Path
 from unittest import mock
 
-from shared.network_utils import NetworkUtils
+from shared.path_utils import load_tool_lib_module
+
+NetworkUtils = load_tool_lib_module(
+    str(Path(__file__).resolve().parents[1] / "tools" / "scan-ports" / "scan-ports.py"),
+    "scan-ports",
+    "network_utils",
+).NetworkUtils
 
 
 class TestNetworkUtils(unittest.TestCase):
@@ -189,6 +196,31 @@ class TestNetworkUtils(unittest.TestCase):
         self.assertEqual(result, {"status": 200, "server": "apache"})
         mock_basic.assert_called_once_with("localhost", 80)
         mock_enhanced.assert_not_called()
+
+
+class TestNetworkUtilsLive(unittest.TestCase):
+    """Tests that touch the local machine rather than mocked sockets."""
+
+    def setUp(self):
+        self.network_utils = NetworkUtils(timeout=1.0)  # Short timeout for tests
+
+    def test_get_ip(self):
+        """Test IP address lookup."""
+        # This should return something for localhost
+        result = self.network_utils.get_ip("localhost")
+        self.assertIsNotNone(result)
+        self.assertTrue(result == "127.0.0.1" or result.startswith("::1"))
+
+    def test_extract_title(self):
+        """Test HTML title extraction."""
+        html = "<html><head><title>Test Page</title></head><body>Content</body></html>"
+        title = self.network_utils._extract_title(html)
+        self.assertEqual(title, "Test Page")
+
+        # No title
+        html = "<html><head></head><body>Content</body></html>"
+        title = self.network_utils._extract_title(html)
+        self.assertIsNone(title)
 
 
 if __name__ == "__main__":

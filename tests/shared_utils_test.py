@@ -12,7 +12,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from shared.config_loader import ConfigLoader
 from shared.dependency_checker import DependencyChecker
-from shared.network_utils import NetworkUtils
 from shared.output import Output
 
 
@@ -89,31 +88,6 @@ class TestOutput(unittest.TestCase):
         # This will depend on the environment, but the function shouldn't error
         result = self.output._supports_color()
         self.assertIsInstance(result, bool)
-
-
-class TestNetworkUtils(unittest.TestCase):
-    """Tests for the NetworkUtils utility."""
-
-    def setUp(self):
-        self.network_utils = NetworkUtils(timeout=1.0)  # Short timeout for tests
-
-    def test_get_ip(self):
-        """Test IP address lookup."""
-        # This should return something for localhost
-        result = self.network_utils.get_ip("localhost")
-        self.assertIsNotNone(result)
-        self.assertTrue(result == "127.0.0.1" or result.startswith("::1"))
-
-    def test_extract_title(self):
-        """Test HTML title extraction."""
-        html = "<html><head><title>Test Page</title></head><body>Content</body></html>"
-        title = self.network_utils._extract_title(html)
-        self.assertEqual(title, "Test Page")
-
-        # No title
-        html = "<html><head></head><body>Content</body></html>"
-        title = self.network_utils._extract_title(html)
-        self.assertIsNone(title)
 
 
 if __name__ == "__main__":

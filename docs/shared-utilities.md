@@ -10,7 +10,6 @@ IntermCLI provides a set of shared utilities that can be used across all tools i
 | Dependency Checker | Handles detection of optional dependencies | `shared/dependency_checker.py` |
 | Output Handler | Provides consistent output formatting | `shared/output.py` |
 | Error Handler | Provides standardized error handling | `shared/error_handler.py` |
-| Network Utilities | Provides common network operations | `shared/network_utils.py` |
 | Argument Parser | Provides consistent argument parsing | `shared/arg_parser.py` |
 | Path Utilities | Ensures shared modules can be imported properly | `shared/path_utils.py` |
 | Tool Metadata | Provides consistent version and documentation handling | `shared/tool_metadata.py` |
@@ -90,31 +89,6 @@ with output.create_progress_bar(total=100, description="Scanning") as progress:
         progress.update(1)
 ```
 
-### Network Utilities (`shared/network_utils.py`)
-
-Provides common network operations with optional enhanced functionality.
-
-**Example Usage:**
-
-```python
-from shared.network_utils import NetworkUtils
-
-# Initialize with timeout
-network = NetworkUtils(timeout=3.0)
-
-# Check if a port is open
-is_open = network.check_port("localhost", 8080)
-
-# Scan multiple ports
-open_ports = network.scan_ports("example.com", [80, 443, 8080])
-
-# Detect service on a port
-banner = network.detect_service_banner("localhost", 22)
-
-# Make HTTP requests (with fallback between requests and urllib)
-response = network.make_http_request("https://api.example.com/data")
-```
-
 ### Argument Parser (`shared/arg_parser.py`)
 
 Provides consistent argument parsing with common patterns.
@@ -170,7 +144,6 @@ from shared.arg_parser import ArgumentParser
 from shared.config_loader import ConfigLoader
 from shared.dependency_checker import DependencyChecker
 from shared.output import Output
-from shared.network_utils import NetworkUtils
 
 __version__ = "1.0.0"
 
@@ -223,12 +196,6 @@ def main():
 
     # Main tool logic
     output.info(f"Processing {args['target']}")
-
-    # Example of using network utilities
-    if enhancements.dependencies.get("requests"):
-        network = NetworkUtils()
-        result = network.make_http_request(f"https://{args['target']}")
-        output.print_json(result, "HTTP Response")
 
     output.success("Operation completed successfully")
 
